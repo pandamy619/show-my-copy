@@ -90,3 +90,63 @@ struct ClipboardMonitorTests {
         #expect(!monitor.isPolling)
     }
 }
+
+@MainActor
+struct ClipboardMonitorPauseTests {
+    private let pasteboard = FakePasteboard()
+    private let history = ClipboardHistory()
+
+    private func makeStartedMonitor() -> ClipboardMonitor {
+        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        monitor.start()
+        return monitor
+    }
+
+    @Test func pauseStopsPolling() {
+        let monitor = makeStartedMonitor()
+        monitor.pause(for: .systemSleep)
+        #expect(!monitor.isPolling)
+        monitor.stop()
+    }
+
+    @Test func resumesOnlyWhenEveryReasonIsCleared() {
+        let monitor = makeStartedMonitor()
+        monitor.pause(for: .displaySleep)
+        monitor.pause(for: .screenLocked)
+
+        monitor.resume(for: .displaySleep)
+        #expect(!monitor.isPolling)
+
+        monitor.resume(for: .screenLocked)
+        #expect(monitor.isPolling)
+        monitor.stop()
+    }
+
+    @Test func resumeChecksThePasteboardRightAway() {
+        let monitor = makeStartedMonitor()
+        monitor.pause(for: .screenLocked)
+        pasteboard.copy("copied before unlock")
+
+        monitor.resume(for: .screenLocked)
+        #expect(history.entries.map(\.text) == ["copied before unlock"])
+        monitor.stop()
+    }
+
+    @Test func pauseBeforeStartKeepsMonitorIdle() {
+        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        monitor.pause(for: .systemSleep)
+        monitor.start()
+        #expect(!monitor.isPolling)
+
+        monitor.resume(for: .systemSleep)
+        #expect(monitor.isPolling)
+        monitor.stop()
+    }
+
+    @Test func resumeWithoutStartDoesNotPoll() {
+        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        monitor.pause(for: .systemSleep)
+        monitor.resume(for: .systemSleep)
+        #expect(!monitor.isPolling)
+    }
+}
