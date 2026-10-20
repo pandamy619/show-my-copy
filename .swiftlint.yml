@@ -1,0 +1,27 @@
+included:
+  - ShowMyCopy
+  - ShowMyCopyTests
+
+disabled_rules:
+  - trailing_comma
+
+opt_in_rules:
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - fatal_error_message
+  - empty_count
+  - first_where
+  - contains_over_first_not_nil
+  - redundant_nil_coalescing
+  - private_over_fileprivate
+
+line_length:
+  warning: 120
+  error: 150
+
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - x
+    - y
