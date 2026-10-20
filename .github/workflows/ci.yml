@@ -30,3 +30,6 @@ jobs:
 
       - name: Test
         run: make test
+
+      - name: Check entitlements of the release build
+        run: make security
