@@ -34,7 +34,7 @@ custom_rules:
     severity: error
   no_print:
     name: "No print"
-    regex: '^\s*(print|debugPrint|dump|NSLog)\('
+    regex: '(?<![\w.])(print|debugPrint|dump|NSLog)\('
     message: "Use os.Logger with privacy: .private for any user data. Never log clipboard contents."
     severity: error
   no_shell_execution:
