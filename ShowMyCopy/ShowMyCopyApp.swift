@@ -2,10 +2,11 @@ import SwiftUI
 
 @main
 struct ShowMyCopyApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
         Settings {
-            Text("Show My Copy")
-                .padding()
+            EmptyView()
         }
     }
 }
