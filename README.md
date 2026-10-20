@@ -21,6 +21,8 @@
 - **No menu bar icon, no Dock icon.**
 - **Private by design.** History stays on your Mac. No analytics, no network.
 
+See [SECURITY.md](SECURITY.md) for the security model.
+
 ## Building
 
 Requires Xcode 26.
