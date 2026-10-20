@@ -3,10 +3,11 @@ import AppKit
 @testable import ShowMyCopy
 
 @MainActor
-final class FakePasteboard: PasteboardReading {
+final class FakePasteboard: PasteboardReading, PasteboardWriting {
     var changeCount = 0
     var types: [NSPasteboard.PasteboardType] = []
     var text: String?
+    private(set) var writtenTexts: [String] = []
 
     func string() -> String? {
         text
@@ -22,5 +23,11 @@ final class FakePasteboard: PasteboardReading {
         changeCount += 1
         text = nil
         types = [.png, .tiff]
+    }
+
+    func write(_ text: String) -> Int {
+        writtenTexts.append(text)
+        copy(text)
+        return changeCount
     }
 }
