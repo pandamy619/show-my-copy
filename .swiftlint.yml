@@ -25,3 +25,25 @@ identifier_name:
   excluded:
     - x
     - y
+
+custom_rules:
+  no_network_api:
+    name: "No network access"
+    regex: '\b(URLSession|URLRequest|NSURLConnection|NWConnection|NWListener|NWPathMonitor|NWBrowser|CFSocket|CFStream|WKWebView|SFSafariViewController|getaddrinfo)\b|import\s+(Network|WebKit|SafariServices|CFNetwork)\b'
+    message: "The app must not access the network."
+    severity: error
+  no_print:
+    name: "No print"
+    regex: '^\s*(print|debugPrint|dump|NSLog)\('
+    message: "Use os.Logger with privacy: .private for any user data. Never log clipboard contents."
+    severity: error
+  no_shell_execution:
+    name: "No process execution"
+    regex: '\b(Process\(\)|NSTask|NSAppleScript|posix_spawn|system\()'
+    message: "The app must not run external processes or scripts."
+    severity: error
+  no_unsafe_archiver:
+    name: "No insecure decoding"
+    regex: '\b(NSUnarchiver|unarchiveObject\(with|unarchiveTopLevelObjectWithData)\b'
+    message: "Use NSKeyedUnarchiver.unarchivedObject(ofClass:from:) with secure coding."
+    severity: error
