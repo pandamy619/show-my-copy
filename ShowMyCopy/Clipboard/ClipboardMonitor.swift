@@ -10,6 +10,7 @@ final class ClipboardMonitor {
         case systemSleep
         case displaySleep
         case screenLocked
+        case sessionInactive
     }
 
     nonisolated static let defaultInterval: Duration = .milliseconds(500)

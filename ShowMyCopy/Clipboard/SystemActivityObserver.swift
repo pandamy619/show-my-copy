@@ -1,6 +1,7 @@
 import AppKit
 
-/// Pauses the clipboard monitor while the Mac sleeps, the displays sleep or the screen is locked.
+/// Pauses the clipboard monitor while the Mac sleeps, the displays sleep, the screen is locked
+/// or another user is active.
 @MainActor
 final class SystemActivityObserver {
     private let monitor: ClipboardMonitor
@@ -19,6 +20,8 @@ final class SystemActivityObserver {
         observe(workspace, NSWorkspace.didWakeNotification) { $0.resume(for: .systemSleep) }
         observe(workspace, NSWorkspace.screensDidSleepNotification) { $0.pause(for: .displaySleep) }
         observe(workspace, NSWorkspace.screensDidWakeNotification) { $0.resume(for: .displaySleep) }
+        observe(workspace, NSWorkspace.sessionDidResignActiveNotification) { $0.pause(for: .sessionInactive) }
+        observe(workspace, NSWorkspace.sessionDidBecomeActiveNotification) { $0.resume(for: .sessionInactive) }
 
         let distributed = DistributedNotificationCenter.default()
         observe(distributed, Notification.Name("com.apple.screenIsLocked")) { $0.pause(for: .screenLocked) }
