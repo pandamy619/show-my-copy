@@ -84,6 +84,12 @@ final class ClipboardMonitor {
         }
     }
 
+    /// Marks a pasteboard change made by this app as seen, so it is not recorded again as a copy
+    /// from whichever app is in front.
+    func acknowledge(changeCount: Int) {
+        lastChangeCount = changeCount
+    }
+
     /// Checks the pasteboard once. The first call records whatever is on the pasteboard at launch.
     func poll() {
         let changeCount = pasteboard.changeCount

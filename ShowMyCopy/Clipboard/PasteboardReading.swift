@@ -27,3 +27,11 @@ final class SystemPasteboard: PasteboardReading {
         pasteboard.string(forType: .string)
     }
 }
+
+extension SystemPasteboard: PasteboardWriting {
+    func write(_ text: String) -> Int {
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        return pasteboard.changeCount
+    }
+}

@@ -1,0 +1,116 @@
+import AppKit
+
+/// Shows the clipboard history in a floating panel over the app the user is working in.
+@MainActor
+final class HistoryWindowController: NSObject, NSWindowDelegate {
+    let model: HistoryWindowModel
+    private let copier: EntryCopier
+    private let onOpenSettings: @MainActor () -> Void
+    private var panel: HistoryPanel?
+
+    init(
+        history: ClipboardHistory,
+        model: HistoryWindowModel? = nil,
+        pasteboard: any PasteboardWriting,
+        monitor: ClipboardMonitor,
+        onOpenSettings: @escaping @MainActor () -> Void
+    ) {
+        self.model = model ?? HistoryWindowModel(history: history)
+        self.copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor)
+        self.onOpenSettings = onOpenSettings
+        super.init()
+    }
+
+    var isVisible: Bool {
+        panel?.isVisible ?? false
+    }
+
+    func show() {
+        let panel = panel ?? makePanel()
+        self.panel = panel
+        model.prepareForPresentation()
+        panel.setFrameOrigin(Self.origin(for: panel.frame.size))
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    func hide() {
+        panel?.orderOut(nil)
+    }
+
+    func toggle() {
+        if isVisible {
+            hide()
+        } else {
+            show()
+        }
+    }
+
+    /// Copies the entry back to the clipboard and closes the window.
+    func choose(_ entry: ClipboardEntry) {
+        // Return can arrive both as a key press and as a submit from the search field.
+        guard isVisible else {
+            return
+        }
+        copier.copy(entry)
+        hide()
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowDidResignKey(_ notification: Notification) {
+        // A click outside the panel or a switch to another app closes it.
+        hide()
+    }
+
+    // MARK: - Private
+
+    private func openSettings() {
+        hide()
+        onOpenSettings()
+    }
+
+    private func makePanel() -> HistoryPanel {
+        let panel = HistoryPanel(contentRect: NSRect(origin: .zero, size: HistoryPanelPlacement.size))
+        // A titled window adds the title bar height to the content rect. Keep the frame at the content size.
+        panel.setFrame(NSRect(origin: .zero, size: HistoryPanelPlacement.size), display: false)
+        panel.delegate = self
+        panel.onCancel = { [weak self] in
+            self?.hide()
+        }
+
+        let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: HistoryPanelPlacement.size))
+        background.material = .popover
+        background.blendingMode = .behindWindow
+        // The app is never active while the panel is shown, so keep the material from looking inactive.
+        background.state = .active
+        background.autoresizingMask = [.width, .height]
+
+        let content = HistoryContentFactory.makeView(
+            model: model,
+            onChoose: { [weak self] entry in
+                self?.choose(entry)
+            },
+            onClose: { [weak self] in
+                self?.hide()
+            },
+            onOpenSettings: { [weak self] in
+                self?.openSettings()
+            }
+        )
+        content.frame = background.bounds
+        content.autoresizingMask = [.width, .height]
+        background.addSubview(content)
+        panel.contentView = background
+        return panel
+    }
+
+    /// The screen with the mouse pointer is the one the user is looking at.
+    private static func origin(for size: CGSize) -> CGPoint {
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
+        guard let visibleFrame = screen?.visibleFrame else {
+            return .zero
+        }
+        return HistoryPanelPlacement.origin(for: size, in: visibleFrame)
+    }
+}
