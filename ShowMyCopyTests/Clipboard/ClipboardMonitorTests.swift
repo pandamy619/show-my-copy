@@ -23,6 +23,7 @@ struct ClipboardMonitorTests {
         pasteboard.copy("already copied")
         makeMonitor().poll()
         #expect(history.entries.map(\.text) == ["already copied"])
+        #expect(history.entries.first?.sourceApp == nil)
     }
 
     @Test func recordsNewCopyWithSourceAppAndTime() throws {

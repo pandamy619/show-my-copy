@@ -89,6 +89,8 @@ final class ClipboardMonitor {
         guard changeCount != lastChangeCount else {
             return
         }
+        // Text that was copied before launch came from an unknown app, not from the one in front now.
+        let isFirstPoll = lastChangeCount == nil
         lastChangeCount = changeCount
 
         let types = Set(pasteboard.types.map(\.rawValue))
@@ -103,6 +105,6 @@ final class ClipboardMonitor {
             AppLogger.clipboard.info("Skipped text larger than \(Self.maximumTextBytes, privacy: .public) bytes")
             return
         }
-        history.record(text: text, sourceApp: frontmostApp(), at: now())
+        history.record(text: text, sourceApp: isFirstPoll ? nil : frontmostApp(), at: now())
     }
 }
