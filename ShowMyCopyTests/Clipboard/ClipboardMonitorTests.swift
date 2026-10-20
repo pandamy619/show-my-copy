@@ -154,3 +154,25 @@ struct ClipboardMonitorPauseTests {
         #expect(!monitor.isPolling)
     }
 }
+
+@MainActor
+struct ClipboardMonitorPollingTests {
+    @Test func pollingLoopPicksUpNewCopies() async throws {
+        let pasteboard = FakePasteboard()
+        let history = ClipboardHistory()
+        let monitor = ClipboardMonitor(
+            pasteboard: pasteboard,
+            history: history,
+            interval: .milliseconds(10),
+            frontmostApp: { nil }
+        )
+        monitor.start()
+        defer { monitor.stop() }
+
+        pasteboard.copy("copied later")
+        for _ in 0..<200 where history.entries.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(history.entries.map(\.text) == ["copied later"])
+    }
+}
