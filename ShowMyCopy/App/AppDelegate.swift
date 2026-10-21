@@ -38,6 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let activityObserver = SystemActivityObserver(monitor: monitor)
+        // Close the history when the Mac sleeps, locks or switches users, so it is not on screen for whoever
+        // wakes or unlocks it next.
+        activityObserver.onUserAway = { [weak historyWindow] in
+            historyWindow?.hide()
+        }
         activityObserver.start()
         monitor.start()
 
