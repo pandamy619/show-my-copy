@@ -1,0 +1,7 @@
+# Changes to the security checks, CI, project settings and dependency pins need the owner's review.
+/scripts/ @pandamy619
+/.github/ @pandamy619
+*.pbxproj @pandamy619
+Package.resolved @pandamy619
+/.swiftlint.yml @pandamy619
+/Makefile @pandamy619
