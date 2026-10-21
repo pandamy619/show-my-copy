@@ -22,6 +22,7 @@ from contextlib import contextmanager
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(SCRIPTS)
 sys.path.insert(0, SCRIPTS)
+sys.dont_write_bytecode = True  # keep scripts/ free of __pycache__
 
 import check_security  # noqa: E402
 
