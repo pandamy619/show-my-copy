@@ -8,9 +8,21 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     var types: [NSPasteboard.PasteboardType] = []
     var text: String?
     private(set) var writtenTexts: [String] = []
+    /// Runs once inside the next `string()` call, before the text is returned, to simulate another app
+    /// writing to the pasteboard while the monitor reads it.
+    var whileReadingString: (@MainActor (FakePasteboard) -> Void)?
 
     func string() -> String? {
-        text
+        if let hook = whileReadingString {
+            whileReadingString = nil
+            hook(self)
+        }
+        return text
+    }
+
+    /// Adds a marker to the current item without a new change count, like an app that adds types after the text.
+    func addMarker(_ marker: String) {
+        types.append(NSPasteboard.PasteboardType(marker))
     }
 
     func copy(_ text: String, markers: [String] = []) {

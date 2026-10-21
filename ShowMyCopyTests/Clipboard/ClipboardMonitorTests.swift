@@ -58,6 +58,40 @@ struct ClipboardMonitorTests {
         #expect(history.entries.isEmpty)
     }
 
+    @Test func skipsConcealedItemWrittenWhileTheTextIsRead() {
+        let monitor = makeMonitor()
+        monitor.poll()
+        pasteboard.copy("plain text")
+        // A password manager replaces the item after the monitor checked the markers but before it read the text.
+        pasteboard.whileReadingString = { $0.copy("secret", markers: [PasteboardMarker.concealed]) }
+        monitor.poll()
+        #expect(history.entries.isEmpty)
+
+        monitor.poll()
+        #expect(history.entries.isEmpty)
+    }
+
+    @Test func readsAgainOnNextPollWhenThePasteboardChangedDuringTheRead() {
+        let monitor = makeMonitor()
+        monitor.poll()
+        pasteboard.copy("first")
+        pasteboard.whileReadingString = { $0.copy("second") }
+        monitor.poll()
+        #expect(history.entries.isEmpty)
+
+        monitor.poll()
+        #expect(history.entries.map(\.text) == ["second"])
+    }
+
+    @Test func skipsItemWhoseMarkerIsAddedAfterTheText() {
+        let monitor = makeMonitor()
+        monitor.poll()
+        pasteboard.copy("secret")
+        pasteboard.whileReadingString = { $0.addMarker(PasteboardMarker.concealed) }
+        monitor.poll()
+        #expect(history.entries.isEmpty)
+    }
+
     @Test func skipsItemsWithoutText() {
         let monitor = makeMonitor()
         pasteboard.copyImage()
