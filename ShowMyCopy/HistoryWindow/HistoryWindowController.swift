@@ -4,6 +4,7 @@ import AppKit
 @MainActor
 final class HistoryWindowController: NSObject, NSWindowDelegate {
     let model: HistoryWindowModel
+    private let monitor: ClipboardMonitor
     private let copier: EntryCopier
     private let onOpenSettings: @MainActor () -> Void
     private var panel: HistoryPanel?
@@ -16,6 +17,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         onOpenSettings: @escaping @MainActor () -> Void
     ) {
         self.model = model ?? HistoryWindowModel(history: history)
+        self.monitor = monitor
         self.copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor)
         self.onOpenSettings = onOpenSettings
         super.init()
@@ -28,6 +30,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     func show() {
         let panel = panel ?? makePanel()
         self.panel = panel
+        // The monitor polls every half second. Catch up first, so a copy made just before the shortcut is listed
+        // and selected.
+        monitor.poll()
         model.prepareForPresentation()
         panel.setFrameOrigin(Self.origin(for: panel.frame.size))
         panel.makeKeyAndOrderFront(nil)
