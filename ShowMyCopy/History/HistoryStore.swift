@@ -34,6 +34,14 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
         expiresAt: Date?
     ) -> ClipboardEntry.ID
 
+    /// Makes the newest entry current, without changing it, when it holds `content`. Returns its ID, or nil when
+    /// the newest entry holds other content.
+    ///
+    /// Used for the pasteboard found at launch: it usually still holds the newest entry from the last session, and
+    /// recording it again would give that entry a new date and lose its source app.
+    @discardableResult
+    func markNewestCurrent(ifItHolds content: ClipboardContent) -> ClipboardEntry.ID?
+
     /// The latest pasteboard change was not recorded, so no entry matches the pasteboard any more.
     func markCurrentSkipped()
 

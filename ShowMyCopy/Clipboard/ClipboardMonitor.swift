@@ -157,6 +157,7 @@ final class ClipboardMonitor {
             AppLogger.clipboard.debug("The pasteboard changed while it was read; reading it again on the next poll")
             return
         }
+        let isFirstRead = lastChangeCount == nil
         sourceOfNextChangeIsUnknown = false
         lastChangeCount = changeCount
         switch item {
@@ -165,6 +166,14 @@ final class ClipboardMonitor {
         case .cleared:
             clipboardWasCleared(at: date, policy: policy)
         case .content(let content, let isSecret):
+            if isFirstRead, let newestID = history.markNewestCurrent(ifItHolds: content) {
+                // At launch the pasteboard usually still holds the newest entry. Nothing says it was copied again,
+                // so keep its date and source app. A password marker still conceals it; an earlier expiry stays.
+                if isSecret {
+                    history.conceal(id: newestID, expiresAt: date + policy.lifetime)
+                }
+                return
+            }
             if isSecret {
                 history.record(
                     content, sourceApp: sourceApp, at: date, concealed: true, expiresAt: date + policy.lifetime)

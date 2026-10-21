@@ -65,6 +65,30 @@ struct HistoryStoreTests {
         #expect(store.entries.count == 10)
     }
 
+    @Test func markNewestCurrentLeavesTheNewestEntryUnchanged() throws {
+        let store = makeStore()
+        store.record(text: "older", sourceApp: nil, at: start)
+        store.record(text: "newest", sourceApp: nil, at: start + 1)
+        store.markCurrentSkipped()
+        let before = try #require(store.entries.first)
+
+        #expect(store.markNewestCurrent(ifItHolds: .text("newest")) == before.id)
+        #expect(store.currentEntryID == before.id)
+        #expect(store.entries.first == before)
+    }
+
+    @Test func markNewestCurrentIgnoresOtherContent() {
+        let store = makeStore()
+        #expect(store.markNewestCurrent(ifItHolds: .text("anything")) == nil)
+        store.record(text: "older", sourceApp: nil, at: start)
+        store.record(text: "newest", sourceApp: nil, at: start + 1)
+        store.markCurrentSkipped()
+
+        #expect(store.markNewestCurrent(ifItHolds: .text("older")) == nil)
+        #expect(store.currentEntryID == nil)
+        #expect(store.entries.map(\.text) == ["newest", "older"])
+    }
+
     @Test func observersOfTheProtocolSeeChanges() {
         let store = makeStore()
         let changed = ChangeFlag()

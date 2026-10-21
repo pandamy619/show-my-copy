@@ -84,6 +84,17 @@ final class InMemoryHistoryStore: HistoryStore {
         removeEntries { $0.id == id }
     }
 
+    @discardableResult
+    func markNewestCurrent(ifItHolds content: ClipboardContent) -> ClipboardEntry.ID? {
+        guard let newest = entries.first, newest.contentHash == hasher.hash(content) else {
+            return nil
+        }
+        if currentEntryID != newest.id {
+            currentEntryID = newest.id
+        }
+        return newest.id
+    }
+
     func markCurrentSkipped() {
         currentEntryID = nil
     }
