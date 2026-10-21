@@ -385,3 +385,71 @@ struct ClipboardMonitorPollingTests {
         #expect(sleeper.requestedDurations.count == 1)
     }
 }
+
+@MainActor
+final class CountingActivity: PollingActivity {
+    private(set) var beginCount = 0
+    private(set) var endCount = 0
+
+    var isActive: Bool {
+        beginCount > endCount
+    }
+
+    func begin() {
+        beginCount += 1
+    }
+
+    func end() {
+        endCount += 1
+    }
+}
+
+@MainActor
+struct ClipboardMonitorActivityTests {
+    private let pasteboard = FakePasteboard()
+    private let history = ClipboardHistory()
+    private let activity = CountingActivity()
+
+    private func makeMonitor() -> ClipboardMonitor {
+        ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil }, activity: activity)
+    }
+
+    @Test func pollingHoldsTheActivityUntilStop() {
+        let monitor = makeMonitor()
+        #expect(!activity.isActive)
+
+        monitor.start()
+        monitor.start()
+        #expect(activity.beginCount == 1)
+        #expect(activity.isActive)
+
+        monitor.stop()
+        #expect(activity.endCount == 1)
+        #expect(!activity.isActive)
+    }
+
+    @Test func pauseEndsTheActivityAndResumeBeginsItAgain() {
+        let monitor = makeMonitor()
+        monitor.start()
+        monitor.pause(for: .screenLocked)
+        monitor.pause(for: .displaySleep)
+        #expect(!activity.isActive)
+        #expect(activity.endCount == 1)
+
+        monitor.resume(for: .screenLocked)
+        #expect(!activity.isActive)
+        monitor.resume(for: .displaySleep)
+        #expect(activity.isActive)
+        #expect(activity.beginCount == 2)
+        monitor.stop()
+    }
+
+    @Test func pausedOrStoppedMonitorDoesNotBeginTheActivity() {
+        let monitor = makeMonitor()
+        monitor.pause(for: .systemSleep)
+        monitor.start()
+        monitor.stop()
+        #expect(activity.beginCount == 0)
+        #expect(activity.endCount == 0)
+    }
+}
