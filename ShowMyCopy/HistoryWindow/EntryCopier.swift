@@ -25,10 +25,18 @@ final class EntryCopier {
     /// The monitor first records anything copied since its last poll, so that copy is not lost. Then it is told
     /// about the write, so the app's own write is not recorded again with the frontmost app as its source.
     /// The entry is recorded by text, so it comes back even if the catch-up poll trimmed it from a full history.
-    func copy(_ entry: ClipboardEntry) {
+    ///
+    /// Returns false when the text did not end up on the pasteboard. Then the history and the monitor are left as
+    /// they are: whatever is on the pasteboard now is recorded by the next poll as a normal copy.
+    @discardableResult
+    func copy(_ entry: ClipboardEntry) -> Bool {
         monitor.poll()
-        let changeCount = pasteboard.write(entry.text)
+        guard let changeCount = pasteboard.write(entry.text) else {
+            AppLogger.clipboard.info("Could not put the picked entry on the pasteboard")
+            return false
+        }
         monitor.acknowledge(changeCount: changeCount)
         history.record(text: entry.text, sourceApp: entry.sourceApp, at: now())
+        return true
     }
 }
