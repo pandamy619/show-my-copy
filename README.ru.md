@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="ShowMyCopy/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="128" alt="Show My Copy">
+</p>
+
 <h1 align="center">Show My Copy</h1>
 
 <p align="center">История буфера обмена для macOS по одному хоткею.</p>
