@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Apply the saved limit before the first entry is recorded.
         let historySettings = HistorySettings(history: history)
+        historySettings.applyStoredLimit()
         let passwordSettings = PasswordSettings(history: history)
         let settingsWindow = SettingsWindowController(
             history: history,

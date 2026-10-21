@@ -19,11 +19,11 @@ final class HistorySettings {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored let history: any HistoryStore
 
-    /// Reads the saved limit and applies it to `history`.
+    /// Leaves `history` as it is. Call `applyStoredLimit()` when the app starts, before the first entry is
+    /// recorded. Creating the settings does not change the history, so the app decides when that happens.
     init(history: any HistoryStore, defaults: UserDefaults = .standard) {
         self.history = history
         self.defaults = defaults
-        history.setLimit(Self.storedLimit(in: defaults))
     }
 
     /// The limit in effect. The history is the single source of truth.
@@ -35,6 +35,11 @@ final class HistorySettings {
             return RetentionPolicy.defaultEntryLimit
         }
         return RetentionPolicy.clamped(value)
+    }
+
+    /// Applies the saved limit to the history, deleting the oldest entries that no longer fit.
+    func applyStoredLimit() {
+        history.setLimit(Self.storedLimit(in: defaults))
     }
 
     /// Describes what setting `newLimit` would do, without changing anything.
