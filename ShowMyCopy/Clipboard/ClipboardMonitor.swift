@@ -22,6 +22,9 @@ final class ClipboardMonitor {
     private let frontmostApp: @MainActor () -> SourceApp?
     private let now: @MainActor () -> Date
     private var lastChangeCount: Int?
+    /// True until the monitor has looked at the pasteboard while running. A change found then was made before
+    /// launch or while the monitor was stopped or paused, so the app in front now did not necessarily make it.
+    private var sourceOfNextChangeIsUnknown = true
     private var pollTask: Task<Void, Never>?
     private var isStarted = false
     private(set) var pauseReasons: Set<PauseReason> = []
@@ -51,12 +54,14 @@ final class ClipboardMonitor {
 
     func stop() {
         isStarted = false
+        sourceOfNextChangeIsUnknown = true
         updatePolling()
     }
 
     /// Stops polling while the Mac sleeps or the screen is locked. Polling resumes when every reason is cleared.
     func pause(for reason: PauseReason) {
         pauseReasons.insert(reason)
+        sourceOfNextChangeIsUnknown = true
         updatePolling()
     }
 
@@ -94,24 +99,30 @@ final class ClipboardMonitor {
     func poll() {
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else {
+            if isStarted, pauseReasons.isEmpty {
+                // Nothing changed while the monitor was away, so the next change happens while it is watching.
+                sourceOfNextChangeIsUnknown = false
+            }
             return
         }
         let text = readText()
-        // The reads above are separate calls, so another app can replace the item between them, for example a
+        // `readText` makes separate calls, so another app can replace the item between them, for example a
         // password manager writing a concealed item after the marker check. Then the text may belong to a newer
         // item than the markers. Record nothing and keep the old count, so the next poll reads the new item again.
         guard pasteboard.changeCount == changeCount else {
             AppLogger.clipboard.debug("The pasteboard changed while it was read; reading it again on the next poll")
             return
         }
-        // Text that was copied before launch came from an unknown app, not from the one in front now.
-        let isFirstPoll = lastChangeCount == nil
+        // Text copied before launch, during sleep or while the screen was locked (for example on another device
+        // through Universal Clipboard) came from an unknown app, not from the one in front now.
+        let sourceIsUnknown = sourceOfNextChangeIsUnknown
+        sourceOfNextChangeIsUnknown = false
         lastChangeCount = changeCount
         guard let text else {
             history.markCurrentSkipped()
             return
         }
-        history.record(text: text, sourceApp: isFirstPoll ? nil : frontmostApp(), at: now())
+        history.record(text: text, sourceApp: sourceIsUnknown ? nil : frontmostApp(), at: now())
     }
 
     /// Returns the text of the current item, or nil when the item must not be recorded.
