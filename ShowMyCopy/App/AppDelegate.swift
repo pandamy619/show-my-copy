@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let history = ClipboardHistory()
     private var historySettings: HistorySettings?
+    private var passwordSettings: PasswordSettings?
     private var monitor: ClipboardMonitor?
     private var activityObserver: SystemActivityObserver?
     private var historyWindow: HistoryWindowController?
@@ -19,12 +20,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Apply the saved limit before the first entry is recorded.
         let historySettings = HistorySettings(history: history)
-        let settingsWindow = SettingsWindowController(history: history, settings: historySettings) {
+        let passwordSettings = PasswordSettings(history: history)
+        let settingsWindow = SettingsWindowController(
+            history: history,
+            settings: historySettings,
+            passwords: passwordSettings
+        ) {
             KeyboardShortcuts.Recorder(for: .toggleHistoryWindow)
         }
 
         let pasteboard = SystemPasteboard()
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history)
+        // The monitor reads the password setting on every change, so a new choice applies to the next copy.
+        let monitor = ClipboardMonitor(
+            pasteboard: pasteboard,
+            history: history,
+            passwordPolicy: { [passwordSettings] in passwordSettings.policy }
+        )
         let historyWindow = HistoryWindowController(
             history: history,
             pasteboard: pasteboard,
@@ -47,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.start()
 
         self.historySettings = historySettings
+        self.passwordSettings = passwordSettings
         self.settingsWindow = settingsWindow
         self.monitor = monitor
         self.historyWindow = historyWindow

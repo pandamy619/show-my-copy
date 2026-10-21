@@ -6,16 +6,19 @@ import SwiftUI
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let history: ClipboardHistory
     private let settings: HistorySettings
+    private let passwords: PasswordSettings
     private let shortcutRecorder: AnyView
     private var window: NSWindow?
 
     init<ShortcutRecorder: View>(
         history: ClipboardHistory,
         settings: HistorySettings,
+        passwords: PasswordSettings,
         @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
     ) {
         self.history = history
         self.settings = settings
+        self.passwords = passwords
         self.shortcutRecorder = AnyView(shortcutRecorder())
         super.init()
     }
@@ -47,7 +50,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeContent() -> NSViewController {
-        NSHostingController(rootView: SettingsView(history: history, settings: settings) { shortcutRecorder })
+        NSHostingController(
+            rootView: SettingsView(history: history, settings: settings, passwords: passwords) { shortcutRecorder }
+        )
     }
 
     private func makeWindow() -> NSWindow {

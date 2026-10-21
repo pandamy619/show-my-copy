@@ -106,6 +106,36 @@
         }
       }
     },
+    "1 hour" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 час"
+          }
+        }
+      }
+    },
+    "1 minute" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 минуту"
+          }
+        }
+      }
+    },
+    "10 minutes" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 минут"
+          }
+        }
+      }
+    },
     "Blank text" : {
       "localizations" : {
         "ru" : {
@@ -142,6 +172,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сейчас в буфере"
+          }
+        }
+      }
+    },
+    "For now, history is kept in memory only." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока история хранится только в памяти."
           }
         }
       }
@@ -246,6 +286,16 @@
         }
       }
     },
+    "Passwords" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароли"
+          }
+        }
+      }
+    },
     "Press the shortcut above to show your history." : {
       "localizations" : {
         "ru" : {
@@ -282,6 +332,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Удалить все"
+          }
+        }
+      }
+    },
+    "Remove after" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалять через"
+          }
+        }
+      }
+    },
+    "Save passwords" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранять пароли"
           }
         }
       }
@@ -454,6 +524,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Неизвестное приложение"
+          }
+        }
+      }
+    },
+    "When off, passwords and anything you copy from a password manager are not kept." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если выключено, пароли и всё, что вы копируете из менеджера паролей, не сохраняются."
+          }
+        }
+      }
+    },
+    "When on, they are kept hidden in the history and removed after the time you choose." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если включено, они хранятся в истории скрытыми и удаляются через выбранное время."
           }
         }
       }
