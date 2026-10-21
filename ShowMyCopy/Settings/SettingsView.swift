@@ -69,7 +69,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
                         .labelsHidden()
                         .multilineTextAlignment(.trailing)
                         .frame(width: 64)
-                    Stepper("Number of items", value: $draftLimit, in: ClipboardHistory.limitRange, step: 10)
+                    Stepper("Number of items", value: $draftLimit, in: RetentionPolicy.entryLimitRange, step: 10)
                         .labelsHidden()
                     // A plural key, so "items" agrees with the limit. The translations leave the number out.
                     Text("\(draftLimit) items", comment: "Unit after the history limit field.")

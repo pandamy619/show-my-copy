@@ -4,19 +4,29 @@ import Observation
 @MainActor
 @Observable
 final class ClipboardHistory {
-    nonisolated static let defaultLimit = 50
-    nonisolated static let limitRange = 10...1000
+    /// Kept for older call sites. `RetentionPolicy` owns the limits.
+    nonisolated static let defaultLimit = RetentionPolicy.defaultEntryLimit
+    nonisolated static let limitRange = RetentionPolicy.entryLimitRange
 
     private(set) var entries: [ClipboardEntry] = []
-    private(set) var limit: Int
+    private(set) var retention: RetentionPolicy
     /// The entry whose text is on the pasteboard now, or nil when the latest pasteboard change was not recorded
     /// (a skipped password, a transient, empty, too large or non-text item). The newest entry is not always current.
     private(set) var currentEntryID: ClipboardEntry.ID?
     private let hasher: any ContentHasher
 
-    init(limit: Int = ClipboardHistory.defaultLimit, hasher: any ContentHasher = SHA256ContentHasher()) {
-        self.limit = Self.clamped(limit)
+    init(retention: RetentionPolicy = .default, hasher: any ContentHasher = SHA256ContentHasher()) {
+        self.retention = retention
         self.hasher = hasher
+    }
+
+    convenience init(limit: Int) {
+        self.init(retention: RetentionPolicy(entryLimit: limit))
+    }
+
+    /// The most entries kept.
+    var limit: Int {
+        retention.entryLimit
     }
 
     /// Adds copied content as the newest entry and makes it current. Content that is already in the history (an
@@ -104,14 +114,19 @@ final class ClipboardHistory {
         currentEntryID = nil
     }
 
-    func setLimit(_ newLimit: Int) {
-        limit = Self.clamped(newLimit)
+    /// Applies new limits, removing the entries they no longer allow.
+    func setRetention(_ policy: RetentionPolicy) {
+        retention = policy
         trim()
+    }
+
+    func setLimit(_ newLimit: Int) {
+        setRetention(retention.withEntryLimit(newLimit))
     }
 
     /// How many entries a new limit would remove, for the confirmation shown before applying it.
     func entriesRemoved(byLimit newLimit: Int) -> Int {
-        max(0, entries.count - Self.clamped(newLimit))
+        retention.withEntryLimit(newLimit).removedCount(from: entries)
     }
 
     func clear() {
@@ -129,8 +144,10 @@ final class ClipboardHistory {
     }
 
     private func trim() {
-        if entries.count > limit {
-            entries.removeLast(entries.count - limit)
+        let kept = retention.kept(entries)
+        // Avoid a change notification to observers when nothing is removed, which is the case on almost every copy.
+        if kept.count != entries.count {
+            entries = kept
         }
         forgetMissingCurrentEntry()
     }
@@ -139,9 +156,5 @@ final class ClipboardHistory {
         if let currentEntryID, !entries.contains(where: { $0.id == currentEntryID }) {
             self.currentEntryID = nil
         }
-    }
-
-    private static func clamped(_ value: Int) -> Int {
-        min(max(value, limitRange.lowerBound), limitRange.upperBound)
     }
 }
