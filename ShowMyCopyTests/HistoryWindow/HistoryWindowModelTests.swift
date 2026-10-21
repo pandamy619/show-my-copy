@@ -114,6 +114,72 @@ struct HistoryWindowModelTests {
         #expect(model.selectedEntry?.text == "only")
     }
 
+    @Test func selectionFollowsItsEntryWhenANewCopyArrives() {
+        let model = makeModel()
+        model.moveSelection(.down)
+        #expect(model.selectedEntry?.text == "second")
+
+        model.history.record(text: "fresh", sourceApp: nil, at: start + 10)
+        #expect(model.selectedEntry?.text == "second")
+        #expect(model.selectedIndex == 2)
+    }
+
+    @Test func firstEntryStaysSelectedWhenANewCopyArrives() {
+        let model = makeModel()
+        model.prepareForPresentation()
+
+        model.history.record(text: "fresh", sourceApp: nil, at: start + 10)
+        #expect(model.selectedEntry?.text == "third")
+        #expect(model.selectedIndex == 1)
+    }
+
+    @Test func selectionFollowsItsEntryWhenItMovesToTheTop() {
+        let model = makeModel()
+        model.moveSelection(.down)
+        model.moveSelection(.down)
+        #expect(model.selectedEntry?.text == "first")
+
+        model.history.record(text: "first", sourceApp: nil, at: start + 10)
+        #expect(model.selectedEntry?.text == "first")
+        #expect(model.selectedIndex == 0)
+    }
+
+    @Test func selectionStaysOnItsEntryWhenAnotherEntryMovesToTheTop() {
+        let model = makeModel()
+        model.moveSelection(.down)
+
+        model.history.record(text: "first", sourceApp: nil, at: start + 10)
+        #expect(model.items.map(\.text) == ["first", "third", "second"])
+        #expect(model.selectedEntry?.text == "second")
+    }
+
+    @Test func selectionKeepsItsRowWhenItsEntryIsRemoved() {
+        let model = makeModel(texts: ["first", "second", "third", "fourth"])
+        model.moveSelection(.down)
+        model.moveSelection(.down)
+        #expect(model.selectedEntry?.text == "second")
+
+        // The selected entry is gone, so the row it was on stays selected.
+        model.history.clear()
+        for text in ["a", "b", "c", "d"] {
+            model.history.record(text: text, sourceApp: nil, at: start)
+        }
+        #expect(model.selectedIndex == 2)
+        #expect(model.selectedEntry?.text == "b")
+    }
+
+    @Test func movingFromAFollowedEntryStartsAtItsNewRow() {
+        let model = makeModel()
+        model.moveSelection(.down)
+        model.history.record(text: "fresh", sourceApp: nil, at: start + 10)
+
+        model.moveSelection(.down)
+        #expect(model.selectedEntry?.text == "first")
+        model.moveSelection(.up)
+        model.moveSelection(.up)
+        #expect(model.selectedEntry?.text == "third")
+    }
+
     @Test func selectByID() throws {
         let model = makeModel()
         let second = try #require(model.items.first { $0.text == "second" })
@@ -135,5 +201,15 @@ struct HistoryWindowModelTests {
         #expect(model.selectedIndex == 0)
         #expect(model.items.count == 3)
         #expect(model.presentationCount == count + 1)
+    }
+
+    @Test func presentationSelectsTheNewestEntryAfterTheHistoryChanged() {
+        let model = makeModel()
+        model.moveSelection(.down)
+        model.history.record(text: "fresh", sourceApp: nil, at: start + 10)
+
+        model.prepareForPresentation()
+        #expect(model.selectedIndex == 0)
+        #expect(model.selectedEntry?.text == "fresh")
     }
 }
