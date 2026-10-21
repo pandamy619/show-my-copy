@@ -14,5 +14,6 @@ First version, 0.1.0. Not released yet.
 - A password copied without a marker leaves the history when its password manager clears the clipboard within 3 minutes of the copy.
 - Settings → Passwords → Save passwords (off by default): passwords are kept hidden in the history, can be revealed one at a time with an eye button, are left out of search and are removed after 1 minute, 10 minutes or 1 hour. Turning it off removes them at once. A password copied back from the history is marked as concealed, so other clipboard managers skip it.
 - English and Russian localization.
+- Requires macOS 15 Sequoia or later.
 - No menu bar or Dock icon. Sandboxed, no network access.
 - Settings open on first launch and explain how to open the history, with a button to quit the app.

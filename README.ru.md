@@ -8,7 +8,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/status-in%20development-orange" alt="В разработке">
-  <img src="https://img.shields.io/badge/macOS-14%2B-black" alt="macOS 14+">
+  <img src="https://img.shields.io/badge/macOS-15%2B-black" alt="macOS 15+">
   <img src="https://img.shields.io/badge/Swift-6-orange" alt="Swift 6">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="Лицензия MIT">
 </p>
@@ -45,7 +45,7 @@ Show My Copy на ранней стадии разработки. Релизов
 
 ## Сборка
 
-Нужны Xcode 26 и macOS 14+.
+Нужны Xcode 26 и macOS 15+.
 
 Откройте `ShowMyCopy.xcodeproj` и запустите схему `ShowMyCopy`.
 

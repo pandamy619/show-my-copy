@@ -8,7 +8,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/status-in%20development-orange" alt="In development">
-  <img src="https://img.shields.io/badge/macOS-14%2B-black" alt="macOS 14+">
+  <img src="https://img.shields.io/badge/macOS-15%2B-black" alt="macOS 15+">
   <img src="https://img.shields.io/badge/Swift-6-orange" alt="Swift 6">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
 </p>
@@ -45,7 +45,7 @@ Not available yet:
 
 ## Building
 
-Requires Xcode 26 and macOS 14+.
+Requires Xcode 26 and macOS 15+.
 
 Open `ShowMyCopy.xcodeproj` and run the `ShowMyCopy` scheme.
 
