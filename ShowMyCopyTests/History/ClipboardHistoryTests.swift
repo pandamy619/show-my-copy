@@ -132,3 +132,134 @@ struct ClipboardHistoryCurrentEntryTests {
         #expect(history.currentEntryID == currentID)
     }
 }
+
+@MainActor
+struct ClipboardHistoryConcealedTests {
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+    private let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
+
+    @Test func plainEntryIsNotConcealed() throws {
+        let history = ClipboardHistory()
+        history.record(text: "plain", sourceApp: nil, at: start)
+        let entry = try #require(history.entries.first)
+        #expect(!entry.isConcealed)
+        #expect(entry.expiresAt == nil)
+    }
+
+    @Test func concealedEntryKeepsItsExpiry() throws {
+        let history = ClipboardHistory()
+        history.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        let entry = try #require(history.entries.first)
+        #expect(entry.isConcealed)
+        #expect(entry.expiresAt == start + 600)
+    }
+
+    @Test func secretCopyOfPlainTextConcealsTheEntry() throws {
+        let history = ClipboardHistory()
+        let id = history.record(text: "hunter2", sourceApp: notes, at: start)
+        history.record(text: "other", sourceApp: nil, at: start + 1)
+
+        history.record(text: "hunter2", sourceApp: nil, at: start + 2, concealed: true, expiresAt: start + 62)
+        #expect(history.entries.count == 2)
+        let entry = try #require(history.entries.first)
+        #expect(entry.id == id)
+        #expect(entry.isConcealed)
+        #expect(entry.expiresAt == start + 62)
+    }
+
+    @Test func plainCopyOfConcealedTextStaysConcealed() throws {
+        let history = ClipboardHistory()
+        let id = history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        history.record(text: "other", sourceApp: nil, at: start + 1)
+
+        // Pasted into a note and copied from there: still a password.
+        history.record(text: "hunter2", sourceApp: notes, at: start + 2)
+        #expect(history.entries.count == 2)
+        let entry = try #require(history.entries.first)
+        #expect(entry.id == id)
+        #expect(entry.isConcealed)
+        #expect(entry.expiresAt == start + 600)
+    }
+
+    @Test func removeExpiredRemovesOnlyConcealedEntriesPastTheirExpiry() {
+        let history = ClipboardHistory()
+        history.record(text: "soon", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
+        history.record(text: "later", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        history.record(text: "plain", sourceApp: nil, at: start)
+
+        history.removeExpired(at: start + 59)
+        #expect(history.entries.map(\.text) == ["plain", "later", "soon"])
+
+        history.removeExpired(at: start + 60)
+        #expect(history.entries.map(\.text) == ["plain", "later"])
+
+        history.removeExpired(at: start + 100_000)
+        #expect(history.entries.map(\.text) == ["plain"])
+    }
+
+    @Test func removingTheCurrentEntryLeavesNoCurrentEntry() {
+        let history = ClipboardHistory()
+        history.record(text: "plain", sourceApp: nil, at: start)
+        history.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
+
+        history.removeExpired(at: start + 60)
+        #expect(history.currentEntryID == nil)
+    }
+
+    @Test func removeConcealedRemovesEveryConcealedEntry() {
+        let history = ClipboardHistory()
+        history.record(text: "first secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
+        history.record(text: "plain", sourceApp: nil, at: start)
+        history.record(text: "second secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+
+        history.removeConcealed()
+        #expect(history.entries.map(\.text) == ["plain"])
+        #expect(history.currentEntryID == nil)
+    }
+
+    @Test func removeDeletesOneEntry() {
+        let history = ClipboardHistory()
+        let firstID = history.record(text: "first", sourceApp: nil, at: start)
+        let secondID = history.record(text: "second", sourceApp: nil, at: start + 1)
+
+        history.remove(id: firstID)
+        #expect(history.entries.map(\.text) == ["second"])
+        #expect(history.currentEntryID == secondID)
+
+        history.remove(id: secondID)
+        #expect(history.entries.isEmpty)
+        #expect(history.currentEntryID == nil)
+    }
+
+    @Test func concealHidesAPlainEntry() throws {
+        let history = ClipboardHistory()
+        let id = history.record(text: "hunter2", sourceApp: nil, at: start)
+
+        history.conceal(id: id, expiresAt: start + 600)
+        let entry = try #require(history.entries.first)
+        #expect(entry.isConcealed)
+        #expect(entry.expiresAt == start + 600)
+        #expect(history.currentEntryID == id)
+    }
+
+    @Test func concealNeverMakesAnExpiryLater() throws {
+        let history = ClipboardHistory()
+        let id = history.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
+
+        history.conceal(id: id, expiresAt: start + 600)
+        #expect(history.entries.first?.expiresAt == start + 60)
+
+        history.conceal(id: id, expiresAt: start + 30)
+        #expect(history.entries.first?.expiresAt == start + 30)
+    }
+
+    @Test func shorterLifetimeMovesLaterExpiriesEarlier() {
+        let history = ClipboardHistory()
+        history.record(text: "soon", sourceApp: nil, at: start, concealed: true, expiresAt: start + 30)
+        history.record(text: "later", sourceApp: nil, at: start, concealed: true, expiresAt: start + 3600)
+        history.record(text: "plain", sourceApp: nil, at: start)
+
+        history.limitExpiry(to: start + 60)
+        #expect(history.entries.map(\.expiresAt) == [nil, start + 60, start + 30])
+    }
+}
