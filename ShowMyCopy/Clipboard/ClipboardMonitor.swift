@@ -3,7 +3,8 @@ import AppKit
 /// Polls the pasteboard and records new text in the history.
 ///
 /// macOS has no notification for pasteboard changes, so the monitor compares `changeCount`
-/// on a timer and reads the contents only when the count changes.
+/// on a timer and reads the contents only when the count changes. It decides when to read, who copied and what
+/// the password settings allow; `PasteboardSnapshotReader` decides what the item is.
 @MainActor
 final class ClipboardMonitor {
     enum PauseReason: Hashable, Sendable {
@@ -14,21 +15,14 @@ final class ClipboardMonitor {
     }
 
     nonisolated static let defaultInterval: Duration = .milliseconds(500)
-    nonisolated static let maximumTextBytes = 1_048_576
+    /// The largest text recorded, in UTF-8 bytes. `TextContentReader` checks it.
+    nonisolated static let maximumTextBytes = TextContentReader.defaultMaximumBytes
     /// How soon after a copy an emptied clipboard counts as a password manager clearing the password it copied.
     /// 1Password and Bitwarden clear after about 90 seconds by default.
     nonisolated static let clearedClipboardWindow: TimeInterval = 180
 
-    /// What the latest pasteboard item turned out to be.
-    private enum Item {
-        case content(ClipboardContent, isSecret: Bool)
-        /// Not recorded: a password while passwords are not saved, a transient, non-text or too large item.
-        case skipped
-        /// Nothing on the pasteboard: an app, usually a password manager, emptied it.
-        case cleared
-    }
-
     private let pasteboard: any PasteboardReading
+    private let reader: PasteboardSnapshotReader
     private let history: any HistoryStore
     private let interval: Duration
     private let frontmostApp: @MainActor () -> SourceApp?
@@ -55,6 +49,7 @@ final class ClipboardMonitor {
         passwordPolicy: @escaping @MainActor () -> PasswordPolicy = { .default }
     ) {
         self.pasteboard = pasteboard
+        self.reader = PasteboardSnapshotReader(pasteboard: pasteboard)
         self.history = history
         self.interval = interval
         self.frontmostApp = frontmostApp
@@ -146,11 +141,11 @@ final class ClipboardMonitor {
         // through Universal Clipboard) came from an unknown app, not from the one in front now.
         let sourceApp = sourceOfNextChangeIsUnknown ? nil : frontmostApp()
         let policy = passwordPolicy()
-        let item = readItem(
+        let item = reader.read(
             fromPasswordManager: PasswordManager.isPasswordManager(bundleIdentifier: sourceApp?.bundleIdentifier),
             savesPasswords: policy.savesPasswords
         )
-        // `readItem` makes separate calls, so another app can replace the item between them, for example a
+        // The reader makes separate calls, so another app can replace the item between them, for example a
         // password manager writing a concealed item after the marker check. Then the text may belong to a newer
         // item than the markers. Record nothing and keep the old count, so the next poll reads the new item again.
         guard pasteboard.changeCount == changeCount else {
@@ -201,68 +196,5 @@ final class ClipboardMonitor {
             history.remove(id: currentID)
             AppLogger.clipboard.debug("The clipboard was cleared soon after a copy; the entry was removed")
         }
-    }
-
-    /// Reads the current item. The text of a password is read only when passwords are saved.
-    private func readItem(fromPasswordManager: Bool, savesPasswords: Bool) -> Item {
-        let markers = currentMarkers()
-        if markers.contentTypes.isEmpty {
-            return .cleared
-        }
-        var isSecret = fromPasswordManager || markers.isSecret
-        guard !shouldSkip(markers, isSecret: isSecret, savesPasswords: savesPasswords) else {
-            return .skipped
-        }
-        let text = pasteboard.string()
-        // An app can add a marker after the text without a new change count, so look at the markers again.
-        let markersAfterText = currentMarkers()
-        isSecret = isSecret || markersAfterText.isSecret
-        guard !shouldSkip(markersAfterText, isSecret: isSecret, savesPasswords: savesPasswords) else {
-            return .skipped
-        }
-        guard let text, !text.isEmpty else {
-            // Empty text, or a text type without text, is what an app leaves when it empties the clipboard.
-            return markersAfterText.contentTypes.isSubset(of: Self.textTypes) ? .cleared : .skipped
-        }
-        guard text.utf8.count <= Self.maximumTextBytes else {
-            AppLogger.clipboard.info("Skipped text larger than \(Self.maximumTextBytes, privacy: .public) bytes")
-            return .skipped
-        }
-        return .content(.text(text), isSecret: isSecret)
-    }
-
-    private func shouldSkip(_ markers: Markers, isSecret: Bool, savesPasswords: Bool) -> Bool {
-        if markers.isAlwaysSkipped {
-            AppLogger.clipboard.debug("Skipped an item marked as transient or auto-generated")
-            return true
-        }
-        if isSecret, !savesPasswords {
-            AppLogger.clipboard.debug("Skipped a secret item")
-            return true
-        }
-        return false
-    }
-
-    /// Types that hold plain text. An item with only these types and no text is an emptied clipboard.
-    private static let textTypes: Set<NSPasteboard.PasteboardType> = [
-        .string, NSPasteboard.PasteboardType("NSStringPboardType"),
-    ]
-
-    private struct Markers {
-        var isSecret: Bool
-        var isAlwaysSkipped: Bool
-        /// The types that hold data, without the nspasteboard.org markers.
-        var contentTypes: Set<NSPasteboard.PasteboardType>
-    }
-
-    private func currentMarkers() -> Markers {
-        let types = Set(pasteboard.types)
-        let names = Set(types.map(\.rawValue))
-        let markerNames = PasteboardMarker.secret.union(PasteboardMarker.alwaysSkipped).union([PasteboardMarker.source])
-        return Markers(
-            isSecret: !names.isDisjoint(with: PasteboardMarker.secret),
-            isAlwaysSkipped: !names.isDisjoint(with: PasteboardMarker.alwaysSkipped),
-            contentTypes: types.filter { !markerNames.contains($0.rawValue) }
-        )
     }
 }
