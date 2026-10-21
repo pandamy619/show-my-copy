@@ -29,7 +29,7 @@ final class ClipboardMonitor {
     }
 
     private let pasteboard: any PasteboardReading
-    private let history: ClipboardHistory
+    private let history: any HistoryStore
     private let interval: Duration
     private let frontmostApp: @MainActor () -> SourceApp?
     private let now: @MainActor () -> Date
@@ -46,7 +46,7 @@ final class ClipboardMonitor {
 
     init(
         pasteboard: any PasteboardReading,
-        history: ClipboardHistory,
+        history: any HistoryStore,
         interval: Duration = ClipboardMonitor.defaultInterval,
         frontmostApp: @escaping @MainActor () -> SourceApp? = { SourceApp.frontmost() },
         now: @escaping @MainActor () -> Date = { Date() },

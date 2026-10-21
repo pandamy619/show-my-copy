@@ -3,13 +3,13 @@ import Foundation
 /// Puts an entry the user picked in the history window back on the pasteboard.
 @MainActor
 final class EntryCopier {
-    private let history: ClipboardHistory
+    private let history: any HistoryStore
     private let pasteboard: any PasteboardWriting
     private let monitor: ClipboardMonitor
     private let now: @MainActor () -> Date
 
     init(
-        history: ClipboardHistory,
+        history: any HistoryStore,
         pasteboard: any PasteboardWriting,
         monitor: ClipboardMonitor,
         now: @escaping @MainActor () -> Date = { Date() }

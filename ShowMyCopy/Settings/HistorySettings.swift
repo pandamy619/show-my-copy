@@ -17,10 +17,10 @@ struct LimitChange: Equatable, Sendable {
 @Observable
 final class HistorySettings {
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored let history: ClipboardHistory
+    @ObservationIgnored let history: any HistoryStore
 
     /// Reads the saved limit and applies it to `history`.
-    init(history: ClipboardHistory, defaults: UserDefaults = .standard) {
+    init(history: any HistoryStore, defaults: UserDefaults = .standard) {
         self.history = history
         self.defaults = defaults
         history.setLimit(Self.storedLimit(in: defaults))

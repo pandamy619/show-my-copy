@@ -29,7 +29,7 @@ struct PasswordPolicy: Equatable, Sendable {
 @Observable
 final class PasswordSettings {
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private let history: ClipboardHistory
+    @ObservationIgnored private let history: any HistoryStore
     @ObservationIgnored private let now: @MainActor () -> Date
 
     /// Off by default. Turning it off removes every saved password from the history at once.
@@ -57,7 +57,7 @@ final class PasswordSettings {
     }
 
     init(
-        history: ClipboardHistory,
+        history: any HistoryStore,
         defaults: UserDefaults = .standard,
         now: @escaping @MainActor () -> Date = { Date() }
     ) {

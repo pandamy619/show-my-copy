@@ -5,7 +5,8 @@ import KeyboardShortcuts
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
-    private let history = ClipboardHistory()
+    // The one place that picks where the history lives. Everything else takes `any HistoryStore`.
+    private let history: any HistoryStore = InMemoryHistoryStore()
     private var historySettings: HistorySettings?
     private var passwordSettings: PasswordSettings?
     private var monitor: ClipboardMonitor?

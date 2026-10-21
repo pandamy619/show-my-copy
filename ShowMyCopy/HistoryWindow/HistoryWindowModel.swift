@@ -10,7 +10,7 @@ final class HistoryWindowModel {
         case down
     }
 
-    let history: ClipboardHistory
+    let history: any HistoryStore
 
     var query = "" {
         didSet {
@@ -34,7 +34,7 @@ final class HistoryWindowModel {
     /// Concealed entries the user revealed with the eye button. Hidden again when the window closes or opens.
     private var revealedIDs: Set<ClipboardEntry.ID> = []
 
-    init(history: ClipboardHistory) {
+    init(history: any HistoryStore) {
         self.history = history
     }
 

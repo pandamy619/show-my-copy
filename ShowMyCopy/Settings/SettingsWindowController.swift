@@ -4,14 +4,14 @@ import SwiftUI
 /// Shows the settings in a regular window. The app has no Dock or menu bar icon, so it opens the window itself.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
-    private let history: ClipboardHistory
+    private let history: any HistoryStore
     private let settings: HistorySettings
     private let passwords: PasswordSettings
     private let shortcutRecorder: AnyView
     private var window: NSWindow?
 
     init<ShortcutRecorder: View>(
-        history: ClipboardHistory,
+        history: any HistoryStore,
         settings: HistorySettings,
         passwords: PasswordSettings,
         @ViewBuilder shortcutRecorder: () -> ShortcutRecorder

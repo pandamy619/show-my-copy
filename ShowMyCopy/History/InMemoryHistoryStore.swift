@@ -1,17 +1,19 @@
 import Foundation
 import Observation
 
+/// The name the history had before `HistoryStore`. Kept so existing call sites and tests read as before.
+typealias ClipboardHistory = InMemoryHistoryStore
+
+/// Keeps the history in memory only: it is gone when the app quits.
 @MainActor
 @Observable
-final class ClipboardHistory {
+final class InMemoryHistoryStore: HistoryStore {
     /// Kept for older call sites. `RetentionPolicy` owns the limits.
     nonisolated static let defaultLimit = RetentionPolicy.defaultEntryLimit
     nonisolated static let limitRange = RetentionPolicy.entryLimitRange
 
     private(set) var entries: [ClipboardEntry] = []
     private(set) var retention: RetentionPolicy
-    /// The entry whose text is on the pasteboard now, or nil when the latest pasteboard change was not recorded
-    /// (a skipped password, a transient, empty, too large or non-text item). The newest entry is not always current.
     private(set) var currentEntryID: ClipboardEntry.ID?
     private let hasher: any ContentHasher
 
@@ -24,24 +26,13 @@ final class ClipboardHistory {
         self.init(retention: RetentionPolicy(entryLimit: limit))
     }
 
-    /// The most entries kept.
-    var limit: Int {
-        retention.entryLimit
-    }
-
-    /// Adds copied content as the newest entry and makes it current. Content that is already in the history (an
-    /// entry with the same content hash) moves to the top. Returns the ID of the entry.
-    ///
-    /// A `concealed` copy hides the entry, also one that was plain before. A plain copy of concealed content keeps
-    /// the entry concealed with its expiry, for example after the user pasted a password into a note and copied it
-    /// from there: it is still a password.
     @discardableResult
     func record(
         _ content: ClipboardContent,
         sourceApp: SourceApp?,
         at date: Date,
-        concealed: Bool = false,
-        expiresAt: Date? = nil
+        concealed: Bool,
+        expiresAt: Date?
     ) -> ClipboardEntry.ID {
         let contentHash = hasher.hash(content)
         var entry: ClipboardEntry
@@ -62,19 +53,6 @@ final class ClipboardHistory {
         return entry.id
     }
 
-    /// Records copied text. See `record(_:sourceApp:at:concealed:expiresAt:)`.
-    @discardableResult
-    func record(
-        text: String,
-        sourceApp: SourceApp?,
-        at date: Date,
-        concealed: Bool = false,
-        expiresAt: Date? = nil
-    ) -> ClipboardEntry.ID {
-        record(.text(text), sourceApp: sourceApp, at: date, concealed: concealed, expiresAt: expiresAt)
-    }
-
-    /// Hides an entry and sets when it is removed. An expiry that is already earlier stays.
     func conceal(id: ClipboardEntry.ID, expiresAt: Date) {
         guard let index = entries.firstIndex(where: { $0.id == id }) else {
             return
@@ -83,14 +61,12 @@ final class ClipboardHistory {
         entries[index].expiresAt = min(entries[index].expiresAt ?? expiresAt, expiresAt)
     }
 
-    /// Moves every concealed entry's expiry to `date` at the latest, after the user picked a shorter lifetime.
     func limitExpiry(to date: Date) {
         for index in entries.indices where entries[index].isConcealed {
             entries[index].expiresAt = min(entries[index].expiresAt ?? date, date)
         }
     }
 
-    /// Removes concealed entries whose time is up.
     func removeExpired(at date: Date) {
         removeEntries { entry in
             guard entry.isConcealed, let expiresAt = entry.expiresAt else {
@@ -100,7 +76,6 @@ final class ClipboardHistory {
         }
     }
 
-    /// Removes every concealed entry, after the user turned off saving passwords.
     func removeConcealed() {
         removeEntries(where: \.isConcealed)
     }
@@ -109,29 +84,25 @@ final class ClipboardHistory {
         removeEntries { $0.id == id }
     }
 
-    /// The latest pasteboard change was not recorded, so no entry matches the pasteboard any more.
     func markCurrentSkipped() {
         currentEntryID = nil
     }
 
-    /// Applies new limits, removing the entries they no longer allow.
     func setRetention(_ policy: RetentionPolicy) {
         retention = policy
         trim()
     }
 
-    func setLimit(_ newLimit: Int) {
-        setRetention(retention.withEntryLimit(newLimit))
-    }
-
-    /// How many entries a new limit would remove, for the confirmation shown before applying it.
-    func entriesRemoved(byLimit newLimit: Int) -> Int {
-        retention.withEntryLimit(newLimit).removedCount(from: entries)
-    }
-
-    func clear() {
+    @discardableResult
+    func clear() -> ClearResult {
+        let stats = stats()
         entries.removeAll()
         currentEntryID = nil
+        return ClearResult(removedCount: stats.count, freedBytes: stats.totalBytes)
+    }
+
+    func stats() -> HistoryStats {
+        HistoryStats(count: entries.count, totalBytes: entries.reduce(0) { $0 + $1.byteSize })
     }
 
     private func removeEntries(where shouldRemove: (ClipboardEntry) -> Bool) {

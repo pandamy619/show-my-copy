@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The settings form. `shortcutRecorder` is the control that records the global shortcut.
 struct SettingsView<ShortcutRecorder: View>: View {
-    let history: ClipboardHistory
+    let history: any HistoryStore
     let settings: HistorySettings
     @Bindable var passwords: PasswordSettings
     let shortcutRecorder: ShortcutRecorder
@@ -14,7 +14,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
     @State private var isConfirmingClear = false
 
     init(
-        history: ClipboardHistory,
+        history: any HistoryStore,
         settings: HistorySettings,
         passwords: PasswordSettings,
         @ViewBuilder shortcutRecorder: () -> ShortcutRecorder

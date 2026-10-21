@@ -10,7 +10,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     private var panel: HistoryPanel?
 
     init(
-        history: ClipboardHistory,
+        history: any HistoryStore,
         model: HistoryWindowModel? = nil,
         pasteboard: any PasteboardWriting,
         monitor: ClipboardMonitor,
