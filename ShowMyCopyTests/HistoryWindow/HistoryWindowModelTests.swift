@@ -290,3 +290,74 @@ struct HistoryWindowModelSearchTests {
         #expect(model.items.map(\.id) == [id])
     }
 }
+
+@MainActor
+struct HistoryWindowModelCacheTests {
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func makeModel() -> HistoryWindowModel {
+        let history = ClipboardHistory()
+        for (index, text) in ["first", "second", "third"].enumerated() {
+            history.record(text: text, sourceApp: nil, at: start + Double(index))
+        }
+        return HistoryWindowModel(history: history)
+    }
+
+    @Test func emptyQueryDoesNotFilter() {
+        let model = makeModel()
+        _ = model.items
+        _ = model.selectedEntry
+        #expect(model.filterCount == 0)
+    }
+
+    @Test func readingTheItemsAgainDoesNotFilterAgain() {
+        let model = makeModel()
+        model.query = "i"
+        let count = model.filterCount
+        #expect(model.items.map(\.text) == ["third", "first"])
+        _ = model.selectedIndex
+        _ = model.selectedEntry
+        model.moveSelection(.down)
+        #expect(model.items.map(\.text) == ["third", "first"])
+        #expect(model.filterCount == count)
+    }
+
+    @Test func changingTheQueryFiltersAgain() {
+        let model = makeModel()
+        model.query = "i"
+        _ = model.items
+        let count = model.filterCount
+        model.query = "ir"
+        #expect(model.items.map(\.text) == ["third", "first"])
+        model.query = "fir"
+        #expect(model.items.map(\.text) == ["first"])
+        #expect(model.filterCount > count)
+    }
+
+    @Test func newCopyIsFoundWithTheSameQuery() {
+        let model = makeModel()
+        model.query = "fresh"
+        #expect(model.items.isEmpty)
+
+        model.history.record(text: "fresh", sourceApp: nil, at: start + 10)
+        #expect(model.items.map(\.text) == ["fresh"])
+    }
+
+    @Test func changedEntryIsFilteredAgainWhenCountAndOrderStay() throws {
+        let model = makeModel()
+        model.query = "second"
+        let entry = try #require(model.items.first)
+
+        // Concealing keeps the number and order of the entries, so only the revision tells the cache.
+        model.history.conceal(id: entry.id, expiresAt: start + 60)
+        #expect(model.items.isEmpty)
+    }
+
+    @Test func removedEntryLeavesTheFilteredList() {
+        let model = makeModel()
+        model.query = "i"
+        #expect(model.items.count == 2)
+        model.history.clear()
+        #expect(model.items.isEmpty)
+    }
+}
