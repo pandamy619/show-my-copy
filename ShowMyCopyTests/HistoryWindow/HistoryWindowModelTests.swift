@@ -261,3 +261,32 @@ struct HistoryWindowModelConcealedTests {
         #expect(!model.isRevealed(concealed.id))
     }
 }
+
+@MainActor
+struct HistoryWindowModelSearchTests {
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+    private let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
+
+    @Test func searchLooksOnlyAtTheStartOfLongText() {
+        let history = ClipboardHistory()
+        let text = String(repeating: "a", count: SearchKey.searchedCharacters) + "needle"
+        history.record(text: text, sourceApp: nil, at: start)
+        let model = HistoryWindowModel(history: history)
+        model.query = "needle"
+        #expect(model.items.isEmpty)
+    }
+
+    @Test func entryConcealedLaterMatchesOnlyByItsAppName() {
+        let history = ClipboardHistory()
+        let id = history.record(text: "hunter2", sourceApp: notes, at: start)
+        let model = HistoryWindowModel(history: history)
+        model.query = "hunter"
+        #expect(model.items.map(\.id) == [id])
+
+        // The clipboard was cleared soon after the copy, so the entry turned out to be a password.
+        history.conceal(id: id, expiresAt: start + 60)
+        #expect(model.items.isEmpty)
+        model.query = "notes"
+        #expect(model.items.map(\.id) == [id])
+    }
+}
