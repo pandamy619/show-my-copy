@@ -51,6 +51,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.monitor = monitor
         self.historyWindow = historyWindow
         self.activityObserver = activityObserver
+
+        let firstLaunch = FirstLaunch()
+        if firstLaunch.shouldShowSettings {
+            settingsWindow.show()
+            firstLaunch.settingsWereShown()
+        }
     }
 
     func showSettings() {
