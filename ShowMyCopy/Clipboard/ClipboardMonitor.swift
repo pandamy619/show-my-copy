@@ -96,22 +96,48 @@ final class ClipboardMonitor {
         guard changeCount != lastChangeCount else {
             return
         }
+        let text = readText()
+        // The reads above are separate calls, so another app can replace the item between them, for example a
+        // password manager writing a concealed item after the marker check. Then the text may belong to a newer
+        // item than the markers. Record nothing and keep the old count, so the next poll reads the new item again.
+        guard pasteboard.changeCount == changeCount else {
+            AppLogger.clipboard.debug("The pasteboard changed while it was read; reading it again on the next poll")
+            return
+        }
         // Text that was copied before launch came from an unknown app, not from the one in front now.
         let isFirstPoll = lastChangeCount == nil
         lastChangeCount = changeCount
-
-        let types = Set(pasteboard.types.map(\.rawValue))
-        guard types.isDisjoint(with: PasteboardMarker.skipped) else {
-            AppLogger.clipboard.debug("Skipped an item marked as concealed, transient or auto-generated")
-            return
-        }
-        guard let text = pasteboard.string(), !text.isEmpty else {
-            return
-        }
-        guard text.utf8.count <= Self.maximumTextBytes else {
-            AppLogger.clipboard.info("Skipped text larger than \(Self.maximumTextBytes, privacy: .public) bytes")
+        guard let text else {
             return
         }
         history.record(text: text, sourceApp: isFirstPoll ? nil : frontmostApp(), at: now())
+    }
+
+    /// Returns the text of the current item, or nil when the item must not be recorded.
+    private func readText() -> String? {
+        guard !hasSkippedMarker() else {
+            return nil
+        }
+        guard let text = pasteboard.string(), !text.isEmpty else {
+            return nil
+        }
+        // An app can add a marker after the text without a new change count, so look at the markers again.
+        guard !hasSkippedMarker() else {
+            return nil
+        }
+        guard text.utf8.count <= Self.maximumTextBytes else {
+            AppLogger.clipboard.info("Skipped text larger than \(Self.maximumTextBytes, privacy: .public) bytes")
+            return nil
+        }
+        return text
+    }
+
+    private func hasSkippedMarker() -> Bool {
+        let types = Set(pasteboard.types.map(\.rawValue))
+        guard types.isDisjoint(with: PasteboardMarker.skipped) else {
+            AppLogger.clipboard.debug("Skipped an item marked as concealed, transient or auto-generated")
+            return true
+        }
+        return false
     }
 }
