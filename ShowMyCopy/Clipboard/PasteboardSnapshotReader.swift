@@ -147,10 +147,23 @@ struct TextContentReader: PasteboardContentReader {
         self.maximumBytes = maximumBytes
     }
 
+    /// Reads the UTF-8 data first and checks its size, so text over the limit is never decoded into a `String`.
+    /// `string()` is only a fallback for an item whose text is not available as UTF-8 data.
     func read(from pasteboard: any PasteboardReading) -> ContentReading {
-        guard let text = pasteboard.string(), !text.isEmpty else {
+        var text: String?
+        if let data = pasteboard.data(forType: .string) {
+            guard data.count <= maximumBytes else {
+                return .tooLarge(limit: maximumBytes)
+            }
+            text = String(data: data, encoding: .utf8)
+        }
+        if text == nil {
+            text = pasteboard.string()
+        }
+        guard let text, !text.isEmpty else {
             return .nothing
         }
+        // A string from the fallback was not checked yet.
         guard text.utf8.count <= maximumBytes else {
             return .tooLarge(limit: maximumBytes)
         }
