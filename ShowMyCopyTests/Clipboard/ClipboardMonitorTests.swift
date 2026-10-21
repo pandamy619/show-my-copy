@@ -237,6 +237,46 @@ struct ClipboardMonitorPauseTests {
         monitor.stop()
     }
 
+    @Test func copyFoundAfterAPauseHasNoSourceApp() throws {
+        let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
+        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { notes })
+        monitor.start()
+        monitor.pause(for: .screenLocked)
+        // Copied on another device or by a background app while the screen was locked.
+        pasteboard.copy("copied while locked")
+
+        monitor.resume(for: .screenLocked)
+        let entry = try #require(history.entries.first)
+        #expect(entry.text == "copied while locked")
+        #expect(entry.sourceApp == nil)
+        monitor.stop()
+    }
+
+    @Test func copyAfterTheFirstPollFollowingAPauseHasSourceApp() {
+        let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
+        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { notes })
+        monitor.start()
+        monitor.pause(for: .systemSleep)
+        monitor.resume(for: .systemSleep)
+
+        pasteboard.copy("copied after wake")
+        monitor.poll()
+        #expect(history.entries.first?.sourceApp == notes)
+        monitor.stop()
+    }
+
+    @Test func copyFoundAfterStopAndStartHasNoSourceApp() {
+        let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
+        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { notes })
+        monitor.start()
+        monitor.stop()
+        pasteboard.copy("copied while stopped")
+
+        monitor.start()
+        #expect(history.entries.first?.sourceApp == nil)
+        monitor.stop()
+    }
+
     @Test func pauseBeforeStartKeepsMonitorIdle() {
         let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
         monitor.pause(for: .systemSleep)
