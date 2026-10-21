@@ -5,6 +5,9 @@ protocol PasteboardReading {
     var changeCount: Int { get }
     var types: [NSPasteboard.PasteboardType] { get }
     func string() -> String?
+    /// The current item's data for `dataType`, without converting it. For `.string` it is UTF-8 text, so its size
+    /// can be checked before a `String` is made from it.
+    func data(forType dataType: NSPasteboard.PasteboardType) -> Data?
 }
 
 /// The parts of `NSPasteboard` the app uses. Tests replace it to check what is written.
@@ -13,6 +16,7 @@ protocol PasteboardBackend: AnyObject {
     var changeCount: Int { get }
     var types: [NSPasteboard.PasteboardType]? { get }
     func string(forType dataType: NSPasteboard.PasteboardType) -> String?
+    func data(forType dataType: NSPasteboard.PasteboardType) -> Data?
     func prepareForNewContents(with options: NSPasteboard.ContentsOptions) -> Int
     func setString(_ string: String, forType dataType: NSPasteboard.PasteboardType) -> Bool
 }
@@ -42,6 +46,10 @@ final class SystemPasteboard: PasteboardReading {
 
     func string() -> String? {
         pasteboard.string(forType: .string)
+    }
+
+    func data(forType dataType: NSPasteboard.PasteboardType) -> Data? {
+        pasteboard.data(forType: dataType)
     }
 }
 
