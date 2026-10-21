@@ -50,13 +50,16 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Copies the entry back to the clipboard and closes the window.
+    /// Copies the entry back to the clipboard and closes the window. When the copy fails, the window stays open,
+    /// so the user can try again or pick another entry.
     func choose(_ entry: ClipboardEntry) {
         // Return can arrive both as a key press and as a submit from the search field.
         guard isVisible else {
             return
         }
-        copier.copy(entry)
+        guard copier.copy(entry) else {
+            return
+        }
         hide()
     }
 
