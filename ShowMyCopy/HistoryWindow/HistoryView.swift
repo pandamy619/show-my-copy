@@ -118,12 +118,27 @@ struct HistoryView: View {
     }
 
     private func row(_ entry: ClipboardEntry, selectedID: ClipboardEntry.ID?, now: Date) -> some View {
-        Button {
-            onChoose(entry)
-        } label: {
-            HistoryRow(entry: entry, isSelected: entry.id == selectedID, now: now)
+        let isSelected = entry.id == selectedID
+        let isRevealed = model.isRevealed(entry.id)
+        // The eye button sits next to the row's button, not inside it: a button inside another button's label
+        // would also choose the entry.
+        return HStack(spacing: 0) {
+            Button {
+                onChoose(entry)
+            } label: {
+                HistoryRow(entry: entry, isRevealed: isRevealed, isSelected: isSelected, now: now)
+            }
+            .buttonStyle(.plain)
+            if entry.isConcealed {
+                RevealButton(isRevealed: isRevealed) {
+                    model.toggleReveal(entry.id)
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.clear)
+        )
         .id(entry.id)
     }
 
@@ -165,15 +180,22 @@ struct HistoryView: View {
 
 private struct HistoryRow: View {
     let entry: ClipboardEntry
+    let isRevealed: Bool
     let isSelected: Bool
     let now: Date
 
     var body: some View {
-        let preview = EntryPreview.text(entry.text)
+        // A concealed entry shows a mask of fixed length until revealed. Revealed text is sanitized like any other.
+        let preview = EntryPreview.rowText(for: entry, isRevealed: isRevealed)
         let appName = entry.sourceApp?.name.map { EntryPreview.text($0) } ?? ""
         VStack(alignment: .leading, spacing: 3) {
             Group {
-                if preview.isEmpty {
+                if entry.isConcealed {
+                    // VoiceOver never reads a password, revealed or not.
+                    Text(verbatim: preview)
+                        .fontDesign(.monospaced)
+                        .accessibilityLabel(isRevealed ? Text("Password, shown") : Text("Password, hidden"))
+                } else if preview.isEmpty {
                     Text("Blank text")
                         .italic()
                         .foregroundStyle(.secondary)
@@ -199,13 +221,27 @@ private struct HistoryRow: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.clear)
-        )
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Shows or hides the text of one concealed entry until the window closes.
+private struct RevealButton: View {
+    let isRevealed: Bool
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            Image(systemName: isRevealed ? "eye.slash" : "eye")
+        }
+        .buttonStyle(.borderless)
+        .help(isRevealed ? Text("Hide password") : Text("Show password"))
+        .accessibilityLabel(isRevealed ? Text("Hide password") : Text("Show password"))
+        .padding(.trailing, 10)
     }
 }
 

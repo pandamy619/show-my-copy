@@ -146,6 +146,16 @@
         }
       }
     },
+    "Hide password" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрыть пароль"
+          }
+        }
+      }
+    },
     "History" : {
       "localizations" : {
         "ru" : {
@@ -212,6 +222,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Открывает окно истории буфера обмена. Не выбирайте ⇧⌘V: это сочетание заменит «Вставить и согласовать стиль» в других приложениях."
+          }
+        }
+      }
+    },
+    "Password, hidden" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароль, скрыт"
+          }
+        }
+      }
+    },
+    "Password, shown" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароль, показан"
           }
         }
       }
@@ -322,6 +352,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Показать историю"
+          }
+        }
+      }
+    },
+    "Show password" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показать пароль"
           }
         }
       }
