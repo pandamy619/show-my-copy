@@ -68,4 +68,17 @@ struct HistoryWindowControllerTests {
         #expect(pasteboard.writtenTexts == ["older"])
         #expect(!controller.isVisible)
     }
+
+    @Test func shortcutClearsStalePauseReasonsAndTogglesTheWindow() {
+        let controller = makeController()
+        // The unlock notification was missed, so the monitor still thinks the screen is locked.
+        monitor.pause(for: .screenLocked)
+
+        controller.shortcutPressed()
+        #expect(monitor.pauseReasons.isEmpty)
+        #expect(controller.isVisible)
+
+        controller.shortcutPressed()
+        #expect(!controller.isVisible)
+    }
 }
