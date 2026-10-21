@@ -24,6 +24,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func show() {
         let window = self.window ?? makeWindow()
         self.window = window
+        // Closing this window hides the app. Show its windows again.
+        NSApplication.shared.unhideWithoutActivation()
         // The app is LSUIElement, so it is usually not active. Activate it so the window can take focus.
         NSApplication.shared.activate()
         window.makeKeyAndOrderFront(nil)
@@ -35,6 +37,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// edits or an open confirmation.
     func windowWillClose(_ notification: Notification) {
         window?.contentViewController = makeContent()
+        // An app without a Dock icon keeps being active after its last window closes, so no window has focus.
+        // Hiding the app returns focus to the app the user was in before. Not while another window is open.
+        let closingWindow = window
+        let otherWindowIsVisible = NSApplication.shared.windows.contains { $0 !== closingWindow && $0.isVisible }
+        if !otherWindowIsVisible {
+            NSApplication.shared.hide(nil)
+        }
     }
 
     private func makeContent() -> NSViewController {

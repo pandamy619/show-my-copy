@@ -34,6 +34,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         // and selected.
         monitor.poll()
         model.prepareForPresentation()
+        // Closing Settings hides the app to return focus to the previous app, and a hidden app shows no windows.
+        // Unhide without activating, so the app the user copied from stays in front.
+        NSApplication.shared.unhideWithoutActivation()
         panel.setFrameOrigin(Self.origin(for: panel.frame.size))
         panel.makeKeyAndOrderFront(nil)
     }
