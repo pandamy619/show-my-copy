@@ -18,6 +18,11 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// The limits in effect.
     var retention: RetentionPolicy { get }
 
+    /// Changes whenever `entries` changes: an entry is added, moved, changed or removed. It stays the same when
+    /// a call leaves the entries as they were. Lets views cache what they derive from the entries, such as a
+    /// filtered list, without comparing every entry.
+    var revision: Int { get }
+
     /// Adds copied content as the newest entry and makes it current. Content that is already in the history (an
     /// entry with the same content hash) moves to the top with the new date and source app. Returns the ID of the
     /// entry.

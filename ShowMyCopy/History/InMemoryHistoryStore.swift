@@ -15,6 +15,7 @@ final class InMemoryHistoryStore: HistoryStore {
     private(set) var entries: [ClipboardEntry] = []
     private(set) var retention: RetentionPolicy
     private(set) var currentEntryID: ClipboardEntry.ID?
+    private(set) var revision = 0
     private let hasher: any ContentHasher
 
     init(retention: RetentionPolicy = .default, hasher: any ContentHasher = SHA256ContentHasher()) {
@@ -48,6 +49,7 @@ final class InMemoryHistoryStore: HistoryStore {
             entry.expiresAt = expiresAt ?? entry.expiresAt
         }
         entries.insert(entry, at: 0)
+        entriesChanged()
         currentEntryID = entry.id
         trim()
         return entry.id
@@ -59,12 +61,17 @@ final class InMemoryHistoryStore: HistoryStore {
         }
         entries[index].isConcealed = true
         entries[index].expiresAt = min(entries[index].expiresAt ?? expiresAt, expiresAt)
+        entriesChanged()
     }
 
     func limitExpiry(to date: Date) {
+        guard entries.contains(where: \.isConcealed) else {
+            return
+        }
         for index in entries.indices where entries[index].isConcealed {
             entries[index].expiresAt = min(entries[index].expiresAt ?? date, date)
         }
+        entriesChanged()
     }
 
     func removeExpired(at date: Date) {
@@ -107,7 +114,10 @@ final class InMemoryHistoryStore: HistoryStore {
     @discardableResult
     func clear() -> ClearResult {
         let stats = stats()
-        entries.removeAll()
+        if !entries.isEmpty {
+            entries.removeAll()
+            entriesChanged()
+        }
         currentEntryID = nil
         return ClearResult(removedCount: stats.count, freedBytes: stats.totalBytes)
     }
@@ -122,6 +132,7 @@ final class InMemoryHistoryStore: HistoryStore {
             return
         }
         entries.removeAll(where: shouldRemove)
+        entriesChanged()
         forgetMissingCurrentEntry()
     }
 
@@ -130,8 +141,14 @@ final class InMemoryHistoryStore: HistoryStore {
         // Avoid a change notification to observers when nothing is removed, which is the case on almost every copy.
         if kept.count != entries.count {
             entries = kept
+            entriesChanged()
         }
         forgetMissingCurrentEntry()
+    }
+
+    /// Call after every change to `entries`.
+    private func entriesChanged() {
+        revision &+= 1
     }
 
     private func forgetMissingCurrentEntry() {
