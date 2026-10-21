@@ -180,16 +180,6 @@ struct HistoryWindowModelTests {
         #expect(model.selectedEntry?.text == "third")
     }
 
-    @Test func selectByID() throws {
-        let model = makeModel()
-        let second = try #require(model.items.first { $0.text == "second" })
-        model.select(id: second.id)
-        #expect(model.selectedEntry == second)
-
-        model.select(id: UUID())
-        #expect(model.selectedEntry == second)
-    }
-
     @Test func prepareForPresentationClearsQueryAndSelectsFirst() {
         let model = makeModel()
         model.query = "i"

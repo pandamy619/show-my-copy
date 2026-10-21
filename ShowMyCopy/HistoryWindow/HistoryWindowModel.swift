@@ -88,13 +88,6 @@ final class HistoryWindowModel {
         }
     }
 
-    func select(id: ClipboardEntry.ID) {
-        let items = items
-        if let index = items.firstIndex(where: { $0.id == id }) {
-            select(row: index, in: items)
-        }
-    }
-
     /// Clears the search, hides revealed passwords and selects the first row. Called each time the window is shown.
     func prepareForPresentation() {
         query = ""

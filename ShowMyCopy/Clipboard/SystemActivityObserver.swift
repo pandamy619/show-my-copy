@@ -49,12 +49,6 @@ final class SystemActivityObserver {
         observe(distributed, Self.screenIsUnlockedNotification, back: .screenLocked)
     }
 
-    func stop() {
-        workspace.removeAllObservers()
-        distributed.removeAllObservers()
-        isStarted = false
-    }
-
     /// Clears pause reasons that are no longer true.
     ///
     /// A notification that ends a pause can be missed or arrive late. A reason left behind would stop recording

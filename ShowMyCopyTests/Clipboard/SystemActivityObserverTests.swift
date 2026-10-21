@@ -153,14 +153,6 @@ struct SystemActivityObserverTests {
         #expect(distributed.observedNames.count == 2)
     }
 
-    @Test func stopRemovesObservers() {
-        let observer = makeObserver()
-        observer.start()
-        observer.stop()
-        #expect(workspace.observedNames.isEmpty)
-        #expect(distributed.observedNames.isEmpty)
-    }
-
     @Test func reconcileClearsAStaleScreenLock() {
         let observer = makeObserver()
         observer.start()
