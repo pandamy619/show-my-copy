@@ -12,32 +12,35 @@ final class ClipboardHistory {
     /// The entry whose text is on the pasteboard now, or nil when the latest pasteboard change was not recorded
     /// (a skipped password, a transient, empty, too large or non-text item). The newest entry is not always current.
     private(set) var currentEntryID: ClipboardEntry.ID?
+    private let hasher: any ContentHasher
 
-    init(limit: Int = ClipboardHistory.defaultLimit) {
+    init(limit: Int = ClipboardHistory.defaultLimit, hasher: any ContentHasher = SHA256ContentHasher()) {
         self.limit = Self.clamped(limit)
+        self.hasher = hasher
     }
 
-    /// Adds copied text as the newest entry and makes it current. Text that is already in the history moves to
-    /// the top. Returns the ID of the entry.
+    /// Adds copied content as the newest entry and makes it current. Content that is already in the history (an
+    /// entry with the same content hash) moves to the top. Returns the ID of the entry.
     ///
-    /// A `concealed` copy hides the entry, also one that was plain before. A plain copy of concealed text keeps the
-    /// entry concealed with its expiry, for example after the user pasted a password into a note and copied it
+    /// A `concealed` copy hides the entry, also one that was plain before. A plain copy of concealed content keeps
+    /// the entry concealed with its expiry, for example after the user pasted a password into a note and copied it
     /// from there: it is still a password.
     @discardableResult
     func record(
-        text: String,
+        _ content: ClipboardContent,
         sourceApp: SourceApp?,
         at date: Date,
         concealed: Bool = false,
         expiresAt: Date? = nil
     ) -> ClipboardEntry.ID {
+        let contentHash = hasher.hash(content)
         var entry: ClipboardEntry
-        if let index = entries.firstIndex(where: { $0.text == text }) {
+        if let index = entries.firstIndex(where: { $0.contentHash == contentHash }) {
             entry = entries.remove(at: index)
             entry.date = date
             entry.sourceApp = sourceApp
         } else {
-            entry = ClipboardEntry(id: UUID(), text: text, date: date, sourceApp: sourceApp)
+            entry = ClipboardEntry(content: content, contentHash: contentHash, date: date, sourceApp: sourceApp)
         }
         if concealed {
             entry.isConcealed = true
@@ -47,6 +50,18 @@ final class ClipboardHistory {
         currentEntryID = entry.id
         trim()
         return entry.id
+    }
+
+    /// Records copied text. See `record(_:sourceApp:at:concealed:expiresAt:)`.
+    @discardableResult
+    func record(
+        text: String,
+        sourceApp: SourceApp?,
+        at date: Date,
+        concealed: Bool = false,
+        expiresAt: Date? = nil
+    ) -> ClipboardEntry.ID {
+        record(.text(text), sourceApp: sourceApp, at: date, concealed: concealed, expiresAt: expiresAt)
     }
 
     /// Hides an entry and sets when it is removed. An expiry that is already earlier stays.

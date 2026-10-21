@@ -127,7 +127,8 @@ final class HistoryWindowModel {
     /// only by its source app name, so typing part of a password does not reveal which entry holds it.
     nonisolated static func entry(_ entry: ClipboardEntry, matches needle: String) -> Bool {
         let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        if !entry.isConcealed, entry.text.prefix(searchedCharacters).range(of: needle, options: options) != nil {
+        let searchedText = entry.isConcealed ? nil : entry.text?.prefix(searchedCharacters)
+        if let searchedText, searchedText.range(of: needle, options: options) != nil {
             return true
         }
         guard let appName = entry.sourceApp?.name else {

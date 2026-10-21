@@ -21,7 +21,7 @@ final class ClipboardMonitor {
 
     /// What the latest pasteboard item turned out to be.
     private enum Item {
-        case text(String, isSecret: Bool)
+        case content(ClipboardContent, isSecret: Bool)
         /// Not recorded: a password while passwords are not saved, a transient, non-text or too large item.
         case skipped
         /// Nothing on the pasteboard: an app, usually a password manager, emptied it.
@@ -164,12 +164,12 @@ final class ClipboardMonitor {
             history.markCurrentSkipped()
         case .cleared:
             clipboardWasCleared(at: date, policy: policy)
-        case .text(let text, let isSecret):
+        case .content(let content, let isSecret):
             if isSecret {
                 history.record(
-                    text: text, sourceApp: sourceApp, at: date, concealed: true, expiresAt: date + policy.lifetime)
+                    content, sourceApp: sourceApp, at: date, concealed: true, expiresAt: date + policy.lifetime)
             } else {
-                history.record(text: text, sourceApp: sourceApp, at: date)
+                history.record(content, sourceApp: sourceApp, at: date)
             }
         }
     }
@@ -219,7 +219,7 @@ final class ClipboardMonitor {
             AppLogger.clipboard.info("Skipped text larger than \(Self.maximumTextBytes, privacy: .public) bytes")
             return .skipped
         }
-        return .text(text, isSecret: isSecret)
+        return .content(.text(text), isSecret: isSecret)
     }
 
     private func shouldSkip(_ markers: Markers, isSecret: Bool, savesPasswords: Bool) -> Bool {

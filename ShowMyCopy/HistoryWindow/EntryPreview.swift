@@ -13,9 +13,9 @@ enum EntryPreview {
     static let mask = "••••••••"
 
     /// The text a history row shows: the mask for a concealed entry the user has not revealed, otherwise the
-    /// sanitized preview.
+    /// sanitized preview made when the entry was recorded.
     static func rowText(for entry: ClipboardEntry, isRevealed: Bool) -> String {
-        entry.isConcealed && !isRevealed ? mask : text(entry.text)
+        entry.isConcealed && !isRevealed ? mask : entry.previewText
     }
 
     /// Builds the preview without walking more of the text than it needs.
