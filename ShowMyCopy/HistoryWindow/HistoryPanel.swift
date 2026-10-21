@@ -31,6 +31,10 @@ final class HistoryPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = true
         animationBehavior = .utilityWindow
+        // The panel shows clipboard contents, so keep it out of screen sharing, screenshots and recordings.
+        // This is the documented opt-out. Capture through ScreenCaptureKit on newer macOS versions may still
+        // include the window.
+        sharingType = NSWindow.SharingType.none
     }
 
     override var canBecomeKey: Bool {
