@@ -1,6 +1,6 @@
 SOURCES := ShowMyCopy ShowMyCopyTests
 
-.PHONY: lint format test security build-release
+.PHONY: lint format test security security-selftest build-release
 
 lint:
 	swiftlint lint --strict --quiet
@@ -15,6 +15,10 @@ format:
 test:
 	xcodebuild test -project ShowMyCopy.xcodeproj -scheme ShowMyCopy -destination 'platform=macOS,arch=arm64' \
 		-testLanguage en -testRegion US -quiet
+
+# Proves every check in check_security.py can fail (fixtures, fake codesign); runs on Linux too.
+security-selftest:
+	python3 -I scripts/test_check_security.py
 
 security: build-release
 	./scripts/check_security.sh build/Build/Products/Release/ShowMyCopy.app
