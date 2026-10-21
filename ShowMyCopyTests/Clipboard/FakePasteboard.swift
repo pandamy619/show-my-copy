@@ -6,7 +6,12 @@ import AppKit
 final class FakePasteboard: PasteboardReading, PasteboardWriting {
     var changeCount = 0
     var types: [NSPasteboard.PasteboardType] = []
-    var text: String?
+    /// The data of the current item per type, like `NSPasteboard.data(forType:)` returns it. Text is UTF-8 data
+    /// under `.string`; other kinds (RTF, PNG, file URLs) can be put here under their own types.
+    var contents: [NSPasteboard.PasteboardType: Data] = [:]
+    /// What `string()` returns instead of decoding `contents[.string]`, like `NSPasteboard` converting text it
+    /// holds in another form. Nil: `string()` decodes the UTF-8 data.
+    var convertedString: String?
     private(set) var writtenTexts: [String] = []
     /// For each write, whether it was marked as concealed.
     private(set) var writtenConcealed: [Bool] = []
@@ -17,6 +22,17 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     /// Runs once inside the next `string()` call, before the text is returned, to simulate another app
     /// writing to the pasteboard while the monitor reads it.
     var whileReadingString: (@MainActor (FakePasteboard) -> Void)?
+
+    /// The text of the current item. Setting it replaces the UTF-8 data under `.string`, without a new change count.
+    var text: String? {
+        get {
+            convertedString ?? contents[.string].flatMap { String(data: $0, encoding: .utf8) }
+        }
+        set {
+            contents[.string] = newValue.map { Data($0.utf8) }
+            convertedString = nil
+        }
+    }
 
     func string() -> String? {
         stringReadCount += 1
@@ -34,21 +50,29 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
 
     func copy(_ text: String, markers: [String] = []) {
         changeCount += 1
+        contents = [:]
         self.text = text
         types = [.string] + markers.map { NSPasteboard.PasteboardType($0) }
+    }
+
+    /// Another app copies an item with the given data per type, for kinds other than plain text.
+    func copy(_ contents: [NSPasteboard.PasteboardType: Data], markers: [String] = []) {
+        changeCount += 1
+        self.contents = contents
+        convertedString = nil
+        types = contents.keys.sorted { $0.rawValue < $1.rawValue } + markers.map { NSPasteboard.PasteboardType($0) }
     }
 
     /// Another app empties the pasteboard, like a password manager clearing a copied password.
     func clear() {
         changeCount += 1
-        text = nil
+        contents = [:]
+        convertedString = nil
         types = []
     }
 
     func copyImage() {
-        changeCount += 1
-        text = nil
-        types = [.png, .tiff]
+        copy([.png: Data([0x89, 0x50, 0x4E, 0x47]), .tiff: Data([0x4D, 0x4D])])
     }
 
     func write(_ text: String, concealed: Bool) -> Int? {
