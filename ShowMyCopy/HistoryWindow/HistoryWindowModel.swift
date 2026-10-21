@@ -38,14 +38,49 @@ final class HistoryWindowModel {
         self.history = history
     }
 
+    /// What the cached search result was computed from. While it stays the same, so do the entries that match.
+    private struct SearchInput: Equatable {
+        let query: String
+        let revision: Int
+        // Cheap extra checks, in case a store misses a revision.
+        let count: Int
+        let firstID: ClipboardEntry.ID?
+        let lastID: ClipboardEntry.ID?
+    }
+
+    /// The positions of the entries that matched the query, not copies of the entries, so an entry the history
+    /// removes (such as an expired password) is not kept alive here.
+    @ObservationIgnored private var cachedSearch: (input: SearchInput, matchingIndices: [Int])?
+
+    /// How often the history was searched. Tests read it to check that the search result is reused.
+    @ObservationIgnored private(set) var filterCount = 0
+
     /// Entries that match the query, newest first.
+    ///
+    /// The view reads this several times per update, and once per keystroke the query changes. The result is
+    /// reused until the query or the history's entries change. Matching uses the search keys made when the entries
+    /// were recorded, so only the query is folded.
     var items: [ClipboardEntry] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let entries = history.entries
         guard !needle.isEmpty else {
-            return history.entries
+            return entries
         }
+        let input = SearchInput(
+            query: needle,
+            revision: history.revision,
+            count: entries.count,
+            firstID: entries.first?.id,
+            lastID: entries.last?.id
+        )
+        if let cachedSearch, cachedSearch.input == input {
+            return cachedSearch.matchingIndices.map { entries[$0] }
+        }
+        filterCount += 1
         let foldedQuery = SearchKey.fold(needle)
-        return history.entries.filter { Self.entry($0, matches: foldedQuery) }
+        let matchingIndices = entries.indices.filter { Self.entry(entries[$0], matches: foldedQuery) }
+        cachedSearch = (input, matchingIndices)
+        return matchingIndices.map { entries[$0] }
     }
 
     /// The entry whose text is on the clipboard now. Nil after a copy that was not recorded, such as a password
