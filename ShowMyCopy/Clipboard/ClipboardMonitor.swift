@@ -6,7 +6,7 @@ import AppKit
 /// on a timer and reads the contents only when the count changes. It decides when to read, who copied and what
 /// the password settings allow; `PasteboardSnapshotReader` decides what the item is.
 @MainActor
-final class ClipboardMonitor {
+final class ClipboardMonitor: PasteboardChangeTracking {
     enum PauseReason: Hashable, Sendable {
         case systemSleep
         case displaySleep

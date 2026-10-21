@@ -5,13 +5,13 @@ import Foundation
 final class EntryCopier {
     private let history: any HistoryStore
     private let pasteboard: any PasteboardWriting
-    private let monitor: ClipboardMonitor
+    private let monitor: any PasteboardChangeTracking
     private let now: @MainActor () -> Date
 
     init(
         history: any HistoryStore,
         pasteboard: any PasteboardWriting,
-        monitor: ClipboardMonitor,
+        monitor: any PasteboardChangeTracking,
         now: @escaping @MainActor () -> Date = { Date() }
     ) {
         self.history = history

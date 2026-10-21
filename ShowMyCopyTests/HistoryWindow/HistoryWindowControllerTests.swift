@@ -83,6 +83,22 @@ struct HistoryWindowControllerTests {
         #expect(!controller.isVisible)
     }
 
+    @Test func shortcutClearsPauseReasonsBeforeCatchingUp() {
+        let tracker = ChangeTrackerSpy()
+        let controller = HistoryWindowController(
+            history: history, pasteboard: pasteboard, monitor: tracker, onOpenSettings: {})
+
+        controller.shortcutPressed()
+
+        // A pause left by a missed notification is cleared first, so the catch-up poll is not the last one.
+        #expect(tracker.calls == [.userIsActive, .poll])
+        #expect(controller.isVisible)
+
+        controller.shortcutPressed()
+        #expect(tracker.calls == [.userIsActive, .poll, .userIsActive])
+        #expect(!controller.isVisible)
+    }
+
     @Test func closingTheWindowHidesRevealedPasswords() throws {
         pasteboard.copy("older")
         monitor.poll()

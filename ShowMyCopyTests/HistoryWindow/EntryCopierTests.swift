@@ -196,6 +196,27 @@ struct EntryCopierTests {
         #expect(EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older))
     }
 
+    @Test func pollsBeforeWritingAndAcknowledgesTheWrite() throws {
+        history.record(text: "older", sourceApp: notes, at: start)
+        let older = try #require(history.entries.first)
+        let tracker = ChangeTrackerSpy()
+
+        #expect(EntryCopier(history: history, pasteboard: pasteboard, monitor: tracker).copy(older))
+
+        #expect(pasteboard.writtenTexts == ["older"])
+        #expect(tracker.calls == [.poll, .acknowledge(changeCount: pasteboard.changeCount)])
+    }
+
+    @Test func failedWriteIsNotAcknowledged() throws {
+        history.record(text: "older", sourceApp: notes, at: start)
+        let older = try #require(history.entries.first)
+        let tracker = ChangeTrackerSpy()
+        pasteboard.writeFails = true
+
+        #expect(!EntryCopier(history: history, pasteboard: pasteboard, monitor: tracker).copy(older))
+        #expect(tracker.calls == [.poll])
+    }
+
     @Test func pickedEntryStaysWhenCatchUpPollFillsTheHistory() throws {
         let history = ClipboardHistory(limit: 10)
         for index in 0..<10 {

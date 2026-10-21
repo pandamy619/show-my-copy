@@ -4,7 +4,7 @@ import AppKit
 @MainActor
 final class HistoryWindowController: NSObject, NSWindowDelegate {
     let model: HistoryWindowModel
-    private let monitor: ClipboardMonitor
+    private let monitor: any PasteboardChangeTracking
     private let copier: EntryCopier
     private let onOpenSettings: @MainActor () -> Void
     private var panel: HistoryPanel?
@@ -13,7 +13,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         history: any HistoryStore,
         model: HistoryWindowModel? = nil,
         pasteboard: any PasteboardWriting,
-        monitor: ClipboardMonitor,
+        monitor: any PasteboardChangeTracking,
         onOpenSettings: @escaping @MainActor () -> Void
     ) {
         self.model = model ?? HistoryWindowModel(history: history)
