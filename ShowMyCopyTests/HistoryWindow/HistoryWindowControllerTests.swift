@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -80,5 +81,14 @@ struct HistoryWindowControllerTests {
 
         controller.shortcutPressed()
         #expect(!controller.isVisible)
+    }
+
+    @Test func showUnhidesTheApp() {
+        // Closing Settings hides the app to give focus back to the previous app. A hidden app shows no windows.
+        NSApplication.shared.hide(nil)
+
+        makeController().show()
+
+        #expect(!NSApplication.shared.isHidden)
     }
 }
