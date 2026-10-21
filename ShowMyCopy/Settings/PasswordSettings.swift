@@ -1,0 +1,76 @@
+import Foundation
+import Observation
+
+/// How long a saved password stays in the history.
+enum PasswordLifetime: Int, CaseIterable, Identifiable, Sendable {
+    case oneMinute = 60
+    case tenMinutes = 600
+    case oneHour = 3600
+
+    static let `default` = PasswordLifetime.tenMinutes
+
+    var id: Int { rawValue }
+
+    var timeInterval: TimeInterval { TimeInterval(rawValue) }
+}
+
+/// What the clipboard monitor does with passwords: items with a password marker and items copied from a known
+/// password manager.
+struct PasswordPolicy: Equatable, Sendable {
+    /// When false, passwords are not recorded. When true, they are recorded concealed and removed after `lifetime`.
+    var savesPasswords: Bool
+    var lifetime: TimeInterval
+
+    static let `default` = PasswordPolicy(savesPasswords: false, lifetime: PasswordLifetime.default.timeInterval)
+}
+
+/// Stores the password choices in UserDefaults and applies them to the clipboard history.
+@MainActor
+@Observable
+final class PasswordSettings {
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let history: ClipboardHistory
+    @ObservationIgnored private let now: @MainActor () -> Date
+
+    /// Off by default. Turning it off removes every saved password from the history at once.
+    var savesPasswords: Bool {
+        didSet {
+            guard savesPasswords != oldValue else {
+                return
+            }
+            defaults.set(savesPasswords, forKey: SettingsKey.savePasswords)
+            if !savesPasswords {
+                history.removeConcealed()
+            }
+        }
+    }
+
+    /// A shorter lifetime also applies to passwords already in the history. A longer one applies to new ones.
+    var lifetime: PasswordLifetime {
+        didSet {
+            guard lifetime != oldValue else {
+                return
+            }
+            defaults.set(lifetime.rawValue, forKey: SettingsKey.passwordLifetime)
+            history.limitExpiry(to: now() + lifetime.timeInterval)
+        }
+    }
+
+    init(
+        history: ClipboardHistory,
+        defaults: UserDefaults = .standard,
+        now: @escaping @MainActor () -> Date = { Date() }
+    ) {
+        self.history = history
+        self.defaults = defaults
+        self.now = now
+        savesPasswords = defaults.object(forKey: SettingsKey.savePasswords) as? Bool ?? false
+        let storedLifetime = (defaults.object(forKey: SettingsKey.passwordLifetime) as? Int)
+            .flatMap(PasswordLifetime.init(rawValue:))
+        lifetime = storedLifetime ?? .default
+    }
+
+    var policy: PasswordPolicy {
+        PasswordPolicy(savesPasswords: savesPasswords, lifetime: lifetime.timeInterval)
+    }
+}
