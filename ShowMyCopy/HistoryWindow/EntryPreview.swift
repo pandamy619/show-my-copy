@@ -9,6 +9,14 @@ enum EntryPreview {
     static let maximumLines = 2
     static let maximumCharacters = 300
     static let ellipsis = "…"
+    /// Shown in place of a concealed entry. Its length is fixed, so it says nothing about the password.
+    static let mask = "••••••••"
+
+    /// The text a history row shows: the mask for a concealed entry the user has not revealed, otherwise the
+    /// sanitized preview.
+    static func rowText(for entry: ClipboardEntry, isRevealed: Bool) -> String {
+        entry.isConcealed && !isRevealed ? mask : text(entry.text)
+    }
 
     /// Builds the preview without walking more of the text than it needs.
     static func text(_ text: String) -> String {

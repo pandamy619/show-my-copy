@@ -43,6 +43,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
 
     func hide() {
         panel?.orderOut(nil)
+        // A revealed password must not be on screen the next time the window opens.
+        model.concealAll()
     }
 
     func toggle() {

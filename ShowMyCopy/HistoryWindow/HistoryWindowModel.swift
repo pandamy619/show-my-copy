@@ -31,6 +31,9 @@ final class HistoryWindowModel {
     /// Changes every time the window is shown, so the view can move focus to the search field.
     private(set) var presentationCount = 0
 
+    /// Concealed entries the user revealed with the eye button. Hidden again when the window closes or opens.
+    private var revealedIDs: Set<ClipboardEntry.ID> = []
+
     init(history: ClipboardHistory) {
         self.history = history
     }
@@ -92,20 +95,39 @@ final class HistoryWindowModel {
         }
     }
 
-    /// Clears the search and selects the first row. Called each time the window is shown.
+    /// Clears the search, hides revealed passwords and selects the first row. Called each time the window is shown.
     func prepareForPresentation() {
         query = ""
+        concealAll()
         selectFirst()
         presentationCount += 1
+    }
+
+    func isRevealed(_ id: ClipboardEntry.ID) -> Bool {
+        revealedIDs.contains(id)
+    }
+
+    func toggleReveal(_ id: ClipboardEntry.ID) {
+        if revealedIDs.remove(id) == nil {
+            revealedIDs.insert(id)
+        }
+    }
+
+    /// Hides every revealed password again.
+    func concealAll() {
+        if !revealedIDs.isEmpty {
+            revealedIDs.removeAll()
+        }
     }
 
     /// Only the beginning of each entry is searched, so typing stays fast with long entries.
     nonisolated static let searchedCharacters = 10_000
 
-    /// Case- and diacritic-insensitive match against the text and the source app name.
+    /// Case- and diacritic-insensitive match against the text and the source app name. A concealed entry matches
+    /// only by its source app name, so typing part of a password does not reveal which entry holds it.
     nonisolated static func entry(_ entry: ClipboardEntry, matches needle: String) -> Bool {
         let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        if entry.text.prefix(searchedCharacters).range(of: needle, options: options) != nil {
+        if !entry.isConcealed, entry.text.prefix(searchedCharacters).range(of: needle, options: options) != nil {
             return true
         }
         guard let appName = entry.sourceApp?.name else {
