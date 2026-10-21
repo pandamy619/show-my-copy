@@ -296,24 +296,92 @@ struct ClipboardMonitorPauseTests {
     }
 }
 
+/// Replaces `Task.sleep` in the polling loop. Each sleep lasts until the test calls `wakeAll()`.
+@MainActor
+final class ManualSleeper {
+    private(set) var requestedDurations: [Duration] = []
+    private var sleepers: [CheckedContinuation<Void, Never>] = []
+
+    var sleepingCount: Int {
+        sleepers.count
+    }
+
+    func sleep(for duration: Duration) async {
+        requestedDurations.append(duration)
+        await withCheckedContinuation { sleepers.append($0) }
+    }
+
+    func wakeAll() {
+        let woken = sleepers
+        sleepers.removeAll()
+        for sleeper in woken {
+            sleeper.resume()
+        }
+    }
+
+    /// Lets other main-actor tasks run until the polling loop sleeps again. Does not wait for real time.
+    func waitUntilSleeping() async {
+        var turns = 0
+        while sleepers.isEmpty, turns < 10_000 {
+            turns += 1
+            await Task.yield()
+        }
+    }
+
+    /// Lets other main-actor tasks run for a while, for checks that nothing happens.
+    func yieldForAWhile() async {
+        for _ in 0..<100 {
+            await Task.yield()
+        }
+    }
+}
+
 @MainActor
 struct ClipboardMonitorPollingTests {
-    @Test func pollingLoopPicksUpNewCopies() async throws {
-        let pasteboard = FakePasteboard()
-        let history = ClipboardHistory()
-        let monitor = ClipboardMonitor(
+    private let pasteboard = FakePasteboard()
+    private let history = ClipboardHistory()
+    private let sleeper = ManualSleeper()
+
+    private func makeMonitor() -> ClipboardMonitor {
+        ClipboardMonitor(
             pasteboard: pasteboard,
             history: history,
-            interval: .milliseconds(10),
-            frontmostApp: { nil }
+            interval: .seconds(3),
+            frontmostApp: { nil },
+            sleep: { [sleeper] duration in await sleeper.sleep(for: duration) }
         )
+    }
+
+    @Test func pollingLoopPicksUpNewCopies() async {
+        let monitor = makeMonitor()
         monitor.start()
-        defer { monitor.stop() }
+        await sleeper.waitUntilSleeping()
+        #expect(sleeper.requestedDurations == [.seconds(3)])
 
         pasteboard.copy("copied later")
-        for _ in 0..<200 where history.entries.isEmpty {
-            try await Task.sleep(for: .milliseconds(10))
-        }
+        #expect(history.entries.isEmpty)
+
+        sleeper.wakeAll()
+        await sleeper.waitUntilSleeping()
         #expect(history.entries.map(\.text) == ["copied later"])
+        #expect(sleeper.requestedDurations == [.seconds(3), .seconds(3)])
+
+        monitor.stop()
+        sleeper.wakeAll()
+    }
+
+    @Test func stoppedLoopDoesNotPollOrSleepAgain() async {
+        let monitor = makeMonitor()
+        monitor.start()
+        await sleeper.waitUntilSleeping()
+
+        monitor.stop()
+        pasteboard.copy("copied after stop")
+        sleeper.wakeAll()
+        await sleeper.yieldForAWhile()
+
+        #expect(history.entries.isEmpty)
+        #expect(sleeper.sleepingCount == 0)
+        #expect(sleeper.requestedDurations.count == 1)
     }
 }
