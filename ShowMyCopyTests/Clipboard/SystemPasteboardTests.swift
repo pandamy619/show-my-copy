@@ -50,6 +50,11 @@ final class FakePasteboardBackend: PasteboardBackend {
         strings[dataType]
     }
 
+    /// Text as UTF-8 data, as `NSPasteboard` returns it for `.string`.
+    func data(forType dataType: NSPasteboard.PasteboardType) -> Data? {
+        strings[dataType].map { Data($0.utf8) }
+    }
+
     /// Another app takes over the pasteboard.
     func otherAppCopies(_ text: String) {
         changeCount += 1
@@ -145,5 +150,12 @@ struct SystemPasteboardTests {
         #expect(pasteboard.changeCount == 1)
         #expect(pasteboard.types.isEmpty)
         #expect(pasteboard.string() == "copied")
+    }
+
+    @Test func readsDataPassThrough() {
+        backend.otherAppCopies("copied")
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: nil)
+        #expect(pasteboard.data(forType: .string) == Data("copied".utf8))
+        #expect(pasteboard.data(forType: .png) == nil)
     }
 }

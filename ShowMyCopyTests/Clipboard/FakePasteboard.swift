@@ -15,12 +15,17 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     private(set) var writtenTexts: [String] = []
     /// For each write, whether it was marked as concealed.
     private(set) var writtenConcealed: [Bool] = []
-    /// How often the text was read, to check that secrets are not read when they are not kept.
+    /// How often the text was read, as a string or as data, to check that secrets are not read when they are not
+    /// kept.
     private(set) var stringReadCount = 0
+    /// How often `string()` was called, to check that text too large to keep is not turned into a string.
+    private(set) var stringCallCount = 0
+    /// How often data of any type was read.
+    private(set) var dataReadCount = 0
     /// When true, `write` fails and leaves the pasteboard unchanged.
     var writeFails = false
-    /// Runs once inside the next `string()` call, before the text is returned, to simulate another app
-    /// writing to the pasteboard while the monitor reads it.
+    /// Runs once inside the next `string()` or `data(forType:)` call, before the contents are returned, to simulate
+    /// another app writing to the pasteboard while the monitor reads it.
     var whileReadingString: (@MainActor (FakePasteboard) -> Void)?
 
     /// The text of the current item. Setting it replaces the UTF-8 data under `.string`, without a new change count.
@@ -36,11 +41,25 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
 
     func string() -> String? {
         stringReadCount += 1
+        stringCallCount += 1
+        runReadHook()
+        return text
+    }
+
+    func data(forType dataType: NSPasteboard.PasteboardType) -> Data? {
+        dataReadCount += 1
+        if dataType == .string {
+            stringReadCount += 1
+        }
+        runReadHook()
+        return contents[dataType]
+    }
+
+    private func runReadHook() {
         if let hook = whileReadingString {
             whileReadingString = nil
             hook(self)
         }
-        return text
     }
 
     /// Adds a marker to the current item without a new change count, like an app that adds types after the text.
