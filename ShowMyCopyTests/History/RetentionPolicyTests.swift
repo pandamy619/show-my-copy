@@ -38,4 +38,31 @@ struct RetentionPolicyTests {
         #expect(policy.removedCount(from: entries(3)) == 0)
         #expect(policy.removedCount(from: []) == 0)
     }
+
+    @Test func neverRemovesPinnedEntries() {
+        var all = entries(14)
+        // Pin the two oldest and one in the middle.
+        for index in [13, 12, 5] {
+            all[index].isPinned = true
+        }
+        let kept = RetentionPolicy(entryLimit: 10).kept(all)
+        #expect(kept.filter(\.isPinned).count == 3)
+        #expect(kept.map(\.text).contains("item 0"))
+        #expect(kept.map(\.text).contains("item 1"))
+    }
+
+    @Test func pinnedEntriesDoNotCountTowardTheLimit() {
+        var all = entries(14)
+        for index in [13, 12, 5] {
+            all[index].isPinned = true
+        }
+        let policy = RetentionPolicy(entryLimit: 10)
+        let kept = policy.kept(all)
+        // Ten unpinned entries plus the three pinned ones, in their original order.
+        #expect(kept.count == 13)
+        #expect(kept.filter { !$0.isPinned }.count == 10)
+        #expect(kept.map(\.id) == all.filter { kept.map(\.id).contains($0.id) }.map(\.id))
+        #expect(kept.last?.text == "item 0")
+        #expect(policy.removedCount(from: all) == 1)
+    }
 }
