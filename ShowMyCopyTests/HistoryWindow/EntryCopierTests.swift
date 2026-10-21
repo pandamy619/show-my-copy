@@ -81,6 +81,32 @@ struct EntryCopierTests {
         #expect(history.entries.map(\.text) == ["older", "copied between polls"])
     }
 
+    @Test func failedWriteLeavesHistoryAndMonitorAlone() throws {
+        history.record(text: "older", sourceApp: notes, at: start)
+        history.record(text: "newer", sourceApp: nil, at: start + 1)
+        let monitor = makeMonitor()
+        monitor.poll()
+        let older = try #require(history.entries.last)
+        pasteboard.writeFails = true
+
+        let copied = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older)
+
+        #expect(!copied)
+        #expect(history.entries.map(\.text) == ["newer", "older"])
+        // The monitor was not told about a write, so a copy made next is still recorded.
+        pasteboard.copy("fresh")
+        monitor.poll()
+        #expect(history.entries.map(\.text) == ["fresh", "newer", "older"])
+    }
+
+    @Test func successfulCopyReturnsTrue() throws {
+        history.record(text: "older", sourceApp: notes, at: start)
+        let monitor = makeMonitor()
+        monitor.poll()
+        let older = try #require(history.entries.first)
+        #expect(EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older))
+    }
+
     @Test func pickedEntryStaysWhenCatchUpPollFillsTheHistory() throws {
         let history = ClipboardHistory(limit: 10)
         for index in 0..<10 {

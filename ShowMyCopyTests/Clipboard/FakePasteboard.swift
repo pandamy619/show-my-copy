@@ -8,6 +8,8 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     var types: [NSPasteboard.PasteboardType] = []
     var text: String?
     private(set) var writtenTexts: [String] = []
+    /// When true, `write` fails and leaves the pasteboard unchanged.
+    var writeFails = false
     /// Runs once inside the next `string()` call, before the text is returned, to simulate another app
     /// writing to the pasteboard while the monitor reads it.
     var whileReadingString: (@MainActor (FakePasteboard) -> Void)?
@@ -37,7 +39,10 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         types = [.png, .tiff]
     }
 
-    func write(_ text: String) -> Int {
+    func write(_ text: String) -> Int? {
+        guard !writeFails else {
+            return nil
+        }
         writtenTexts.append(text)
         copy(text)
         return changeCount
