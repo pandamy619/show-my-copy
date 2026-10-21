@@ -25,12 +25,13 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Entry limit** from 10 to 1000, 50 by default. Lowering it asks before removing old entries.
 - **Clear history** in Settings, with confirmation.
 - **Pauses while the Mac sleeps or the screen is locked.**
-- **Skips passwords** that password managers mark as concealed, and other items marked as transient or auto-generated.
+- **Passwords are not kept** by default: items that password managers mark as concealed and anything copied from a known password manager are skipped, as are items marked as transient or auto-generated. When a password manager clears a password it copied without a marker, the entry leaves the history too.
+- **Save passwords, if you want.** Turn it on in Settings to keep passwords hidden in the history: an eye button reveals one, search skips them, and they are removed after 1 minute, 10 minutes or 1 hour.
 - **No menu bar icon, no Dock icon.**
 - **English and Russian** interface.
 - **Private by design.** No analytics, no network, sandboxed.
 
-History is kept in memory only and is lost when you quit the app. Passwords copied without a marker are kept like normal text for now — see [SECURITY.md](SECURITY.md) for the details and known limitations.
+History is kept in memory only and is lost when you quit the app. A password copied without a marker from an app that is not a known password manager, such as a browser extension, can still be kept like normal text — see [SECURITY.md](SECURITY.md) for the details and known limitations.
 
 ## Planned features
 
@@ -39,7 +40,7 @@ Not available yet:
 - **More than text.** Rich text, images and files.
 - **History that survives a restart,** stored only on your Mac.
 - **Control Center button** on macOS 26.
-- **Passwords stay hidden.** Entries from password managers are masked until you reveal them, encrypted on disk and deleted after a set time.
+- **Saved passwords encrypted on disk,** with a key kept in your Keychain, once history survives a restart.
 - **Usage at a glance.** See how much disk and memory the history uses.
 
 ## Building
