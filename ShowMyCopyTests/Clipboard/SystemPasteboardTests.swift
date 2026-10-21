@@ -62,6 +62,7 @@ final class FakePasteboardBackend: PasteboardBackend {
 struct SystemPasteboardTests {
     private let backend = FakePasteboardBackend()
     private let sourceType = NSPasteboard.PasteboardType(PasteboardMarker.source)
+    private let concealedType = NSPasteboard.PasteboardType(PasteboardMarker.concealed)
 
     @Test func writeReturnsTheChangeCountOfItsOwnItem() throws {
         backend.changeCount = 41
@@ -108,6 +109,33 @@ struct SystemPasteboardTests {
         // Returning the newer count would make the monitor ignore the other app's copy.
         #expect(pasteboard.write("hello") == nil)
         #expect(pasteboard.string() == "from another app")
+    }
+
+    @Test func plainWriteHasNoConcealedMarker() {
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: "com.example.ShowMyCopy")
+        pasteboard.write("hello")
+        #expect(!pasteboard.types.contains(concealedType))
+    }
+
+    @Test func concealedWriteIsMarkedAndStaysOnThisMac() throws {
+        backend.changeCount = 7
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: "com.example.ShowMyCopy")
+
+        let changeCount = try #require(pasteboard.write("hunter2", concealed: true))
+        #expect(changeCount == 8)
+        #expect(backend.preparedOptions == [.currentHostOnly])
+        #expect(pasteboard.string() == "hunter2")
+        #expect(backend.string(forType: sourceType) == "com.example.ShowMyCopy")
+        // Other clipboard managers check the marker as soon as the text appears, so it goes first.
+        #expect(pasteboard.types.first == concealedType)
+    }
+
+    @Test func concealedWriteFailsWithoutTheMarker() {
+        backend.failingTypes = [concealedType]
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: "com.example.ShowMyCopy")
+        // Without the marker other clipboard managers would keep the password, so the text is not written.
+        #expect(pasteboard.write("hunter2", concealed: true) == nil)
+        #expect(pasteboard.string() == nil)
     }
 
     @Test func readsPassThrough() {
