@@ -15,9 +15,24 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
     /// For a concealed entry it is shown only after the user reveals it.
     let previewText: String
     var date: Date
-    var sourceApp: SourceApp?
+    var sourceApp: SourceApp? {
+        didSet {
+            sourceAppSearchKey = SearchKey.appName(of: sourceApp)
+        }
+    }
     /// A password: shown masked, left out of text search and removed at `expiresAt`.
-    var isConcealed: Bool
+    var isConcealed: Bool {
+        didSet {
+            if isConcealed != oldValue {
+                searchKey = isConcealed ? nil : SearchKey.text(of: content)
+            }
+        }
+    }
+    /// The start of the text, folded for search when the entry is made, so typing a query does not fold every
+    /// entry again. Nil for a concealed entry: search never looks inside a password.
+    private(set) var searchKey: String?
+    /// The source app's name, folded for search. A concealed entry is found only by this.
+    private(set) var sourceAppSearchKey: String?
     /// When a concealed entry is removed from the history. Nil for plain entries.
     var expiresAt: Date?
     /// A pinned entry is never removed by the history limits. Nothing pins entries yet.
@@ -43,6 +58,8 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
         self.isConcealed = isConcealed
         self.expiresAt = expiresAt
         self.isPinned = isPinned
+        self.searchKey = isConcealed ? nil : SearchKey.text(of: content)
+        self.sourceAppSearchKey = SearchKey.appName(of: sourceApp)
     }
 
     /// Makes a text entry, hashing the text with `hasher`.

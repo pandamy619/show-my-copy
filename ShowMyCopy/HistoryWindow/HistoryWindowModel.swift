@@ -44,7 +44,8 @@ final class HistoryWindowModel {
         guard !needle.isEmpty else {
             return history.entries
         }
-        return history.entries.filter { Self.entry($0, matches: needle) }
+        let foldedQuery = SearchKey.fold(needle)
+        return history.entries.filter { Self.entry($0, matches: foldedQuery) }
     }
 
     /// The entry whose text is on the clipboard now. Nil after a copy that was not recorded, such as a password
@@ -114,20 +115,16 @@ final class HistoryWindowModel {
     }
 
     /// Only the beginning of each entry is searched, so typing stays fast with long entries.
-    nonisolated static let searchedCharacters = 10_000
+    nonisolated static let searchedCharacters = SearchKey.searchedCharacters
 
-    /// Case- and diacritic-insensitive match against the text and the source app name. A concealed entry matches
-    /// only by its source app name, so typing part of a password does not reveal which entry holds it.
-    nonisolated static func entry(_ entry: ClipboardEntry, matches needle: String) -> Bool {
-        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        let searchedText = entry.isConcealed ? nil : entry.text?.prefix(searchedCharacters)
-        if let searchedText, searchedText.range(of: needle, options: options) != nil {
+    /// Case- and diacritic-insensitive match against the text and the source app name, using the keys folded when
+    /// the entry was made. `foldedQuery` must be folded with `SearchKey.fold(_:)`. A concealed entry matches only by
+    /// its source app name, so typing part of a password does not reveal which entry holds it.
+    nonisolated static func entry(_ entry: ClipboardEntry, matches foldedQuery: String) -> Bool {
+        if !entry.isConcealed, SearchKey.key(entry.searchKey, contains: foldedQuery) {
             return true
         }
-        guard let appName = entry.sourceApp?.name else {
-            return false
-        }
-        return appName.range(of: needle, options: options) != nil
+        return SearchKey.key(entry.sourceAppSearchKey, contains: foldedQuery)
     }
 
     private func selectFirst() {

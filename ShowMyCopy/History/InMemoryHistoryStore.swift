@@ -42,7 +42,9 @@ final class InMemoryHistoryStore: HistoryStore {
             entry.date = date
             entry.sourceApp = sourceApp
         } else {
-            entry = ClipboardEntry(content: content, contentHash: contentHash, date: date, sourceApp: sourceApp)
+            // Made concealed right away, so no search key is ever made from a password.
+            entry = ClipboardEntry(
+                content: content, contentHash: contentHash, date: date, sourceApp: sourceApp, isConcealed: concealed)
         }
         if concealed {
             entry.isConcealed = true
