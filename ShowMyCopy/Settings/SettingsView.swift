@@ -49,7 +49,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
             LabeledContent("Show history") {
                 shortcutRecorder
             }
-            Text("Opens the clipboard history window")
+            Text("Opens the clipboard history window. Avoid ⇧⌘V: it would replace Paste and Match Style in other apps.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

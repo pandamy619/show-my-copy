@@ -206,12 +206,12 @@
         }
       }
     },
-    "Opens the clipboard history window" : {
+    "Opens the clipboard history window. Avoid ⇧⌘V: it would replace Paste and Match Style in other apps." : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Открывает окно истории буфера обмена"
+            "value" : "Открывает окно истории буфера обмена. Не выбирайте ⇧⌘V: это сочетание заменит «Вставить и согласовать стиль» в других приложениях."
           }
         }
       }
