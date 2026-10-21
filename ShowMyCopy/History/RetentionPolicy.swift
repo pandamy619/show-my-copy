@@ -22,8 +22,17 @@ struct RetentionPolicy: Equatable, Sendable {
     }
 
     /// The entries the policy keeps, in their order. `entries` are newest first, so the oldest are removed.
+    ///
+    /// Pinned entries are never removed and do not count toward the limit, so pinning cannot crowd out new copies.
     func kept(_ entries: [ClipboardEntry]) -> [ClipboardEntry] {
-        Array(entries.prefix(entryLimit))
+        var unpinnedCount = 0
+        return entries.filter { entry in
+            if entry.isPinned {
+                return true
+            }
+            unpinnedCount += 1
+            return unpinnedCount <= entryLimit
+        }
     }
 
     /// How many of `entries` the policy removes.
