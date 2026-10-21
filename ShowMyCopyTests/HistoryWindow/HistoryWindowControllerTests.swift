@@ -33,4 +33,39 @@ struct HistoryWindowControllerTests {
         #expect(selected.text == "just copied")
         #expect(controller.model.currentEntryID == selected.id)
     }
+
+    @Test func choosingAnEntryCopiesItAndCloses() throws {
+        pasteboard.copy("older")
+        monitor.poll()
+        pasteboard.copy("newer")
+        let controller = makeController()
+        controller.show()
+        let older = try #require(controller.model.items.last)
+
+        controller.choose(older)
+
+        #expect(pasteboard.writtenTexts == ["older"])
+        #expect(!controller.isVisible)
+    }
+
+    @Test func failedCopyKeepsTheWindowOpen() throws {
+        pasteboard.copy("older")
+        monitor.poll()
+        pasteboard.copy("newer")
+        let controller = makeController()
+        controller.show()
+        let older = try #require(controller.model.items.last)
+        pasteboard.writeFails = true
+
+        controller.choose(older)
+
+        // Nothing was copied, so the user can try again.
+        #expect(controller.isVisible)
+        #expect(pasteboard.string() == "newer")
+
+        pasteboard.writeFails = false
+        controller.choose(older)
+        #expect(pasteboard.writtenTexts == ["older"])
+        #expect(!controller.isVisible)
+    }
 }
