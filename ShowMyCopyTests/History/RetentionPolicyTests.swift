@@ -65,4 +65,88 @@ struct RetentionPolicyTests {
         #expect(kept.last?.text == "item 0")
         #expect(policy.removedCount(from: all) == 1)
     }
+
+    @Test func hasNoByteLimitByDefault() {
+        #expect(RetentionPolicy.default.byteLimit == nil)
+        let all = (0..<10).map { index in
+            ClipboardEntry(text: String(repeating: "x", count: 100_000), date: start + Double(index), sourceApp: nil)
+        }
+        #expect(RetentionPolicy.default.removedCount(from: all) == 0)
+    }
+
+    @Test func byteLimitRemovesTheOldestEntriesThatDoNotFit() {
+        // "item 9" ... "item 0": six bytes each.
+        let policy = RetentionPolicy(entryLimit: 100, byteLimit: 20)
+        #expect(policy.kept(entries(10)).map(\.text) == ["item 9", "item 8", "item 7"])
+        #expect(policy.removedCount(from: entries(10)) == 7)
+    }
+
+    @Test func entryThatFitsExactlyIsKept() {
+        let policy = RetentionPolicy(entryLimit: 100, byteLimit: 18)
+        #expect(policy.kept(entries(10)).count == 3)
+    }
+
+    @Test func noOlderEntryIsKeptAfterOneThatDoesNotFit() {
+        let all = [
+            ClipboardEntry(text: "new", date: start + 2, sourceApp: nil),
+            ClipboardEntry(text: String(repeating: "x", count: 50), date: start + 1, sourceApp: nil),
+            ClipboardEntry(text: "old", date: start, sourceApp: nil),
+        ]
+        #expect(RetentionPolicy(byteLimit: 10).kept(all).map(\.text) == ["new"])
+    }
+
+    @Test func bothLimitsApply() {
+        #expect(RetentionPolicy(entryLimit: 10, byteLimit: 1000).kept(entries(12)).count == 10)
+        // "item 11" and "item 10" are seven bytes, the rest six: 7 + 7 + 6 + 6 fits in 30, a fifth does not.
+        #expect(RetentionPolicy(entryLimit: 10, byteLimit: 30).kept(entries(12)).count == 4)
+    }
+
+    @Test func pinnedEntriesDoNotCountTowardTheByteLimit() {
+        var all = entries(10)
+        all[9].isPinned = true
+        all[0].isPinned = true
+        let kept = RetentionPolicy(entryLimit: 100, byteLimit: 12).kept(all)
+        #expect(kept.map(\.text) == ["item 9", "item 8", "item 7", "item 0"])
+    }
+
+    @Test func negativeByteLimitKeepsOnlyPinnedEntries() {
+        var all = entries(3)
+        all[1].isPinned = true
+        let policy = RetentionPolicy(byteLimit: -1)
+        #expect(policy.byteLimit == 0)
+        #expect(policy.kept(all).map(\.text) == ["item 1"])
+    }
+
+    @Test func changingOneLimitKeepsTheOther() {
+        let policy = RetentionPolicy(entryLimit: 20, byteLimit: 500)
+        #expect(policy.withEntryLimit(30) == RetentionPolicy(entryLimit: 30, byteLimit: 500))
+        #expect(policy.withByteLimit(nil) == RetentionPolicy(entryLimit: 20))
+    }
+}
+
+@MainActor
+struct HistoryByteLimitTests {
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+
+    @Test func historyKeepsItsByteLimit() {
+        let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 20))
+        for index in 0..<5 {
+            history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
+        }
+        #expect(history.entries.map(\.text) == ["item 4", "item 3", "item 2"])
+        #expect(history.stats().totalBytes == 18)
+    }
+
+    @Test func changingTheEntryLimitKeepsTheByteLimit() {
+        let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 20))
+        history.setLimit(200)
+        #expect(history.retention == RetentionPolicy(entryLimit: 200, byteLimit: 20))
+    }
+
+    @Test func entryLargerThanTheByteLimitIsNotKept() {
+        let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 4))
+        history.record(text: "too long", sourceApp: nil, at: start)
+        #expect(history.entries.isEmpty)
+        #expect(history.currentEntryID == nil)
+    }
 }
