@@ -22,6 +22,7 @@ final class ClipboardMonitor {
     private let frontmostApp: @MainActor () -> SourceApp?
     private let now: @MainActor () -> Date
     private let sleep: @Sendable (Duration) async throws -> Void
+    private let activity: any PollingActivity
     private var lastChangeCount: Int?
     /// True until the monitor has looked at the pasteboard while running. A change found then was made before
     /// launch or while the monitor was stopped or paused, so the app in front now did not necessarily make it.
@@ -36,7 +37,8 @@ final class ClipboardMonitor {
         interval: Duration = ClipboardMonitor.defaultInterval,
         frontmostApp: @escaping @MainActor () -> SourceApp? = { SourceApp.frontmost() },
         now: @escaping @MainActor () -> Date = { Date() },
-        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        activity: any PollingActivity = ProcessPollingActivity()
     ) {
         self.pasteboard = pasteboard
         self.history = history
@@ -44,6 +46,7 @@ final class ClipboardMonitor {
         self.frontmostApp = frontmostApp
         self.now = now
         self.sleep = sleep
+        self.activity = activity
     }
 
     var isPolling: Bool {
@@ -76,6 +79,7 @@ final class ClipboardMonitor {
     private func updatePolling() {
         let shouldPoll = isStarted && pauseReasons.isEmpty
         if shouldPoll, pollTask == nil {
+            activity.begin()
             poll()
             pollTask = Task { [weak self, interval, sleep] in
                 while !Task.isCancelled {
@@ -89,6 +93,7 @@ final class ClipboardMonitor {
         } else if !shouldPoll, let pollTask {
             pollTask.cancel()
             self.pollTask = nil
+            activity.end()
         }
     }
 
