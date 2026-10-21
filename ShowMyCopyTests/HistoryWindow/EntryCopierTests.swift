@@ -38,6 +38,20 @@ struct EntryCopierTests {
         #expect(top.id == older.id)
         #expect(top.sourceApp == notes)
         #expect(top.date == start + 5)
+        #expect(history.currentEntryID == older.id)
+    }
+
+    @Test func copiedEntryBecomesCurrentAfterASkippedCopy() throws {
+        history.record(text: "older", sourceApp: notes, at: start)
+        let monitor = makeMonitor()
+        monitor.poll()
+        pasteboard.copy("secret", markers: [PasteboardMarker.concealed])
+        monitor.poll()
+        #expect(history.currentEntryID == nil)
+        let older = try #require(history.entries.first)
+
+        EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older)
+        #expect(history.currentEntryID == older.id)
     }
 
     @Test func monitorDoesNotRecordTheAppsOwnWrite() throws {
@@ -88,11 +102,13 @@ struct EntryCopierTests {
         monitor.poll()
         let older = try #require(history.entries.last)
         pasteboard.writeFails = true
+        let currentID = history.currentEntryID
 
         let copied = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older)
 
         #expect(!copied)
         #expect(history.entries.map(\.text) == ["newer", "older"])
+        #expect(history.currentEntryID == currentID)
         // The monitor was not told about a write, so a copy made next is still recorded.
         pasteboard.copy("fresh")
         monitor.poll()

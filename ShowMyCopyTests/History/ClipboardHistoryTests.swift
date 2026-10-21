@@ -80,3 +80,55 @@ struct ClipboardHistoryTests {
         #expect(history.entries.isEmpty)
     }
 }
+
+@MainActor
+struct ClipboardHistoryCurrentEntryTests {
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+
+    @Test func startsWithoutCurrentEntry() {
+        #expect(ClipboardHistory().currentEntryID == nil)
+    }
+
+    @Test func recordedTextBecomesCurrent() throws {
+        let history = ClipboardHistory()
+        let firstID = history.record(text: "first", sourceApp: nil, at: start)
+        #expect(history.currentEntryID == firstID)
+        #expect(history.entries.first?.id == firstID)
+
+        let secondID = history.record(text: "second", sourceApp: nil, at: start + 1)
+        #expect(history.currentEntryID == secondID)
+    }
+
+    @Test func repeatedTextMakesTheExistingEntryCurrent() {
+        let history = ClipboardHistory()
+        let firstID = history.record(text: "first", sourceApp: nil, at: start)
+        history.record(text: "second", sourceApp: nil, at: start + 1)
+        #expect(history.record(text: "first", sourceApp: nil, at: start + 2) == firstID)
+        #expect(history.currentEntryID == firstID)
+    }
+
+    @Test func skippedCopyLeavesNoCurrentEntry() {
+        let history = ClipboardHistory()
+        history.record(text: "first", sourceApp: nil, at: start)
+        history.markCurrentSkipped()
+        #expect(history.currentEntryID == nil)
+        #expect(history.entries.map(\.text) == ["first"])
+    }
+
+    @Test func clearRemovesCurrentEntry() {
+        let history = ClipboardHistory()
+        history.record(text: "first", sourceApp: nil, at: start)
+        history.clear()
+        #expect(history.currentEntryID == nil)
+    }
+
+    @Test func loweringLimitKeepsCurrentEntry() {
+        let history = ClipboardHistory(limit: 20)
+        var currentID: ClipboardEntry.ID?
+        for index in 0..<15 {
+            currentID = history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
+        }
+        history.setLimit(10)
+        #expect(history.currentEntryID == currentID)
+    }
+}
