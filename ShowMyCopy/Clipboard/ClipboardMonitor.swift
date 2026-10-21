@@ -108,6 +108,7 @@ final class ClipboardMonitor {
         let isFirstPoll = lastChangeCount == nil
         lastChangeCount = changeCount
         guard let text else {
+            history.markCurrentSkipped()
             return
         }
         history.record(text: text, sourceApp: isFirstPoll ? nil : frontmostApp(), at: now())
