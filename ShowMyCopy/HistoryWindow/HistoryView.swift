@@ -72,6 +72,8 @@ struct HistoryView: View {
     }
 
     private func list(items: [ClipboardEntry], selectedID: ClipboardEntry.ID?, now: Date) -> some View {
+        // The current entry, when there is one, is the newest. After a skipped copy (a password, an image) nothing
+        // in the history is on the clipboard, so every entry is listed under "History".
         let current = items.first.flatMap { $0.id == model.currentEntryID ? $0 : nil }
         let rest = current == nil ? items[...] : items.dropFirst()
         return ScrollViewReader { proxy in

@@ -39,9 +39,10 @@ final class HistoryWindowModel {
         return history.entries.filter { Self.entry($0, matches: needle) }
     }
 
-    /// The newest entry is what is on the clipboard now.
+    /// The entry whose text is on the clipboard now. Nil after a copy that was not recorded, such as a password
+    /// or an image: then the newest entry is no longer on the clipboard and the window shows no current entry.
     var currentEntryID: ClipboardEntry.ID? {
-        history.entries.first?.id
+        history.currentEntryID
     }
 
     var selectedIndex: Int? {
