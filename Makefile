@@ -13,8 +13,9 @@ format:
 	swiftlint lint --fix --quiet
 
 test:
+	rm -rf build/Tests.xcresult
 	xcodebuild test -project ShowMyCopy.xcodeproj -scheme ShowMyCopy -destination 'platform=macOS,arch=arm64' \
-		-testLanguage en -testRegion US -quiet
+		-testLanguage en -testRegion US -resultBundlePath build/Tests.xcresult -quiet
 
 # Proves every check in check_security.py can fail (fixtures, fake codesign); runs on Linux too.
 security-selftest:
