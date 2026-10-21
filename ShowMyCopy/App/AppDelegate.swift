@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let historyWindow = HistoryWindowController(
             history: history,
-            pasteboard: pasteboard,
+            copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
             monitor: monitor,
             onOpenSettings: { [weak settingsWindow] in
                 settingsWindow?.show()

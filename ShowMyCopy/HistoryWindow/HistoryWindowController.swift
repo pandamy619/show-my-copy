@@ -5,20 +5,20 @@ import AppKit
 final class HistoryWindowController: NSObject, NSWindowDelegate {
     let model: HistoryWindowModel
     private let monitor: any PasteboardChangeTracking
-    private let copier: EntryCopier
+    private let copier: any EntryCopying
     private let onOpenSettings: @MainActor () -> Void
     private var panel: HistoryPanel?
 
     init(
         history: any HistoryStore,
         model: HistoryWindowModel? = nil,
-        pasteboard: any PasteboardWriting,
+        copier: any EntryCopying,
         monitor: any PasteboardChangeTracking,
         onOpenSettings: @escaping @MainActor () -> Void
     ) {
         self.model = model ?? HistoryWindowModel(history: history)
+        self.copier = copier
         self.monitor = monitor
-        self.copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor)
         self.onOpenSettings = onOpenSettings
         super.init()
     }

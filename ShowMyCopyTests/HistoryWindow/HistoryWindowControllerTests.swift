@@ -16,7 +16,16 @@ struct HistoryWindowControllerTests {
     }
 
     private func makeController() -> HistoryWindowController {
-        HistoryWindowController(history: history, pasteboard: pasteboard, monitor: monitor, onOpenSettings: {})
+        makeController(monitor: monitor)
+    }
+
+    private func makeController(monitor: any PasteboardChangeTracking) -> HistoryWindowController {
+        HistoryWindowController(
+            history: history,
+            copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
+            monitor: monitor,
+            onOpenSettings: {}
+        )
     }
 
     @Test func showListsACopyMadeSinceTheLastPoll() throws {
@@ -70,6 +79,31 @@ struct HistoryWindowControllerTests {
         #expect(!controller.isVisible)
     }
 
+    @Test func choosingUsesTheGivenCopier() throws {
+        let copier = EntryCopierSpy()
+        let controller = HistoryWindowController(
+            history: history, copier: copier, monitor: ChangeTrackerSpy(), onOpenSettings: {})
+        history.record(text: "older", sourceApp: nil, at: start)
+        let older = try #require(history.entries.first)
+
+        // A Return that arrives after the window closed copies nothing.
+        controller.choose(older)
+        #expect(copier.copied.isEmpty)
+
+        controller.show()
+        copier.succeeds = false
+        controller.choose(older)
+        #expect(copier.copied == [older.id])
+        #expect(controller.isVisible)
+
+        copier.succeeds = true
+        controller.choose(older)
+        #expect(copier.copied == [older.id, older.id])
+        #expect(!controller.isVisible)
+        // The controller leaves the pasteboard to the copier.
+        #expect(pasteboard.writtenTexts.isEmpty)
+    }
+
     @Test func shortcutClearsStalePauseReasonsAndTogglesTheWindow() {
         let controller = makeController()
         // The unlock notification was missed, so the monitor still thinks the screen is locked.
@@ -85,8 +119,7 @@ struct HistoryWindowControllerTests {
 
     @Test func shortcutClearsPauseReasonsBeforeCatchingUp() {
         let tracker = ChangeTrackerSpy()
-        let controller = HistoryWindowController(
-            history: history, pasteboard: pasteboard, monitor: tracker, onOpenSettings: {})
+        let controller = makeController(monitor: tracker)
 
         controller.shortcutPressed()
 
@@ -119,8 +152,7 @@ struct HistoryWindowControllerTests {
         monitor.poll()
         history.record(
             text: "hunter2", sourceApp: nil, at: environment.now, concealed: true, expiresAt: environment.now + 60)
-        let controller = HistoryWindowController(
-            history: history, pasteboard: pasteboard, monitor: monitor, onOpenSettings: {})
+        let controller = makeController(monitor: monitor)
 
         environment.now += 60
         controller.show()
@@ -134,5 +166,17 @@ struct HistoryWindowControllerTests {
         makeController().show()
 
         #expect(!NSApplication.shared.isHidden)
+    }
+}
+
+/// Records which entries the history window asked to copy, and answers with `succeeds`.
+@MainActor
+final class EntryCopierSpy: EntryCopying {
+    var succeeds = true
+    private(set) var copied: [ClipboardEntry.ID] = []
+
+    func copy(_ entry: ClipboardEntry) -> Bool {
+        copied.append(entry.id)
+        return succeeds
     }
 }

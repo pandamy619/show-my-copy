@@ -2,7 +2,7 @@ import Foundation
 
 /// Puts an entry the user picked in the history window back on the pasteboard.
 @MainActor
-final class EntryCopier {
+final class EntryCopier: EntryCopying {
     private let history: any HistoryStore
     private let pasteboard: any PasteboardWriting
     private let monitor: any PasteboardChangeTracking
