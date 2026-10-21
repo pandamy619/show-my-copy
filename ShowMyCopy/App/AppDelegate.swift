@@ -5,76 +5,29 @@ import KeyboardShortcuts
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
-    // The one place that picks where the history lives. Everything else takes `any HistoryStore`.
-    private let history: any HistoryStore = InMemoryHistoryStore()
-    private var historySettings: HistorySettings?
-    private var passwordSettings: PasswordSettings?
-    private var monitor: ClipboardMonitor?
-    private var activityObserver: SystemActivityObserver?
-    private var historyWindow: HistoryWindowController?
-    private var settingsWindow: SettingsWindowController?
+    private var container: AppContainer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Unit tests run inside the app. Do not read the real clipboard or register the hotkey there.
         guard !Self.isRunningTests else {
             return
         }
-        // Apply the saved limit before the first entry is recorded.
-        let historySettings = HistorySettings(history: history)
-        historySettings.applyStoredLimit()
-        let passwordSettings = PasswordSettings(history: history)
-        let settingsWindow = SettingsWindowController(
-            history: history,
-            settings: historySettings,
-            passwords: passwordSettings
-        ) {
-            KeyboardShortcuts.Recorder(for: .toggleHistoryWindow)
+        let container = AppContainer(makeSettingsWindow: Self.makeSettingsWindow)
+        KeyboardShortcuts.onKeyDown(for: .toggleHistoryWindow) { [weak container] in
+            container?.toggleHistory()
         }
-
-        let pasteboard = SystemPasteboard()
-        // The monitor reads the password setting on every change, so a new choice applies to the next copy.
-        let monitor = ClipboardMonitor(
-            pasteboard: pasteboard,
-            history: history,
-            passwordPolicy: { [passwordSettings] in passwordSettings.policy }
-        )
-        let historyWindow = HistoryWindowController(
-            history: history,
-            copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
-            monitor: monitor,
-            onOpenSettings: { [weak settingsWindow] in
-                settingsWindow?.show()
-            }
-        )
-        KeyboardShortcuts.onKeyDown(for: .toggleHistoryWindow) { [weak historyWindow] in
-            historyWindow?.shortcutPressed()
-        }
-
-        let activityObserver = SystemActivityObserver(monitor: monitor)
-        // Close the history when the Mac sleeps, locks or switches users, so it is not on screen for whoever
-        // wakes or unlocks it next.
-        activityObserver.onUserAway = { [weak historyWindow] in
-            historyWindow?.hide()
-        }
-        activityObserver.start()
-        monitor.start()
-
-        self.historySettings = historySettings
-        self.passwordSettings = passwordSettings
-        self.settingsWindow = settingsWindow
-        self.monitor = monitor
-        self.historyWindow = historyWindow
-        self.activityObserver = activityObserver
+        container.start()
+        self.container = container
 
         let firstLaunch = FirstLaunch()
         if firstLaunch.shouldShowSettings {
-            settingsWindow.show()
+            container.showSettings()
             firstLaunch.settingsWereShown()
         }
     }
 
     func showSettings() {
-        settingsWindow?.show()
+        container?.showSettings()
     }
 
     /// The app has no Dock or menu bar icon. Opening it again from Finder, Spotlight or Launchpad shows Settings.
@@ -82,4 +35,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showSettings()
         return false
     }
+
+    /// The settings window shows the shortcut recorder, a SwiftUI view from KeyboardShortcuts. It is made here,
+    /// so `AppContainer` does not depend on SwiftUI.
+    private static func makeSettingsWindow(
+        history: any HistoryStore,
+        settings: HistorySettings,
+        passwords: PasswordSettings
+    ) -> any SettingsWindowShowing {
+        SettingsWindowController(history: history, settings: settings, passwords: passwords) {
+            KeyboardShortcuts.Recorder(for: .toggleHistoryWindow)
+        }
+    }
 }
+
+extension SettingsWindowController: SettingsWindowShowing {}
