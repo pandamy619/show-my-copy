@@ -76,6 +76,17 @@ final class ClipboardMonitor {
         updatePolling()
     }
 
+    /// Clears every pause reason. Call it when the user does something only a person at the unlocked Mac can do,
+    /// such as pressing the history shortcut: then the Mac is awake, the screen is unlocked and the session is
+    /// active, even if a notification saying so was missed.
+    func userIsActive() {
+        guard !pauseReasons.isEmpty else {
+            return
+        }
+        pauseReasons.removeAll()
+        updatePolling()
+    }
+
     private func updatePolling() {
         let shouldPoll = isStarted && pauseReasons.isEmpty
         if shouldPoll, pollTask == nil {
