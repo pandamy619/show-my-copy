@@ -128,6 +128,11 @@ struct HistoryView: View {
     }
 
     private func handleKey(_ key: KeyEquivalent) -> KeyPress.Result {
+        // While an input method composes text (Japanese, Chinese, Korean), these keys move between and confirm
+        // its candidates or cancel the composition. Leave them to the search field.
+        guard !Self.isComposingText else {
+            return .ignored
+        }
         switch key {
         case .upArrow:
             model.moveSelection(.up)
@@ -141,6 +146,14 @@ struct HistoryView: View {
             return .ignored
         }
         return .handled
+    }
+
+    /// True while the search field holds marked text: input that an input method has not committed yet.
+    @MainActor private static var isComposingText: Bool {
+        guard let editor = NSApplication.shared.keyWindow?.firstResponder as? NSTextView else {
+            return false
+        }
+        return editor.hasMarkedText()
     }
 
     private func chooseSelected() {
