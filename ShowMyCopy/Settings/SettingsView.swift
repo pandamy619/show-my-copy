@@ -65,11 +65,12 @@ struct SettingsView<ShortcutRecorder: View>: View {
                         .frame(width: 64)
                     Stepper("Number of items", value: $draftLimit, in: ClipboardHistory.limitRange, step: 10)
                         .labelsHidden()
-                    Text("items")
+                    // A plural key, so "items" agrees with the limit. The translations leave the number out.
+                    Text("\(draftLimit) items", comment: "Unit after the history limit field.")
                 }
             }
             LabeledContent("In history") {
-                Text("^[\(history.entries.count) item](inflect: true) now")
+                Text("\(history.entries.count) items now")
                     .monospacedDigit()
             }
             if let pendingLimit {
@@ -105,9 +106,8 @@ struct SettingsView<ShortcutRecorder: View>: View {
     }
 
     private func removalMessage(count: Int) -> Text {
-        count == 1
-            ? Text("This removes your oldest item.")
-            : Text("This removes \(count) of your oldest items.")
+        // The catalog has plural variations, including "This removes your oldest item." for one.
+        Text("This removes \(count) of your oldest items.")
     }
 
     private func draftLimitChanged(to value: Int) {
