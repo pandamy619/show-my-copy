@@ -47,14 +47,21 @@ final class SystemPasteboard: PasteboardReading {
 
 extension SystemPasteboard: PasteboardWriting {
     @discardableResult
-    func write(_ text: String) -> Int? {
+    func write(_ text: String, concealed: Bool) -> Int? {
         // `.currentHostOnly` keeps an entry the user picked off Universal Clipboard, so history from this Mac is
-        // not sent to the user's other devices again.
+        // not sent to the user's other devices again. For a password it also keeps it off the user's other devices.
         //
         // The change count increases when an app takes ownership of the pasteboard (`clearContents` or
         // `prepareForNewContents`), not when it adds data to contents it owns. So the count returned here is the
-        // count of this app's item, and it stays the same while the text and marker are added.
+        // count of this app's item, and it stays the same while the text and markers are added.
         let changeCount = pasteboard.prepareForNewContents(with: .currentHostOnly)
+        // The concealed marker goes before the text, so a clipboard manager that reads the item as soon as the text
+        // appears already sees it. Without the marker it would keep the password, so do not write the text then.
+        if concealed {
+            guard pasteboard.setString("", forType: NSPasteboard.PasteboardType(PasteboardMarker.concealed)) else {
+                return nil
+            }
+        }
         guard pasteboard.setString(text, forType: .string) else {
             return nil
         }
