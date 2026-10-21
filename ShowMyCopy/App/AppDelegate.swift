@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
         KeyboardShortcuts.onKeyDown(for: .toggleHistoryWindow) { [weak historyWindow] in
-            historyWindow?.toggle()
+            historyWindow?.shortcutPressed()
         }
 
         let activityObserver = SystemActivityObserver(monitor: monitor)

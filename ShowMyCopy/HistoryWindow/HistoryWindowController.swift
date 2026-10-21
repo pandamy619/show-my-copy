@@ -50,6 +50,13 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Called when the user presses the history shortcut. Only a person at the awake, unlocked Mac can press it,
+    /// so the monitor drops pause reasons left by a missed wake or unlock notification before the window opens.
+    func shortcutPressed() {
+        monitor.userIsActive()
+        toggle()
+    }
+
     /// Copies the entry back to the clipboard and closes the window. When the copy fails, the window stays open,
     /// so the user can try again or pick another entry.
     func choose(_ entry: ClipboardEntry) {
