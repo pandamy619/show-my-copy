@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The settings form. `shortcutRecorder` is the control that records the global shortcut.
@@ -27,6 +28,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
             shortcutSection
             limitSection
             clearSection
+            appSection
         }
         .formStyle(.grouped)
         .frame(width: 460)
@@ -101,6 +103,23 @@ struct SettingsView<ShortcutRecorder: View>: View {
                     isConfirmingClear = true
                 }
                 .disabled(history.entries.isEmpty)
+            }
+        }
+    }
+
+    /// The app has no Dock or menu bar icon, so this is the only place that says how to reach it and how to quit.
+    /// Settings open on the first launch, so a new user reads this first.
+    private var appSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Show My Copy has no Dock or menu bar icon.")
+                Text("Press the shortcut above to show your history.")
+                Text("To return to Settings, open Show My Copy again.")
+            }
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            Button("Quit Show My Copy") {
+                NSApplication.shared.terminate(nil)
             }
         }
     }

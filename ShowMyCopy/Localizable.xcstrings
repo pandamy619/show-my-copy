@@ -216,6 +216,26 @@
         }
       }
     },
+    "Press the shortcut above to show your history." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы открыть историю, нажмите сочетание клавиш выше."
+          }
+        }
+      }
+    },
+    "Quit Show My Copy" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершить Show My Copy"
+          }
+        }
+      }
+    },
     "Remove" : {
       "localizations" : {
         "ru" : {
@@ -282,6 +302,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Настройки Show My Copy"
+          }
+        }
+      }
+    },
+    "Show My Copy has no Dock or menu bar icon." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У Show My Copy нет значка в Dock и в строке меню."
           }
         }
       }
@@ -364,6 +394,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Из истории будут удалены все записи."
+          }
+        }
+      }
+    },
+    "To return to Settings, open Show My Copy again." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы вернуться в настройки, снова откройте Show My Copy."
           }
         }
       }
