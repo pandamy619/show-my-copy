@@ -20,7 +20,7 @@
 Show My Copy is in early development. There are no releases yet; build it from source. What works now:
 
 - **Background history of text.** Text you copy is collected quietly, with the app it came from.
-- **Hotkey window.** ⌘⇧V by default, changeable in Settings, opens your recent copies on top of any app.
+- **Hotkey window.** ⌥⌘V by default, changeable in Settings, opens your recent copies on top of any app.
 - **Search and keyboard navigation.** Type to filter, arrow keys to move, Enter to copy the entry back to the clipboard, Esc to close.
 - **Entry limit** from 10 to 1000, 50 by default. Lowering it asks before removing old entries.
 - **Clear history** in Settings, with confirmation.

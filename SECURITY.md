@@ -21,7 +21,7 @@ There are no releases yet. Security fixes go to the `main` branch; once releases
 ### Known limitations
 
 - **Unmarked passwords are kept.** A password copied without a marker — for example from some browser extensions or a text file — is kept like any other text. We are working on this.
-- **Screen sharing.** The history window can appear in screen sharing and screen recordings. A fix is in progress.
+- **Screen sharing.** The history window uses the standard macOS opt-out from screen sharing, screenshots and screen recordings. Some newer capture methods (ScreenCaptureKit on recent macOS versions) may still capture it.
 
 ### Planned
 
