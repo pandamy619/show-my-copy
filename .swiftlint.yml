@@ -32,6 +32,12 @@ custom_rules:
     regex: '\b(URLSession|URLRequest|NSURLConnection|NWConnection|NWListener|NWPathMonitor|NWBrowser|CFSocket|CFStream|WKWebView|SFSafariViewController|getaddrinfo)\b|import\s+(Network|WebKit|SafariServices|CFNetwork)\b'
     message: "The app must not access the network."
     severity: error
+  # Keep in sync with SOURCE_PATTERNS in scripts/check_security.py.
+  no_external_handoff:
+    name: "No hand-off to other apps or processes"
+    regex: 'NSWorkspace\s*\.\s*shared\s*\.\s*open|(?<![A-Za-z0-9_])(openApplication|openURL|NSSharingService\w*|ShareLink|NSXPCConnection|CSSearchableIndex|NSUserActivity)(?![A-Za-z0-9_])|(?<![A-Za-z0-9_])Link\s*\(|(?<![A-Za-z0-9_.])[A-Z][A-Za-z0-9_]*\s*\(\s*contentsOf\s*:|\.init\s*\(\s*contentsOf\s*:|contentsOf\s*:\s*URL(?![A-Za-z0-9_])'
+    message: "Clipboard data must not leave the app: no opening URLs or apps, sharing, XPC, Spotlight, Handoff or loading from URLs."
+    severity: error
   no_print:
     name: "No print"
     regex: '(?<![\w.])(print|debugPrint|dump|NSLog)\('
@@ -39,7 +45,7 @@ custom_rules:
     severity: error
   no_shell_execution:
     name: "No process execution"
-    regex: '\b(Process\(\)|NSTask|NSAppleScript|posix_spawn|system\()'
+    regex: '(?<![A-Za-z0-9_])(Process\s*\(|Process\s*\.\s*run|NSTask|NSAppleScript|posix_spawn|system\s*\()'
     message: "The app must not run external processes or scripts."
     severity: error
   no_unsafe_archiver:
