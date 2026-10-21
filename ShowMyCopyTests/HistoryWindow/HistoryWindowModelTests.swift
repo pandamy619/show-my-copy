@@ -25,6 +25,16 @@ struct HistoryWindowModelTests {
         #expect(model.currentEntryID == model.items.first?.id)
     }
 
+    @Test func currentEntryIsWhatTheHistoryMarksAsCurrent() {
+        let model = makeModel()
+        #expect(model.currentEntryID == model.history.currentEntryID)
+
+        // A skipped copy (a password, an image) replaced the pasteboard: no entry is on it now.
+        model.history.markCurrentSkipped()
+        #expect(model.currentEntryID == nil)
+        #expect(model.items.count == 3)
+    }
+
     @Test func emptyHistoryHasNoSelection() {
         let model = HistoryWindowModel(history: ClipboardHistory())
         #expect(model.items.isEmpty)
