@@ -114,4 +114,71 @@ struct HistoryStoreTests {
         store.markCurrentSkipped()
         #expect(changed.value)
     }
+
+    @Test func revisionChangesWithEveryChangeToTheEntries() throws {
+        let store = makeStore()
+        var revisions = [store.revision]
+        func expectNewRevision(_ comment: Comment) {
+            #expect(!revisions.contains(store.revision), comment)
+            revisions.append(store.revision)
+        }
+        let first = store.record(text: "first", sourceApp: nil, at: start)
+        expectNewRevision("record")
+        store.record(text: "second", sourceApp: nil, at: start + 1)
+        store.record(text: "first", sourceApp: nil, at: start + 2)
+        expectNewRevision("record moves an entry to the top")
+        store.conceal(id: first, expiresAt: start + 60)
+        expectNewRevision("conceal")
+        store.limitExpiry(to: start + 30)
+        expectNewRevision("limitExpiry")
+        store.removeExpired(at: start + 30)
+        expectNewRevision("removeExpired")
+        let second = try #require(store.entries.first?.id)
+        store.remove(id: second)
+        expectNewRevision("remove")
+        for index in 0..<11 {
+            store.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
+        }
+        revisions.append(store.revision)
+        store.setRetention(RetentionPolicy(entryLimit: 10))
+        expectNewRevision("setRetention removes an entry")
+        store.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
+        revisions.append(store.revision)
+        store.removeConcealed()
+        expectNewRevision("removeConcealed")
+        store.clear()
+        expectNewRevision("clear")
+    }
+
+    @Test func revisionStaysWhenTheEntriesStay() {
+        let store = makeStore()
+        store.record(text: "plain", sourceApp: nil, at: start)
+        let revision = store.revision
+        store.removeExpired(at: start + 1000)
+        store.removeConcealed()
+        store.limitExpiry(to: start)
+        store.remove(id: UUID())
+        store.conceal(id: UUID(), expiresAt: start)
+        store.markCurrentSkipped()
+        store.markNewestCurrent(ifItHolds: .text("plain"))
+        store.setRetention(RetentionPolicy(entryLimit: 20))
+        #expect(store.revision == revision)
+
+        let empty = makeStore()
+        let emptyRevision = empty.revision
+        empty.clear()
+        #expect(empty.revision == emptyRevision)
+    }
+
+    @Test func observersOfTheRevisionSeeChanges() {
+        let store = makeStore()
+        let changed = ChangeFlag()
+        withObservationTracking {
+            _ = store.revision
+        } onChange: {
+            changed.set()
+        }
+        store.record(text: "new", sourceApp: nil, at: start)
+        #expect(changed.value)
+    }
 }
