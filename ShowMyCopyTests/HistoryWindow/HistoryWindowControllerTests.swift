@@ -83,6 +83,34 @@ struct HistoryWindowControllerTests {
         #expect(!controller.isVisible)
     }
 
+    @Test func closingTheWindowHidesRevealedPasswords() throws {
+        pasteboard.copy("older")
+        monitor.poll()
+        history.record(text: "hunter2", sourceApp: nil, at: Date(), concealed: true, expiresAt: .distantFuture)
+        let controller = makeController()
+        controller.show()
+        let password = try #require(controller.model.items.first)
+        controller.model.toggleReveal(password.id)
+
+        controller.hide()
+        #expect(!controller.model.isRevealed(password.id))
+    }
+
+    @Test func showRemovesExpiredPasswords() {
+        let environment = MonitorEnvironment()
+        let monitor = environment.makeMonitor(pasteboard: pasteboard, history: history)
+        pasteboard.copy("older")
+        monitor.poll()
+        history.record(
+            text: "hunter2", sourceApp: nil, at: environment.now, concealed: true, expiresAt: environment.now + 60)
+        let controller = HistoryWindowController(
+            history: history, pasteboard: pasteboard, monitor: monitor, onOpenSettings: {})
+
+        environment.now += 60
+        controller.show()
+        #expect(controller.model.items.map(\.text) == ["older"])
+    }
+
     @Test func showUnhidesTheApp() {
         // Closing Settings hides the app to give focus back to the previous app. A hidden app shows no windows.
         NSApplication.shared.hide(nil)

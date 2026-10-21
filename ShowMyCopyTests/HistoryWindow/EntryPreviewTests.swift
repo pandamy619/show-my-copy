@@ -76,3 +76,30 @@ struct EntryPreviewTests {
         #expect(days.contains("3"))
     }
 }
+
+struct ConcealedEntryPreviewTests {
+    private let date = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func entry(_ text: String, concealed: Bool) -> ClipboardEntry {
+        ClipboardEntry(
+            id: UUID(), text: text, date: date, sourceApp: nil, isConcealed: concealed,
+            expiresAt: concealed ? date + 600 : nil)
+    }
+
+    @Test(arguments: ["a", "hunter2", String(repeating: "x", count: 500)])
+    func maskDoesNotDependOnThePassword(password: String) {
+        #expect(EntryPreview.rowText(for: entry(password, concealed: true), isRevealed: false) == EntryPreview.mask)
+        #expect(!EntryPreview.mask.contains(password.prefix(1)))
+    }
+
+    @Test func revealedPasswordIsSanitized() {
+        let password = entry("hun\u{202E}ter2\n\n\nsecond\nthird", concealed: true)
+        #expect(EntryPreview.rowText(for: password, isRevealed: true) == "hunter2\nsecond…")
+    }
+
+    @Test func plainEntryIsShownWhetherOrNotRevealed() {
+        let plain = entry("hello", concealed: false)
+        #expect(EntryPreview.rowText(for: plain, isRevealed: false) == "hello")
+        #expect(EntryPreview.rowText(for: plain, isRevealed: true) == "hello")
+    }
+}

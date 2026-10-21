@@ -213,3 +213,61 @@ struct HistoryWindowModelTests {
         #expect(model.selectedEntry?.text == "fresh")
     }
 }
+
+@MainActor
+struct HistoryWindowModelConcealedTests {
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+    private let onePassword = SourceApp(bundleIdentifier: "com.1password.1password", name: "1Password")
+    private let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
+
+    /// "hunter2" is a concealed entry from 1Password, "hunter2 notes" a plain entry from Notes.
+    private func makeModel() -> HistoryWindowModel {
+        let history = ClipboardHistory()
+        history.record(text: "hunter2 notes", sourceApp: notes, at: start)
+        history.record(
+            text: "hunter2", sourceApp: onePassword, at: start + 1, concealed: true, expiresAt: start + 600)
+        return HistoryWindowModel(history: history)
+    }
+
+    @Test func searchDoesNotLookInsideConcealedEntries() {
+        let model = makeModel()
+        model.query = "hunter"
+        #expect(model.items.map(\.text) == ["hunter2 notes"])
+    }
+
+    @Test func concealedEntryMatchesItsSourceApp() {
+        let model = makeModel()
+        model.query = "1password"
+        #expect(model.items.map(\.text) == ["hunter2"])
+    }
+
+    @Test func toggleRevealShowsAndHidesOneEntry() throws {
+        let model = makeModel()
+        let concealed = try #require(model.items.first)
+        #expect(!model.isRevealed(concealed.id))
+
+        model.toggleReveal(concealed.id)
+        #expect(model.isRevealed(concealed.id))
+
+        model.toggleReveal(concealed.id)
+        #expect(!model.isRevealed(concealed.id))
+    }
+
+    @Test func presentationHidesRevealedEntriesAgain() throws {
+        let model = makeModel()
+        let concealed = try #require(model.items.first)
+        model.toggleReveal(concealed.id)
+
+        model.prepareForPresentation()
+        #expect(!model.isRevealed(concealed.id))
+    }
+
+    @Test func concealAllHidesEveryRevealedEntry() throws {
+        let model = makeModel()
+        let concealed = try #require(model.items.first)
+        model.toggleReveal(concealed.id)
+
+        model.concealAll()
+        #expect(!model.isRevealed(concealed.id))
+    }
+}

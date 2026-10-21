@@ -115,6 +115,79 @@ struct EntryCopierTests {
         #expect(history.entries.map(\.text) == ["fresh", "newer", "older"])
     }
 
+    @Test func plainEntryIsWrittenWithoutTheConcealedMarker() throws {
+        history.record(text: "older", sourceApp: notes, at: start)
+        let monitor = makeMonitor()
+        monitor.poll()
+        let older = try #require(history.entries.first)
+
+        EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older)
+        #expect(pasteboard.writtenConcealed == [false])
+    }
+
+    @Test func concealedEntryIsWrittenConcealedAndStaysConcealed() throws {
+        let onePassword = SourceApp(bundleIdentifier: "com.1password.1password", name: "1Password")
+        history.record(
+            text: "hunter2", sourceApp: onePassword, at: start, concealed: true, expiresAt: start + 600)
+        let monitor = ClipboardMonitor(
+            pasteboard: pasteboard, history: history, frontmostApp: { [safari] in safari }, now: { [start] in start })
+        pasteboard.copy("newer")
+        monitor.poll()
+        let password = try #require(history.entries.last)
+
+        let copier = EntryCopier(
+            history: history, pasteboard: pasteboard, monitor: monitor, now: { [start] in start + 5 })
+        #expect(copier.copy(password))
+
+        #expect(pasteboard.writtenTexts == ["hunter2"])
+        #expect(pasteboard.writtenConcealed == [true])
+        let top = try #require(history.entries.first)
+        #expect(top.id == password.id)
+        #expect(top.isConcealed)
+        // Copying a password back does not keep it longer.
+        #expect(top.expiresAt == start + 600)
+        #expect(top.sourceApp == onePassword)
+
+        // The app's own write is not recorded again.
+        monitor.poll()
+        #expect(history.entries.map(\.text) == ["hunter2", "newer"])
+    }
+
+    @Test func concealedEntryTrimmedByTheCatchUpPollComesBackConcealed() throws {
+        let history = ClipboardHistory(limit: 10)
+        history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        for index in 1..<10 {
+            history.record(text: "item \(index)", sourceApp: notes, at: start + Double(index))
+        }
+        let monitor = ClipboardMonitor(
+            pasteboard: pasteboard, history: history, frontmostApp: { [safari] in safari }, now: { [start] in start })
+        pasteboard.copy("item 9")
+        monitor.poll()
+        let password = try #require(history.entries.last)
+
+        pasteboard.copy("copied between polls")
+        EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor, now: { [start] in start + 5 })
+            .copy(password)
+
+        let top = try #require(history.entries.first)
+        #expect(top.text == "hunter2")
+        #expect(top.isConcealed)
+        #expect(top.expiresAt == start + 600)
+    }
+
+    @Test func expiredPasswordIsNotCopied() throws {
+        history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
+        let monitor = ClipboardMonitor(
+            pasteboard: pasteboard, history: history, frontmostApp: { nil }, now: { [start] in start + 60 })
+        let password = try #require(history.entries.first)
+
+        let copier = EntryCopier(
+            history: history, pasteboard: pasteboard, monitor: monitor, now: { [start] in start + 60 })
+        #expect(!copier.copy(password))
+        #expect(pasteboard.writtenTexts.isEmpty)
+        #expect(history.entries.isEmpty)
+    }
+
     @Test func successfulCopyReturnsTrue() throws {
         history.record(text: "older", sourceApp: notes, at: start)
         let monitor = makeMonitor()
