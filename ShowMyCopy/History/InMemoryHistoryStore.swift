@@ -23,6 +23,23 @@ final class InMemoryHistoryStore: HistoryStore {
         self.hasher = hasher
     }
 
+    /// Starts with `entries`, newest first, such as a history saved before the app quit. Removes the concealed
+    /// entries whose time is up at `date` first, then the entries `retention` does not allow, so an expired
+    /// password does not push out an entry that fits once it is gone. No entry is current: nothing says yet what is
+    /// on the pasteboard.
+    init(
+        restoring entries: [ClipboardEntry],
+        at date: Date,
+        retention: RetentionPolicy = .default,
+        hasher: any ContentHasher = SHA256ContentHasher()
+    ) {
+        self.entries = entries
+        self.retention = retention
+        self.hasher = hasher
+        removeExpired(at: date)
+        trim()
+    }
+
     convenience init(limit: Int) {
         self.init(retention: RetentionPolicy(entryLimit: limit))
     }
