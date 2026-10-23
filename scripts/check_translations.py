@@ -11,16 +11,20 @@ PLACEHOLDER = re.compile(r"%(?:\d+\$)?(?:@|lld|ld|d|f)")
 PLURAL_FORMS = {"en": ("one", "other"), "ru": ("one", "few", "many", "other")}
 
 
+def specifiers(text):
+    return sorted(match.lstrip("%").split("$")[-1] for match in PLACEHOLDER.findall(text))
+
+
 def plural_problems(key, language, forms):
-    expected = len(PLACEHOLDER.findall(key))
+    expected = specifiers(key)
     for form in PLURAL_FORMS[language]:
         unit = forms.get(form, {}).get("stringUnit", {})
         value = unit.get("value", "")
         if unit.get("state") != "translated" or not value:
             yield f"missing {language} plural form {form!r}: {key!r}"
-        # A plural form may leave out the number it agrees with, as in "This removes your oldest item."
-        elif len(PLACEHOLDER.findall(value)) not in (expected, expected - 1):
-            yield f"placeholder mismatch in {language} plural form {form!r}: {key!r}"
+        # Xcode 26 rejects a plural form that leaves out the number it agrees with.
+        elif specifiers(value) != expected:
+            yield f"{language} plural form {form!r} must contain {' '.join('%' + s for s in expected)}: {key!r}"
 
 
 def problems(catalog):
