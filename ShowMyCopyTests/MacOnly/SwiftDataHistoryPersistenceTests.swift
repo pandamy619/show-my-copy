@@ -1,0 +1,178 @@
+import Foundation
+import SwiftData
+import Testing
+
+@testable import ShowMyCopy
+
+@MainActor
+struct SwiftDataHistoryPersistenceTests {
+    private let date = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func makeRecord(
+        id: UUID = UUID(),
+        text: String = "hello",
+        date: Date? = nil,
+        isConcealed: Bool = false
+    ) -> StoredEntryRecord {
+        StoredEntryRecord(
+            id: id,
+            kind: "text",
+            payload: Data(text.utf8),
+            contentHash: isConcealed ? nil : "00ff",
+            byteSize: isConcealed ? 0 : text.utf8.count,
+            previewText: isConcealed ? nil : text,
+            date: date ?? self.date,
+            sourceAppBundleIdentifier: "com.apple.Notes",
+            sourceAppName: "Notes",
+            isConcealed: isConcealed,
+            expiresAt: isConcealed ? self.date + 600 : nil,
+            isPinned: false,
+            schemaVersion: StoredEntryRecord.currentSchemaVersion
+        )
+    }
+
+    private func sorted(_ records: [StoredEntryRecord]) -> [StoredEntryRecord] {
+        records.sorted { $0.date > $1.date }
+    }
+
+    /// A new folder in the temporary directory, removed after `body`.
+    private func withTemporaryDirectory(_ body: (URL) throws -> Void) throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "ShowMyCopyTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer {
+            do {
+                try FileManager.default.removeItem(at: directory)
+            } catch {
+                Issue.record("Could not remove the temporary directory: \(error)")
+            }
+        }
+        try body(directory)
+    }
+
+    @Test func recordsRoundTripWithEveryField() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        let plain = makeRecord(text: "plain", date: date + 1)
+        let concealed = makeRecord(text: "sealed bytes", isConcealed: true)
+        let noApp = StoredEntryRecord(
+            id: UUID(), kind: "text", payload: Data(), contentHash: "ab", byteSize: 0, previewText: "",
+            date: date - 1, sourceAppBundleIdentifier: nil, sourceAppName: nil, isConcealed: false,
+            expiresAt: nil, isPinned: true, schemaVersion: 1)
+
+        try persistence.insert([plain, concealed, noApp])
+        #expect(sorted(try persistence.loadAll()) == [plain, concealed, noApp])
+    }
+
+    @Test func updateReplacesSavedRecordsAndAddsMissingOnes() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        let original = makeRecord(text: "hello")
+        try persistence.insert([original])
+
+        var moved = original
+        moved.date = date + 10
+        moved.sourceAppName = "Safari"
+        let added = makeRecord(text: "new", date: date + 5)
+        try persistence.update([moved, added])
+
+        #expect(sorted(try persistence.loadAll()) == [moved, added])
+    }
+
+    @Test func idsAreUnique() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        let id = UUID()
+        try persistence.insert([makeRecord(id: id, text: "first")])
+        try persistence.insert([makeRecord(id: id, text: "second", date: date + 1)])
+
+        let records = try persistence.loadAll()
+        #expect(records.count == 1)
+        #expect(records.first?.payload == Data("second".utf8))
+    }
+
+    @Test func deleteRemovesOnlyTheGivenIDs() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        let kept = makeRecord(text: "kept", date: date + 1)
+        let removed = makeRecord(text: "removed")
+        try persistence.insert([kept, removed])
+
+        try persistence.delete(ids: [removed.id, UUID()])
+        #expect(try persistence.loadAll() == [kept])
+    }
+
+    @Test func deleteAllRemovesEverything() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        try persistence.insert([makeRecord(text: "a"), makeRecord(text: "b", date: date + 1)])
+
+        try persistence.deleteAll()
+        #expect(try persistence.loadAll().isEmpty)
+    }
+
+    @Test func emptyChangesDoNothing() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        let record = makeRecord()
+        try persistence.insert([record])
+
+        try persistence.insert([])
+        try persistence.update([])
+        try persistence.delete(ids: [])
+        #expect(try persistence.loadAll() == [record])
+    }
+
+    @Test func storesInMemoryAreSeparate() throws {
+        let first = try SwiftDataHistoryPersistence.inMemory()
+        let second = try SwiftDataHistoryPersistence.inMemory()
+        try first.insert([makeRecord()])
+        #expect(try second.loadAll().isEmpty)
+    }
+
+    @Test func historySurvivesReopeningTheStoreOnDisk() throws {
+        try withTemporaryDirectory { directory in
+            let record = makeRecord()
+            let first = SwiftDataHistoryPersistence.open(in: directory)
+            #expect(first.error == nil)
+            #expect(first.persistence is SwiftDataHistoryPersistence)
+            try first.persistence.insert([record])
+
+            let second = SwiftDataHistoryPersistence.open(in: directory)
+            #expect(second.error == nil)
+            #expect(try second.persistence.loadAll() == [record])
+        }
+    }
+
+    @Test func storeFolderIsExcludedFromBackups() throws {
+        try withTemporaryDirectory { directory in
+            _ = SwiftDataHistoryPersistence.open(in: directory)
+            let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
+            #expect(values.isExcludedFromBackup == true)
+        }
+    }
+
+    @Test func damagedStoreIsMovedAsideAndANewOneStarts() throws {
+        try withTemporaryDirectory { directory in
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let storeURL = directory.appending(path: SwiftDataHistoryPersistence.storeFileName)
+            try Data(repeating: 0x42, count: 4096).write(to: storeURL)
+
+            let opened = SwiftDataHistoryPersistence.open(in: directory)
+            #expect(opened.error == .storeReset)
+            #expect(opened.persistence is SwiftDataHistoryPersistence)
+            #expect(try opened.persistence.loadAll().isEmpty)
+            let damaged = directory.appending(path: SwiftDataHistoryPersistence.damagedStoreFileName)
+            #expect(FileManager.default.fileExists(atPath: damaged.path(percentEncoded: false)))
+
+            try opened.persistence.insert([makeRecord()])
+            #expect(try SwiftDataHistoryPersistence.open(in: directory).persistence.loadAll().count == 1)
+        }
+    }
+
+    @Test func persistentStoreRoundTripsThroughSwiftData() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        let first = PersistentHistoryStore(persistence: persistence, sealer: FakeSecretSealer(), now: date)
+        first.record(text: "plain", sourceApp: nil, at: date)
+        first.record(text: "hunter2", sourceApp: nil, at: date + 1, concealed: true, expiresAt: date + 600)
+
+        let second = PersistentHistoryStore(persistence: persistence, sealer: FakeSecretSealer(), now: date + 2)
+        #expect(second.entries == first.entries)
+        #expect(second.storageError == nil)
+        let saved = try persistence.loadAll()
+        #expect(!saved.contains { $0.payload.range(of: Data("hunter2".utf8)) != nil })
+    }
+}
