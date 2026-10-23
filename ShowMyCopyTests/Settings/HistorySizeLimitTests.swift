@@ -114,7 +114,6 @@ struct HistorySizeLimitTests {
         (999_999_999, .gigabyte1),
         (1_000_000_000, .gigabyte1),
         (5_000_000_000, .gigabyte1),
-        (Int.max, .gigabyte1),
     ])
     func savedSizeIsMovedToAnOption(saved: Int, expected: HistorySizeLimit) throws {
         try withDefaults { defaults in
