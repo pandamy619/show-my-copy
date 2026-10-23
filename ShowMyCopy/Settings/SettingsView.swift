@@ -6,22 +6,24 @@ struct SettingsView<ShortcutRecorder: View>: View {
     let history: any HistoryStore
     let settings: HistorySettings
     @Bindable var passwords: PasswordSettings
+    let usage: StorageUsage
     let shortcutRecorder: ShortcutRecorder
 
     @State private var draftLimit: Int
     /// A lower limit the user picked that would delete entries. Applied only after they confirm.
     @State private var pendingLimit: Int?
-    @State private var isConfirmingClear = false
 
     init(
         history: any HistoryStore,
         settings: HistorySettings,
         passwords: PasswordSettings,
+        usage: StorageUsage,
         @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
     ) {
         self.history = history
         self.settings = settings
         _passwords = Bindable(passwords)
+        self.usage = usage
         self.shortcutRecorder = shortcutRecorder()
         _draftLimit = State(initialValue: settings.limit)
     }
@@ -30,8 +32,9 @@ struct SettingsView<ShortcutRecorder: View>: View {
         Form {
             shortcutSection
             limitSection
+            StorageSection(settings: settings, usage: usage)
+            ClearHistorySection(usage: usage)
             passwordsSection
-            clearSection
             appSection
         }
         .formStyle(.grouped)
@@ -40,11 +43,23 @@ struct SettingsView<ShortcutRecorder: View>: View {
         .onChange(of: draftLimit) { _, newValue in
             draftLimitChanged(to: newValue)
         }
-        .onChange(of: history.entries.count) { _, count in
+        .onChange(of: history.revision) {
             // The history can change while a confirmation is shown. Re-check what the change would do.
             draftLimitChanged(to: draftLimit)
-            if count == 0 {
-                isConfirmingClear = false
+        }
+        .task {
+            // Memory changes all the time, so it is read again while the settings are open. The window stays
+            // loaded after it is closed, so later reads happen only while the app is in front.
+            usage.refreshAppMemory()
+            while true {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return
+                }
+                if NSApplication.shared.isActive {
+                    usage.refreshAppMemory()
+                }
             }
         }
         .onDisappear(perform: resetDrafts)
@@ -78,8 +93,10 @@ struct SettingsView<ShortcutRecorder: View>: View {
                     .monospacedDigit()
             }
             if let pendingLimit {
+                let change = settings.proposeLimit(pendingLimit)
                 InlineConfirmation(
-                    message: removalMessage(count: history.entriesRemoved(byLimit: pendingLimit)),
+                    message: .removingOldestItems(change.removedCount),
+                    detail: .freeing(bytes: change.freedBytes),
                     confirmTitle: "Remove",
                     onConfirm: confirmPendingLimit,
                     onCancel: cancelPendingLimit
@@ -119,27 +136,6 @@ struct SettingsView<ShortcutRecorder: View>: View {
         }
     }
 
-    private var clearSection: some View {
-        Section {
-            if isConfirmingClear {
-                InlineConfirmation(
-                    message: Text("This removes all items from your history."),
-                    confirmTitle: "Remove All",
-                    onConfirm: {
-                        history.clear()
-                        isConfirmingClear = false
-                    },
-                    onCancel: { isConfirmingClear = false }
-                )
-            } else {
-                Button("Clear History…") {
-                    isConfirmingClear = true
-                }
-                .disabled(history.entries.isEmpty)
-            }
-        }
-    }
-
     /// The app has no Dock or menu bar icon, so this is the only place that says how to reach it and how to quit.
     /// Settings open on the first launch, so a new user reads this first.
     private var appSection: some View {
@@ -155,11 +151,6 @@ struct SettingsView<ShortcutRecorder: View>: View {
                 NSApplication.shared.terminate(nil)
             }
         }
-    }
-
-    private func removalMessage(count: Int) -> Text {
-        // The catalog has plural variations, including "This removes your oldest item." for one.
-        Text("This removes \(count) of your oldest items.")
     }
 
     private func draftLimitChanged(to value: Int) {
@@ -194,27 +185,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
 
     private func resetDrafts() {
         pendingLimit = nil
-        isConfirmingClear = false
         draftLimit = settings.limit
-    }
-}
-
-/// A question shown in place, with a destructive confirm button and a cancel button.
-private struct InlineConfirmation: View {
-    let message: Text
-    let confirmTitle: LocalizedStringKey
-    let onConfirm: @MainActor () -> Void
-    let onCancel: @MainActor () -> Void
-
-    var body: some View {
-        HStack {
-            message
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer()
-            Button("Cancel", action: onCancel)
-            Button(confirmTitle, role: .destructive, action: onConfirm)
-        }
-        .accessibilityElement(children: .contain)
+        usage.forgetRecentClear()
     }
 }

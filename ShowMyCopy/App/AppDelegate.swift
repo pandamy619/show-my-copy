@@ -36,14 +36,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    /// The settings window shows the shortcut recorder, a SwiftUI view from KeyboardShortcuts. It is made here,
-    /// so `AppContainer` does not depend on SwiftUI.
+    /// The settings window shows the shortcut recorder, a SwiftUI view from KeyboardShortcuts, and the app's
+    /// memory, read with Mach calls. Both are made here, so `AppContainer` depends on neither.
     private static func makeSettingsWindow(
         history: any HistoryStore,
         settings: HistorySettings,
         passwords: PasswordSettings
     ) -> any SettingsWindowShowing {
-        SettingsWindowController(history: history, settings: settings, passwords: passwords) {
+        SettingsWindowController(
+            history: history,
+            settings: settings,
+            passwords: passwords,
+            memoryReader: TaskMemoryReader()
+        ) {
             KeyboardShortcuts.Recorder(for: .toggleHistoryWindow)
         }
     }

@@ -7,6 +7,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let history: any HistoryStore
     private let settings: HistorySettings
     private let passwords: PasswordSettings
+    /// Kept across closes, so the breakdown cache and the last memory reading survive a fresh form.
+    private let usage: StorageUsage
     private let shortcutRecorder: AnyView
     private var window: NSWindow?
 
@@ -14,11 +16,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         history: any HistoryStore,
         settings: HistorySettings,
         passwords: PasswordSettings,
+        memoryReader: any MemoryUsageReading,
         @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
     ) {
         self.history = history
         self.settings = settings
         self.passwords = passwords
+        self.usage = StorageUsage(history: history, memoryReader: memoryReader)
         self.shortcutRecorder = AnyView(shortcutRecorder())
         super.init()
     }
@@ -51,7 +55,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private func makeContent() -> NSViewController {
         NSHostingController(
-            rootView: SettingsView(history: history, settings: settings, passwords: passwords) { shortcutRecorder }
+            rootView: SettingsView(history: history, settings: settings, passwords: passwords, usage: usage) {
+                shortcutRecorder
+            }
         )
     }
 

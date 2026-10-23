@@ -83,6 +83,16 @@
         }
       }
     },
+    "App memory" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Память приложения"
+          }
+        }
+      }
+    },
     "Blank text" : {
       "localizations" : {
         "ru" : {
@@ -133,6 +143,16 @@
         }
       }
     },
+    "Frees %@." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Освободится %@."
+          }
+        }
+      }
+    },
     "Hide password" : {
       "localizations" : {
         "ru" : {
@@ -149,6 +169,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "История"
+          }
+        }
+      }
+    },
+    "History by type" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "История по типам"
+          }
+        }
+      }
+    },
+    "History can use up to %@." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "История может занимать до %@."
+          }
+        }
+      }
+    },
+    "History cleared, %@ freed." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "История очищена, освобождено %@."
+          }
+        }
+      }
+    },
+    "History size" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Размер истории"
           }
         }
       }
@@ -173,12 +233,32 @@
         }
       }
     },
+    "No limit" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без ограничения"
+          }
+        }
+      }
+    },
     "No matches" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ничего не найдено"
+          }
+        }
+      }
+    },
+    "Not available" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет данных"
           }
         }
       }
@@ -199,6 +279,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Количество записей"
+          }
+        }
+      }
+    },
+    "Only the number of items limits the history." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Историю ограничивает только число записей."
           }
         }
       }
@@ -293,6 +383,58 @@
         }
       }
     },
+    "Removes %lld items" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Removes %lld item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Removes %lld items"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Удалятся %lld записи"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Удалится %lld записей"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Удалится %lld запись"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Удалится %lld записи"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Save passwords" : {
       "localizations" : {
         "ru" : {
@@ -383,6 +525,36 @@
         }
       }
     },
+    "Size limit" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ограничение размера"
+          }
+        }
+      }
+    },
+    "Storage" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хранилище"
+          }
+        }
+      }
+    },
+    "Text" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текст"
+          }
+        }
+      }
+    },
     "Text you copy will appear here." : {
       "localizations" : {
         "ru" : {
@@ -445,12 +617,54 @@
         }
       }
     },
-    "This removes all items from your history." : {
+    "This removes all %lld items from your history." : {
       "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This removes %lld item from your history."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This removes all %lld items from your history."
+                }
+              }
+            }
+          }
+        },
         "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Из истории будут удалены все записи."
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из истории будут удалены все %lld записи."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из истории будут удалены все %lld записей."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из истории будет удалена %lld запись."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из истории будут удалены все %lld записи."
+                }
+              }
+            }
           }
         }
       }
