@@ -17,6 +17,7 @@ There are no releases yet. Security fixes go to the `main` branch; once releases
 - **Passwords are not kept by default.** Items marked as concealed (see [nspasteboard.org](http://nspasteboard.org)) or with the older markers some password managers use, and anything copied while a known password manager is the frontmost app (1Password, Bitwarden, Passwords, Keychain Access, KeePassXC, Strongbox, LastPass, Proton Pass, Enpass, Keeper), are not recorded, and their text is not read. Items marked as transient or auto-generated are never stored.
 - **Cleared passwords leave the history.** Password managers empty the clipboard a while after copying a password. When the clipboard is emptied within 3 minutes of a copy that is still on it, that entry is removed, or hidden with an expiry if you save passwords.
 - **Saving passwords is opt-in.** With Settings → Passwords → Save passwords on, passwords are kept masked in the history (the mask does not show their length), revealed one row at a time with the eye button and hidden again when the window closes, left out of text search, never read out by VoiceOver, and removed after 1 minute, 10 minutes (default) or 1 hour. Turning the setting off removes them at once. A password copied back from the history is marked as concealed and kept off Universal Clipboard, so other clipboard managers and your other devices do not get it.
+- **Saved passwords are encrypted on disk.** When history is saved on disk and Save passwords is on, each password is encrypted with AES-256-GCM before it is written. The key is created on this Mac, kept in your Keychain and never synced to iCloud. If the key cannot be read, for example because you deny Show My Copy access to it, passwords are kept in memory only, and passwords saved before can no longer be opened and are removed.
 - **Minimal permissions.** The app asks for no permissions: no Accessibility, no Input Monitoring.
 - **No secrets in logs.** Clipboard contents are never logged.
 
@@ -25,12 +26,12 @@ There are no releases yet. Security fixes go to the `main` branch; once releases
 - **Some unmarked passwords are kept.** A password copied without a marker from an app that is not a known password manager — for example from a browser extension or a text file — is kept like any other text, unless a password manager empties the clipboard within 3 minutes. The same rule can remove an ordinary entry when an app empties the clipboard soon after you copy it.
 - **The first copy after launch, sleep or unlock** has no known source app, so only markers tell whether it is a password.
 - **Saved passwords are plain text in memory** while they are kept; the mask only hides them on screen.
+- **Where the encryption key is kept.** The app has no keychain entitlement, so macOS does not let it use the keychain that keeps an item on one Mac only and readable only while the Mac is unlocked. The key is kept in your login keychain instead: Time Machine backs it up, and Migration Assistant can move it to a new Mac together with the history. When the app's code signature changes, for example in a copy you built yourself, macOS asks whether Show My Copy may use the key.
 - **Password manager list.** Some bundle identifiers (Proton Pass, Keeper, LastPass, Enpass, Strongbox Pro) are taken from third-party catalogs and still have to be checked on a Mac; Dashlane and NordPass are not listed yet.
 - **Screen sharing.** The history window uses the standard macOS opt-out from screen sharing, screenshots and screen recordings. Some newer capture methods (ScreenCaptureKit on recent macOS versions) may still capture it.
 
 ### Planned
 
 - History saved on disk in the app container, so it survives a restart.
-- Saved passwords encrypted on disk with a key kept in your Keychain, once history is saved on disk.
 - Paste into the active app. Accessibility will be requested only if you turn this on.
 - Releases, with CI checking the signed entitlements of every release build.
