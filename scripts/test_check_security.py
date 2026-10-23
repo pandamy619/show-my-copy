@@ -2,12 +2,14 @@
 """Canary tests for scripts/check_security.py: prove that each check can actually fail.
 
 Run with `make security-selftest`. Works on Linux and macOS. Fixture projects are built in a
-temporary directory from the real project file; the signed-app checks use a fake `codesign`
-put first on PATH for the duration of one test, so check_security.py itself has no test hook.
+temporary directory from the real project file; the signed-app and resolved-settings checks use
+a fake `codesign` or `xcodebuild` put first on PATH for the duration of one test, so
+check_security.py itself has no test hook.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import plistlib
 import shutil
@@ -54,6 +56,20 @@ if "-d" in args:
     sys.stderr.write("Executable=%s\nCodeDirectory v=20500 size=1 flags=%s hashes=1+1\n" % (path, flags))
     sys.exit(0)
 sys.exit(2)
+'''
+
+FAKE_XCODEBUILD = r'''#!/usr/bin/env python3
+# Fake xcodebuild for the self-test: answers -showBuildSettings -json from settings/<target>/<config>.json.
+import os, sys
+args = sys.argv[1:]
+target = args[args.index("-target") + 1]
+config = args[args.index("-configuration") + 1]
+path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings", target, config + ".json")
+if "-showBuildSettings" not in args or "-json" not in args or not os.path.exists(path):
+    sys.stderr.write("fake xcodebuild: no answer for %s\\n" % args)
+    sys.exit(1)
+with open(path) as handle:
+    sys.stdout.write(handle.read())
 '''
 
 
@@ -280,6 +296,79 @@ class SourceScanTests(CheckerTestCase):
     def test_lookalikes_pass(self) -> None:
         self.fixture.write("ShowMyCopy/Good.swift", self.GOOD)
         self.assertEqual(self.fixture.errors(), [])
+
+
+class XcodebuildTests(CheckerTestCase):
+    """The resolved-settings cross-check, fed by a fake xcodebuild put first on PATH."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.bin = os.path.join(self.tmp, "xcodebuild-bin")
+        os.makedirs(self.bin)
+        xcodebuild = os.path.join(self.bin, "xcodebuild")
+        with open(xcodebuild, "w") as out:
+            out.write(FAKE_XCODEBUILD)
+        os.chmod(xcodebuild, os.stat(xcodebuild).st_mode | stat.S_IXUSR)
+        # Start from what the fixture project declares, as Xcode would resolve it.
+        targets, _ = check_security.project_targets(self.fixture.root)
+        self.settings = {}
+        for name, product_type, configs in targets:
+            for config, settings in configs.items():
+                resolved = dict(settings, PRODUCT_TYPE=product_type)
+                if config == "Debug":
+                    resolved["ENABLE_DEBUG_DYLIB"] = "YES"
+                self.settings[(name, config)] = resolved
+
+    def resolve(self, config: str, key: str, value: str) -> None:
+        self.settings[("ShowMyCopy", config)][key] = value
+
+    def errors(self) -> list:
+        for (target, config), settings in self.settings.items():
+            path = os.path.join(self.bin, "settings", target, config + ".json")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as out:
+                json.dump([{"target": target, "buildSettings": settings}], out)
+        old = os.environ.get("PATH", "")
+        os.environ["PATH"] = self.bin + os.pathsep + old
+        try:
+            return check_security.run_checks(self.fixture.root, use_xcodebuild=True)
+        finally:
+            os.environ["PATH"] = old
+
+    def test_resolved_settings_pass(self) -> None:
+        self.assertEqual(self.errors(), [])
+
+    def test_debug_hardened_runtime_resolved_to_no_passes(self) -> None:
+        # What Xcode 26 reports for the Debug configuration of the app.
+        self.resolve("Debug", "ENABLE_HARDENED_RUNTIME", "NO")
+        self.assertEqual(self.errors(), [])
+
+    def test_release_hardened_runtime_resolved_to_no(self) -> None:
+        self.resolve("Release", "ENABLE_HARDENED_RUNTIME", "NO")
+        self.assertFailsWith(
+            self.errors(), "xcodebuild: target ShowMyCopy (Release): ENABLE_HARDENED_RUNTIME must be YES"
+        )
+
+    def test_debug_sandbox_resolved_to_no(self) -> None:
+        self.resolve("Debug", "ENABLE_HARDENED_RUNTIME", "NO")
+        self.resolve("Debug", "ENABLE_APP_SANDBOX", "NO")
+        self.assertFailsWith(self.errors(), "xcodebuild: target ShowMyCopy (Debug): ENABLE_APP_SANDBOX must be YES")
+
+    def test_debug_network_resolved_to_yes(self) -> None:
+        self.resolve("Debug", "ENABLE_HARDENED_RUNTIME", "NO")
+        self.resolve("Debug", "ENABLE_OUTGOING_NETWORK_CONNECTIONS", "YES")
+        self.assertFailsWith(
+            self.errors(), "xcodebuild: target ShowMyCopy (Debug): ENABLE_OUTGOING_NETWORK_CONNECTIONS must not be YES"
+        )
+
+    def test_project_file_debug_hardened_runtime_no_still_fails(self) -> None:
+        # The project file must still declare YES everywhere; only Xcode's own resolution may say NO.
+        self.fixture.pbxproj = self.fixture.pbxproj.replace(
+            "ENABLE_HARDENED_RUNTIME = YES;", "ENABLE_HARDENED_RUNTIME = NO;", 1
+        )
+        self.fixture.save()
+        errors = self.errors()
+        self.assertIn("target ShowMyCopy (Debug): ENABLE_HARDENED_RUNTIME must be YES", errors)
 
 
 class SignedAppTests(CheckerTestCase):
