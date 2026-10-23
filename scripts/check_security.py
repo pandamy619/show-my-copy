@@ -53,6 +53,13 @@ LIBRARY_PRODUCT_TYPES = {
     "com.apple.product-type.library.dynamic",
 }
 APPLICATION_PRODUCT_TYPE = "com.apple.product-type.application"
+# Configurations in which Xcode itself may resolve ENABLE_HARDENED_RUNTIME to NO even though the
+# project file sets YES. Observed with Xcode 26: `xcodebuild -showBuildSettings` for Debug reports
+# "ENABLE_DEBUG_DYLIB" : "YES" and "ENABLE_HARDENED_RUNTIME" : "NO" (debug builds load a debug
+# dylib for previews and debugging). These are local development builds; the shipped Release app
+# is still checked for the hardened runtime flag in its code signature by `make security`.
+# Only the xcodebuild cross-check uses this; the project file must still say YES everywhere.
+XCODE_DEBUG_CONFIGURATIONS = {"Debug"}
 DISABLED_VALUES = {"", "NO", "none", "None"}
 ACCESS_SETTING = re.compile(r"^ENABLE_[A-Z0-9_]*ACCESS[A-Z0-9_]*$|^ENABLE_USER_SELECTED_FILES$")
 
@@ -256,11 +263,17 @@ def project_targets(root: str) -> Tuple[List[Tuple[str, str, Dict[str, Dict[str,
 
 
 def check_target_settings(
-    root: str, target: str, product_type: str, config: str, settings: Dict[str, str]
+    root: str,
+    target: str,
+    product_type: str,
+    config: str,
+    settings: Dict[str, str],
+    require_hardened_runtime: bool = True,
 ) -> List[str]:
     """Apply the per-target rules to one configuration's settings.
 
     Conditional variants (KEY[sdk=...]) are checked like the plain key, so they cannot override it.
+    require_hardened_runtime is False only for Xcode-resolved settings of XCODE_DEBUG_CONFIGURATIONS.
     """
     where = "target %s (%s)" % (target, config)
     if product_type in TEST_PRODUCT_TYPES:
@@ -275,7 +288,10 @@ def check_target_settings(
     errors = []
     sandboxed = product_type not in LIBRARY_PRODUCT_TYPES
     if sandboxed:
-        for key in ("ENABLE_APP_SANDBOX", "ENABLE_HARDENED_RUNTIME"):
+        required = ["ENABLE_APP_SANDBOX"]
+        if require_hardened_runtime:
+            required.append("ENABLE_HARDENED_RUNTIME")
+        for key in required:
             if not values(key) or any(value != "YES" for value in values(key)):
                 errors.append("%s: %s must be YES" % (where, key))
     for key in ("ENABLE_INCOMING_NETWORK_CONNECTIONS", "ENABLE_OUTGOING_NETWORK_CONNECTIONS"):
@@ -356,6 +372,8 @@ def _check_with_xcodebuild(root: str, target: str, config: str) -> List[str]:
         return ["xcodebuild -showBuildSettings failed for %s (%s): %s" % (target, config, error)]
     if not isinstance(entries, list) or not entries:
         return ["xcodebuild -showBuildSettings failed for %s (%s): %s" % (target, config, result.stderr.strip())]
+    # Xcode may turn the hardened runtime off for debug builds; see XCODE_DEBUG_CONFIGURATIONS.
+    require_hardened_runtime = config not in XCODE_DEBUG_CONFIGURATIONS
     errors = []
     for entry in entries:
         settings = entry.get("buildSettings", {}) if isinstance(entry, dict) else {}
@@ -363,7 +381,9 @@ def _check_with_xcodebuild(root: str, target: str, config: str) -> List[str]:
         if not product_type:
             errors.append("xcodebuild reported no PRODUCT_TYPE for %s (%s)" % (target, config))
         settings = {key: _flatten(value) for key, value in settings.items()}
-        for error in check_target_settings(root, target, product_type, config, settings):
+        for error in check_target_settings(
+            root, target, product_type, config, settings, require_hardened_runtime=require_hardened_runtime
+        ):
             errors.append("xcodebuild: " + error)
     return errors
 
