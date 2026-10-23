@@ -14,6 +14,10 @@ final class FakeHistoryPersistence: HistoryPersistence {
     var failing: Set<Operation> = []
     /// Every call, in order, also the failed ones.
     private(set) var calls: [Operation] = []
+    /// What `storedBytes()` returns, like the size of the files on disk.
+    var bytesOnDisk: Int64?
+    /// How often `storedBytes()` was called.
+    private(set) var storedBytesReadCount = 0
 
     func record(_ id: UUID) -> StoredEntryRecord? {
         records[id]
@@ -45,6 +49,11 @@ final class FakeHistoryPersistence: HistoryPersistence {
     func deleteAll() throws(HistoryPersistenceError) {
         try perform(.deleteAll)
         records.removeAll()
+    }
+
+    func storedBytes() -> Int64? {
+        storedBytesReadCount += 1
+        return bytesOnDisk
     }
 
     func resetCalls() {
