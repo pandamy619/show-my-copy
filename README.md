@@ -24,6 +24,7 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Search and keyboard navigation.** Type to filter, arrow keys to move, Enter to copy the entry back to the clipboard, Esc to close.
 - **Entry limit** from 10 to 1000, 50 by default. Lowering it asks before removing old entries.
 - **Clear history** in Settings, with confirmation.
+- **Storage at a glance.** Settings show how much the history takes, split into text and passwords, and how much memory the app uses. An optional size limit of 100 MB, 500 MB or 1 GB asks before removing old entries.
 - **Pauses while the Mac sleeps or the screen is locked.**
 - **Passwords are not kept** by default: items that password managers mark as concealed and anything copied from a known password manager are skipped, as are items marked as transient or auto-generated. When a password manager clears a password it copied without a marker, the entry leaves the history too.
 - **Save passwords, if you want.** Turn it on in Settings to keep passwords hidden in the history: an eye button reveals one, search skips them, and they are removed after 1 minute, 10 minutes or 1 hour.
@@ -41,7 +42,7 @@ Not available yet:
 - **History that survives a restart,** stored only on your Mac.
 - **Control Center button** on macOS 26.
 - **Saved passwords encrypted on disk,** with a key kept in your Keychain, once history survives a restart.
-- **Usage at a glance.** See how much disk and memory the history uses.
+- **Disk usage at a glance,** once history is saved on disk.
 
 ## Building
 
