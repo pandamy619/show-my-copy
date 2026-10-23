@@ -8,11 +8,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var container: AppContainer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Unit tests run inside the app. Do not read the real clipboard or register the hotkey there.
+        // Unit tests run inside the app. Do not open the saved history, read the real clipboard or register the
+        // hotkey there.
         guard !Self.isRunningTests else {
             return
         }
-        let container = AppContainer(makeSettingsWindow: Self.makeSettingsWindow)
+        let container = AppContainer(store: Self.makeHistoryStore(), makeSettingsWindow: Self.makeSettingsWindow)
         KeyboardShortcuts.onKeyDown(for: .toggleHistoryWindow) { [weak container] in
             container?.toggleHistory()
         }
@@ -34,6 +35,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showSettings()
         return false
+    }
+
+    /// The history saved on disk, with passwords encrypted by a key kept in the Keychain.
+    ///
+    /// Without the key, passwords are kept in memory only and everything else is still saved. When the store on
+    /// disk cannot be opened, the history is kept in memory only, as before v2, and `storageError` tells why.
+    private static func makeHistoryStore() -> any HistoryStore {
+        let sealer: (any SecretSealing)?
+        do {
+            sealer = try KeychainSecretSealer()
+        } catch {
+            AppLogger.history.error(
+                "No key for saved passwords, keeping them in memory: \(String(describing: error), privacy: .private)")
+            sealer = nil
+        }
+        let opened = SwiftDataHistoryPersistence.openDefault()
+        // Loading deletes the entries the limits do not allow, so load with the limit the user saved, not the
+        // default one. `AppContainer.start()` applies the same limit again.
+        let retention = RetentionPolicy(entryLimit: HistorySettings.storedLimit(in: .standard))
+        return PersistentHistoryStore(
+            persistence: opened.persistence,
+            sealer: sealer,
+            retention: retention,
+            openError: opened.error
+        )
     }
 
     /// The settings window shows the shortcut recorder, a SwiftUI view from KeyboardShortcuts, and the app's
