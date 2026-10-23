@@ -64,10 +64,16 @@ final class PasswordSettings {
         self.history = history
         self.defaults = defaults
         self.now = now
-        savesPasswords = defaults.object(forKey: SettingsKey.savePasswords) as? Bool ?? false
+        savesPasswords = Self.storedSavesPasswords(in: defaults)
         let storedLifetime = (defaults.object(forKey: SettingsKey.passwordLifetime) as? Int)
             .flatMap(PasswordLifetime.init(rawValue:))
         lifetime = storedLifetime ?? .default
+    }
+
+    /// The saved Save passwords choice, off when nothing valid is saved. Read before the history is loaded, so
+    /// loading deletes saved passwords without opening them when saving them is off.
+    nonisolated static func storedSavesPasswords(in defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: SettingsKey.savePasswords) as? Bool ?? false
     }
 
     var policy: PasswordPolicy {

@@ -13,6 +13,10 @@ import os
 /// kept in memory only, and saved ones cannot be opened and are deleted at launch. They expire within an hour
 /// anyway.
 ///
+/// Opening a saved password needs the key, and getting the key can show a Keychain prompt. So at launch only
+/// passwords that are still wanted are opened: expired ones, and all of them when saving passwords is off, are
+/// deleted unopened, by what their records say in plain text.
+///
 /// A failed write never loses what is in memory: it is logged, shown through `storageError`, and the next change
 /// writes the whole history again, so the disk catches up with memory as soon as writing works.
 @MainActor
@@ -34,12 +38,14 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     var retention: RetentionPolicy { memory.retention }
     var revision: Int { memory.revision }
 
-    /// Loads the saved history. Concealed entries whose time is up at `now` are removed, then the entries
-    /// `retention` does not allow, also from disk, so pass the limits the user saved, not the defaults.
+    /// Loads the saved history. Concealed entries whose time is up at `now`, and all of them unless
+    /// `savesPasswords`, are deleted without being opened. Then the entries `retention` does not allow are removed,
+    /// also from disk, so pass the limits and the password choice the user saved, not the defaults.
     /// `openError` is what went wrong opening the store on disk, if anything, to show in `storageError`.
     init(
         persistence: any HistoryPersistence,
         sealer: (any SecretSealing)?,
+        savesPasswords: Bool,
         retention: RetentionPolicy = .default,
         hasher: any ContentHasher = SHA256ContentHasher(),
         now: Date = Date(),
@@ -57,7 +63,13 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
 
         var loaded: [ClipboardEntry] = []
         var unreadable: [UUID] = []
+        var unwanted: [UUID] = []
         for record in records {
+            // Decided before opening: opening asks for the key, which can show a Keychain prompt.
+            if Self.isUnwantedPassword(record, savesPasswords: savesPasswords, at: now, coder: coder) {
+                unwanted.append(record.id)
+                continue
+            }
             switch coder.decode(record) {
             case .entry(let entry):
                 loaded.append(entry)
@@ -83,11 +95,32 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
             AppLogger.history.error(
                 "Deleting \(unreadable.count, privacy: .public) saved entries that could not be read or decrypted")
         }
-        if !(unreadable + removed).isEmpty {
+        let deleted = unwanted + unreadable + removed
+        if !deleted.isEmpty {
             write { () throws(HistoryPersistenceError) in
-                try persistence.delete(ids: unreadable + removed)
+                try persistence.delete(ids: deleted)
             }
         }
+    }
+
+    /// Whether `record` is a saved password that is no longer wanted: expired at `now`, or saving passwords is off.
+    /// Records from a newer app version are left to that version.
+    private static func isUnwantedPassword(
+        _ record: StoredEntryRecord,
+        savesPasswords: Bool,
+        at now: Date,
+        coder: StoredEntryCoder
+    ) -> Bool {
+        guard record.isConcealed, coder.supports(record) else {
+            return false
+        }
+        guard savesPasswords else {
+            return true
+        }
+        guard let expiresAt = record.expiresAt else {
+            return false
+        }
+        return expiresAt <= now
     }
 
     @discardableResult

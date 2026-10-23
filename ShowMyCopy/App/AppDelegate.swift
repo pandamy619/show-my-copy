@@ -40,9 +40,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The history saved on disk, with passwords encrypted by a key kept in the Keychain.
     ///
     /// The key is read or created only when a password is saved or a saved one is loaded: getting it can show a
-    /// Keychain prompt, which users who never save passwords should not see. Without the key, passwords are kept
-    /// in memory only and everything else is still saved. When the store on disk cannot be opened, the history is
-    /// kept in memory only, as before v2, and `storageError` tells why.
+    /// Keychain prompt, which users who never save passwords should not see. Saved passwords that have expired, or
+    /// all of them when saving passwords is off, are deleted at load without the key. Without the key, passwords
+    /// are kept in memory only and everything else is still saved. When the store on disk cannot be opened, the
+    /// history is kept in memory only, as before v2, and `storageError` tells why.
     private static func makeHistoryStore() -> any HistoryStore {
         let sealer = LazySecretSealer {
             do {
@@ -54,11 +55,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         let opened = SwiftDataHistoryPersistence.openDefault()
-        // Loading deletes the entries the limits do not allow, so load with both limits the user saved, not the
-        // defaults. `AppContainer.start()` applies the same limits again.
+        // Loading deletes the entries the limits do not allow, and saved passwords when saving them is off, so
+        // load with the limits and the password choice the user saved, not the defaults. `AppContainer.start()`
+        // applies the same limits and removes passwords again.
         return PersistentHistoryStore(
             persistence: opened.persistence,
             sealer: sealer,
+            savesPasswords: PasswordSettings.storedSavesPasswords(in: .standard),
             retention: HistorySettings.storedRetention(in: .standard),
             openError: opened.error
         )

@@ -61,9 +61,7 @@ struct StoredEntryCoder: Sendable {
     /// The entry a saved record holds. Its hash and preview are made again from the content, so a concealed entry
     /// gets them back after its payload is opened.
     func decode(_ record: StoredEntryRecord) -> Decoded {
-        guard record.schemaVersion <= StoredEntryRecord.currentSchemaVersion,
-            let kind = ClipboardContent.Kind(rawValue: record.kind)
-        else {
+        guard supports(record), let kind = ClipboardContent.Kind(rawValue: record.kind) else {
             return .unsupported
         }
         var payload = record.payload
@@ -94,6 +92,13 @@ struct StoredEntryCoder: Sendable {
                 isPinned: record.isPinned
             )
         )
+    }
+
+    /// Whether this app version can read `record`: false for a record saved by a newer version (a new schema or
+    /// content kind). Reads only plain fields, so it never opens a sealed payload.
+    func supports(_ record: StoredEntryRecord) -> Bool {
+        record.schemaVersion <= StoredEntryRecord.currentSchemaVersion
+            && ClipboardContent.Kind(rawValue: record.kind) != nil
     }
 
     private func open(_ sealed: Data) -> Data? {
