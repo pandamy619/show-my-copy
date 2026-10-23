@@ -10,4 +10,8 @@ enum SecretSealingError: Error, Equatable, Sendable {
     case authenticationFailed
     /// The cipher could not seal the data.
     case sealingFailed
+    /// A key had an unexpected length; keys are `SealingKey.byteCount` bytes.
+    case invalidKeyLength(Int)
+    /// The key could not be loaded or stored. Secrets should then stay in memory only.
+    case keyUnavailable(SymmetricKeyStoreError)
 }
