@@ -54,13 +54,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         let opened = SwiftDataHistoryPersistence.openDefault()
-        // Loading deletes the entries the limits do not allow, so load with the limit the user saved, not the
-        // default one. `AppContainer.start()` applies the same limit again.
-        let retention = RetentionPolicy(entryLimit: HistorySettings.storedLimit(in: .standard))
+        // Loading deletes the entries the limits do not allow, so load with both limits the user saved, not the
+        // defaults. `AppContainer.start()` applies the same limits again.
         return PersistentHistoryStore(
             persistence: opened.persistence,
             sealer: sealer,
-            retention: retention,
+            retention: HistorySettings.storedRetention(in: .standard),
             openError: opened.error
         )
     }
