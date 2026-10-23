@@ -41,15 +41,67 @@ struct PersistentHistoryStoreKeyTests {
         #expect(disk.savedTexts() == ["plain", "hunter2", "swordfish"])
     }
 
-    @Test func loadingASavedPasswordAsksForTheKey() {
+    @Test func loadingSavedPasswordsAsksForTheKeyOnce() {
         let earlier = disk.makeStore(now: start)
         earlier.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        earlier.record(text: "swordfish", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 600)
         let factory = SealerFactorySpy()
 
-        let store = disk.makeStore(sealer: factory.makeLazySealer(), now: start + 1)
+        let store = disk.makeStore(sealer: factory.makeLazySealer(), savesPasswords: true, now: start + 2)
 
         #expect(factory.calls == 1)
-        #expect(store.entries.map(\.text) == ["hunter2"])
+        #expect(store.entries.map(\.text) == ["swordfish", "hunter2"])
+    }
+
+    /// Saved passwords live an hour at most, so after a restart they have usually expired. Deleting them must not
+    /// show a Keychain prompt.
+    @Test func expiredSavedPasswordsAreDeletedWithoutAskingForTheKey() {
+        let earlier = disk.makeStore(now: start)
+        let expiredID = earlier.record(
+            text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        let plainID = earlier.record(text: "plain", sourceApp: nil, at: start + 1)
+        let factory = SealerFactorySpy()
+
+        // Expiring exactly now counts as expired, as in `removeExpired(at:)`.
+        let store = disk.makeStore(sealer: factory.makeLazySealer(), savesPasswords: true, now: start + 600)
+
+        #expect(factory.calls == 0)
+        #expect(store.entries.map(\.id) == [plainID])
+        #expect(disk.record(expiredID) == nil)
+        #expect(disk.record(plainID) != nil)
+        #expect(store.storageError == nil)
+    }
+
+    @Test func savedPasswordsAreDeletedWithoutAskingForTheKeyWhenSavingThemIsOff() {
+        let earlier = disk.makeStore(now: start)
+        let passwordID = earlier.record(
+            text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        let plainID = earlier.record(text: "plain", sourceApp: nil, at: start + 1)
+        let factory = SealerFactorySpy()
+
+        let store = disk.makeStore(sealer: factory.makeLazySealer(), savesPasswords: false, now: start + 2)
+
+        #expect(factory.calls == 0)
+        #expect(store.entries.map(\.id) == [plainID])
+        #expect(disk.record(passwordID) == nil)
+        #expect(disk.record(plainID) != nil)
+        #expect(store.storageError == nil)
+    }
+
+    /// A newer app version may read a record differently, so it decides about that record, also with saving off.
+    @Test func aPasswordFromANewerVersionIsLeftOnDiskWithoutAskingForTheKey() throws {
+        let earlier = disk.makeStore(now: start)
+        let id = earlier.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        var record = try #require(disk.record(id))
+        record.schemaVersion = StoredEntryRecord.currentSchemaVersion + 1
+        disk.records[id] = record
+        let factory = SealerFactorySpy()
+
+        let store = disk.makeStore(sealer: factory.makeLazySealer(), savesPasswords: false, now: start + 600)
+
+        #expect(factory.calls == 0)
+        #expect(store.entries.isEmpty)
+        #expect(disk.record(id) == record)
     }
 
     @Test func withoutTheKeyPasswordsStayInMemoryAndTheKeyIsNotAskedForAgain() {

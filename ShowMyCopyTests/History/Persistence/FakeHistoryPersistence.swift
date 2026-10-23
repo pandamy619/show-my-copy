@@ -81,12 +81,14 @@ extension FakeHistoryPersistence {
     /// A store on this persistence. Making another one stands for quitting and starting the app.
     func makeStore(
         sealer: (any SecretSealing)? = FakeSecretSealer(),
+        savesPasswords: Bool = true,
         retention: RetentionPolicy = .default,
         now: Date,
         openError: HistoryPersistenceError? = nil
     ) -> PersistentHistoryStore {
         PersistentHistoryStore(
-            persistence: self, sealer: sealer, retention: retention, now: now, openError: openError)
+            persistence: self, sealer: sealer, savesPasswords: savesPasswords, retention: retention, now: now,
+            openError: openError)
     }
 
     /// The texts of the saved records that `sealer` can read.

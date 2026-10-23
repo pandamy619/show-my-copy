@@ -47,6 +47,24 @@ struct PasswordSettingsTests {
         }
     }
 
+    @Test func storedSavesPasswordsReadsTheSavedChoice() throws {
+        try withDefaults { defaults in
+            #expect(!PasswordSettings.storedSavesPasswords(in: defaults))
+            makeSettings(defaults: defaults).savesPasswords = true
+            #expect(PasswordSettings.storedSavesPasswords(in: defaults))
+            makeSettings(defaults: defaults).savesPasswords = false
+            #expect(!PasswordSettings.storedSavesPasswords(in: defaults))
+        }
+    }
+
+    @Test func storedSavesPasswordsIgnoresAValueOfTheWrongType() throws {
+        try withDefaults { defaults in
+            defaults.set("yes", forKey: SettingsKey.savePasswords)
+            #expect(!PasswordSettings.storedSavesPasswords(in: defaults))
+            #expect(!makeSettings(defaults: defaults).savesPasswords)
+        }
+    }
+
     @Test(arguments: [0, 59, 601, -1])
     func unknownSavedLifetimeFallsBackToDefault(saved: Int) throws {
         try withDefaults { defaults in

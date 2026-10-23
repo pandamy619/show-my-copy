@@ -145,7 +145,7 @@ struct PersistentHistoryStoreTests {
     }
 
     @Test func aRecordThatCannotBeOpenedIsDroppedAndDeleted() {
-        let other = PersistentHistoryStore(persistence: disk, sealer: FakeSecretSealer(key: 0x11), now: start)
+        let other = disk.makeStore(sealer: FakeSecretSealer(key: 0x11), now: start)
         let lostID = other.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
         let plainID = other.record(text: "plain", sourceApp: nil, at: start + 1)
 
