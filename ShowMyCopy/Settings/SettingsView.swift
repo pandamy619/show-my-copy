@@ -63,7 +63,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
 
     private var limitSection: some View {
         Section("History") {
-            LabeledContent("Keep the last") {
+            LabeledContent("Items to keep") {
                 HStack(spacing: 6) {
                     TextField("Number of items", value: $draftLimit, format: .number)
                         .labelsHidden()
@@ -71,8 +71,6 @@ struct SettingsView<ShortcutRecorder: View>: View {
                         .frame(width: 64)
                     Stepper("Number of items", value: $draftLimit, in: RetentionPolicy.entryLimitRange, step: 10)
                         .labelsHidden()
-                    // A plural key, so "items" agrees with the limit. The translations leave the number out.
-                    Text("\(draftLimit) items", comment: "Unit after the history limit field.")
                 }
             }
             LabeledContent("In history") {

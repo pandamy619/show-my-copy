@@ -1,59 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%lld items" : {
-      "comment" : "Unit after the history limit field.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "item"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "items"
-                }
-              }
-            }
-          }
-        },
-        "ru" : {
-          "variations" : {
-            "plural" : {
-              "few" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "записи"
-                }
-              },
-              "many" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "записей"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "запись"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "записи"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld items now" : {
       "localizations" : {
         "en" : {
@@ -216,12 +163,12 @@
         }
       }
     },
-    "Keep the last" : {
+    "Items to keep" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Хранить последние"
+            "value" : "Сколько записей хранить"
           }
         }
       }
@@ -454,13 +401,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "This removes your oldest item."
+                  "value" : "This removes your %lld oldest item."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "This removes %lld of your oldest items."
+                  "value" : "This removes your %lld oldest items."
                 }
               }
             }
