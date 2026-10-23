@@ -262,4 +262,19 @@ struct ClipboardHistoryConcealedTests {
         history.limitExpiry(to: start + 60)
         #expect(history.entries.map(\.expiresAt) == [nil, start + 60, start + 30])
     }
+
+    @Test func restoringRemovesExpiredPasswordsThenAppliesTheLimit() {
+        let hasher = SHA256ContentHasher()
+        var saved = (0..<10).map { index in
+            ClipboardEntry(text: "item \(index)", date: start - Double(index), sourceApp: nil, hasher: hasher)
+        }
+        saved.insert(
+            ClipboardEntry(
+                text: "hunter2", date: start, sourceApp: nil, isConcealed: true, expiresAt: start + 60, hasher: hasher),
+            at: 0)
+
+        let history = ClipboardHistory(restoring: saved, at: start + 60, retention: RetentionPolicy(entryLimit: 10))
+        #expect(history.entries == Array(saved.dropFirst()))
+        #expect(history.currentEntryID == nil)
+    }
 }
