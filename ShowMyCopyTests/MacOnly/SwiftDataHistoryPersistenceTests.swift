@@ -163,6 +163,24 @@ struct SwiftDataHistoryPersistenceTests {
         }
     }
 
+    @Test func storeInMemoryHasNoSizeOnDisk() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        try persistence.insert([makeRecord()])
+        #expect(persistence.storedBytes() == nil)
+    }
+
+    @Test func sizeOnDiskIsTheSizeOfTheStoreFiles() throws {
+        try withTemporaryDirectory { directory in
+            let opened = SwiftDataHistoryPersistence.open(in: directory)
+            try opened.persistence.insert([makeRecord(text: String(repeating: "a", count: 10_000))])
+
+            let storeURL = directory.appending(path: SwiftDataHistoryPersistence.storeFileName)
+            let bytes = try #require(opened.persistence.storedBytes())
+            #expect(bytes > 10_000)
+            #expect(bytes == StoreFiles.totalBytes(ofStoreAt: storeURL))
+        }
+    }
+
     @Test func persistentStoreRoundTripsThroughSwiftData() throws {
         let persistence = try SwiftDataHistoryPersistence.inMemory()
         let first = PersistentHistoryStore(persistence: persistence, sealer: FakeSecretSealer(), now: date)
