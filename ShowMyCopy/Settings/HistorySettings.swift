@@ -84,12 +84,15 @@ final class HistorySettings {
         return value == 0 ? .noLimit : HistorySizeLimit(byteLimit: value)
     }
 
+    /// Both saved limits as one policy. Load the saved history with it, so loading deletes exactly what
+    /// `applyStoredLimit()` would.
+    nonisolated static func storedRetention(in defaults: UserDefaults) -> RetentionPolicy {
+        RetentionPolicy(entryLimit: storedLimit(in: defaults), byteLimit: storedSizeLimit(in: defaults).byteLimit)
+    }
+
     /// Applies the saved limits to the history at once, deleting the oldest entries that no longer fit.
     func applyStoredLimit() {
-        let policy = history.retention
-            .withEntryLimit(Self.storedLimit(in: defaults))
-            .withByteLimit(Self.storedSizeLimit(in: defaults).byteLimit)
-        history.setRetention(policy)
+        history.setRetention(Self.storedRetention(in: defaults))
     }
 
     /// Describes what setting `newLimit` would do, without changing anything.
