@@ -39,16 +39,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The history saved on disk, with passwords encrypted by a key kept in the Keychain.
     ///
-    /// Without the key, passwords are kept in memory only and everything else is still saved. When the store on
-    /// disk cannot be opened, the history is kept in memory only, as before v2, and `storageError` tells why.
+    /// The key is read or created only when a password is saved or a saved one is loaded: getting it can show a
+    /// Keychain prompt, which users who never save passwords should not see. Without the key, passwords are kept
+    /// in memory only and everything else is still saved. When the store on disk cannot be opened, the history is
+    /// kept in memory only, as before v2, and `storageError` tells why.
     private static func makeHistoryStore() -> any HistoryStore {
-        let sealer: (any SecretSealing)?
-        do {
-            sealer = try KeychainSecretSealer()
-        } catch {
-            AppLogger.history.error(
-                "No key for saved passwords, keeping them in memory: \(String(describing: error), privacy: .private)")
-            sealer = nil
+        let sealer = LazySecretSealer {
+            do {
+                return try KeychainSecretSealer()
+            } catch {
+                AppLogger.history.error(
+                    "No key for saved passwords; they stay in memory: \(String(describing: error), privacy: .private)")
+                throw error
+            }
         }
         let opened = SwiftDataHistoryPersistence.openDefault()
         // Loading deletes the entries the limits do not allow, so load with the limit the user saved, not the
