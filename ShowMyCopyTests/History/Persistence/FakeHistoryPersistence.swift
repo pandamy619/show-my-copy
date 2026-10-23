@@ -67,3 +67,28 @@ final class FakeHistoryPersistence: HistoryPersistence {
         }
     }
 }
+
+extension FakeHistoryPersistence {
+    /// A store on this persistence. Making another one stands for quitting and starting the app.
+    func makeStore(
+        sealer: (any SecretSealing)? = FakeSecretSealer(),
+        retention: RetentionPolicy = .default,
+        now: Date,
+        openError: HistoryPersistenceError? = nil
+    ) -> PersistentHistoryStore {
+        PersistentHistoryStore(
+            persistence: self, sealer: sealer, retention: retention, now: now, openError: openError)
+    }
+
+    /// The texts of the saved records that `sealer` can read.
+    func savedTexts(sealer: FakeSecretSealer = FakeSecretSealer()) -> Set<String> {
+        let coder = StoredEntryCoder(sealer: sealer, hasher: SHA256ContentHasher())
+        return Set(
+            records.values.compactMap { record in
+                guard case .entry(let entry) = coder.decode(record) else {
+                    return nil
+                }
+                return entry.text
+            })
+    }
+}
