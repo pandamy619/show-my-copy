@@ -36,6 +36,7 @@ struct AppContainerTests {
     /// Runs `body` with a container built from fakes and an empty UserDefaults suite that is removed afterwards.
     private func withContainer(
         savedLimit: Int? = nil,
+        savesPasswords: Bool? = nil,
         _ body: (AppContainer) throws -> Void
     ) throws {
         let suiteName = "ShowMyCopyTests.\(UUID().uuidString)"
@@ -43,6 +44,9 @@ struct AppContainerTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         if let savedLimit {
             defaults.set(savedLimit, forKey: SettingsKey.historyLimit)
+        }
+        if let savesPasswords {
+            defaults.set(savesPasswords, forKey: SettingsKey.savePasswords)
         }
         let container = AppContainer(
             store: store,
@@ -110,6 +114,30 @@ struct AppContainerTests {
             #expect(container.monitor.isPolling)
             #expect(!workspace.observedNames.isEmpty)
             #expect(!distributed.observedNames.isEmpty)
+        }
+    }
+
+    /// A saved history may still hold passwords from a session in which removing them from disk failed.
+    @Test func startRemovesSavedPasswordsWhenSavingThemIsOff() throws {
+        store.record(text: "hunter2", sourceApp: nil, at: start - 10, concealed: true, expiresAt: start + 600)
+        store.record(text: "plain", sourceApp: nil, at: start - 5)
+        store.markCurrentSkipped()
+        pasteboard.copy("plain")
+
+        try withContainer(savesPasswords: false) { container in
+            container.start()
+            #expect(store.entries.map(\.text) == ["plain"])
+        }
+    }
+
+    @Test func startKeepsSavedPasswordsWhenSavingThemIsOn() throws {
+        store.record(text: "hunter2", sourceApp: nil, at: start - 10, concealed: true, expiresAt: start + 600)
+        store.markCurrentSkipped()
+        pasteboard.copy("hunter2", markers: [PasteboardMarker.concealed])
+
+        try withContainer(savesPasswords: true) { container in
+            container.start()
+            #expect(store.entries.map(\.text) == ["hunter2"])
         }
     }
 
