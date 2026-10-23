@@ -13,6 +13,8 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
 
     private let container: ModelContainer
     private let context: ModelContext
+    /// The SQLite file, or nil for a store in memory.
+    private let storeURL: URL?
 
     /// Opens the store described by `configuration`. Use `open(in:)` for the app's store and `inMemory()` in
     /// tests.
@@ -26,6 +28,7 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
         }
         context = ModelContext(container)
         context.autosaveEnabled = false
+        storeURL = configuration.isStoredInMemoryOnly ? nil : configuration.url
     }
 
     /// A store that lives in memory only, for tests.
@@ -67,6 +70,12 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
         try save { context in
             try context.delete(model: StoredEntry.self)
         }
+    }
+
+    /// The size of `History.store` and its SQLite side files. It need not drop right after entries are deleted:
+    /// SQLite may keep the free space for new ones.
+    func storedBytes() -> Int64? {
+        storeURL.flatMap(StoreFiles.totalBytes(ofStoreAt:))
     }
 
     /// Changes the saved models with the records' IDs and adds the others. Done by hand rather than left to the
@@ -116,8 +125,6 @@ extension SwiftDataHistoryPersistence {
     static let storeFileName = "History.store"
     /// Where a store that could not be opened is moved. Only the latest one is kept.
     static let damagedStoreFileName = "History.store.damaged"
-    /// SQLite keeps recent changes in these files next to the store until it checkpoints them.
-    private static let storeFileSuffixes = ["", "-wal", "-shm"]
 
     /// Opens the history in Application Support/ShowMyCopy, inside the app's sandbox container.
     static func openDefault() -> Opened {
@@ -188,7 +195,7 @@ extension SwiftDataHistoryPersistence {
     /// not deleted, so the history can still be recovered by hand; it stays in the folder excluded from backups.
     private static func moveAside(in directory: URL) throws {
         let fileManager = FileManager.default
-        for suffix in storeFileSuffixes {
+        for suffix in StoreFiles.suffixes {
             let source = directory.appending(path: storeFileName + suffix, directoryHint: .notDirectory)
             let destination = directory.appending(path: damagedStoreFileName + suffix, directoryHint: .notDirectory)
             if fileManager.fileExists(atPath: destination.path(percentEncoded: false)) {
