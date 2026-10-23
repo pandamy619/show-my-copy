@@ -125,6 +125,39 @@ struct HistorySizeLimitTests {
         }
     }
 
+    @Test func storedRetentionHoldsBothSavedLimits() throws {
+        try withDefaults { defaults in
+            #expect(HistorySettings.storedRetention(in: defaults) == .default)
+
+            defaults.set(120, forKey: SettingsKey.historyLimit)
+            defaults.set(500_000_000, forKey: SettingsKey.historyByteLimit)
+            #expect(
+                HistorySettings.storedRetention(in: defaults)
+                    == RetentionPolicy(entryLimit: 120, byteLimit: 500_000_000))
+
+            defaults.set(5, forKey: SettingsKey.historyLimit)
+            defaults.set(300_000_000, forKey: SettingsKey.historyByteLimit)
+            #expect(
+                HistorySettings.storedRetention(in: defaults)
+                    == RetentionPolicy(entryLimit: RetentionPolicy.entryLimitRange.lowerBound, byteLimit: 500_000_000))
+        }
+    }
+
+    /// The history is loaded with `storedRetention` before the settings apply the saved limits, so both must agree:
+    /// loading must not delete more or less than the settings would.
+    @Test(arguments: [nil, 0, 100_000_000, 1_000_000_000])
+    func storedRetentionIsWhatTheSettingsApply(byteLimit: Int?) throws {
+        try withDefaults { defaults in
+            defaults.set(300, forKey: SettingsKey.historyLimit)
+            if let byteLimit {
+                defaults.set(byteLimit, forKey: SettingsKey.historyByteLimit)
+            }
+            let history = ClipboardHistory(retention: RetentionPolicy(entryLimit: 10, byteLimit: 1))
+            _ = makeSettings(history: history, defaults: defaults)
+            #expect(history.retention == HistorySettings.storedRetention(in: defaults))
+        }
+    }
+
     @Test func sizeLimitShowsTheOptionForTheHistorysByteLimit() throws {
         try withDefaults { defaults in
             let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 200_000_000))
