@@ -117,7 +117,6 @@ struct SettingsView<ShortcutRecorder: View>: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("When off, passwords and anything you copy from a password manager are not kept.")
                 Text("When on, they are kept hidden in the history and removed after the time you choose.")
-                Text("For now, history is kept in memory only.")
             }
             .font(.caption)
             .foregroundStyle(.secondary)

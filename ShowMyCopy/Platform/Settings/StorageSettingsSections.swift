@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Settings → Storage: how much the history takes by type, the app's memory and the size limit.
+/// Settings → Storage: how much the history takes by type and on disk, the app's memory, the size limit and any
+/// problem saving the history.
 struct StorageSection: View {
     let settings: HistorySettings
     let usage: StorageUsage
@@ -19,9 +20,26 @@ struct StorageSection: View {
     var body: some View {
         Section("Storage") {
             let breakdown = usage.breakdown
+            let warning = usage.storageWarning
+            if let warning {
+                // A problem saving never stops the app, so this is a note, not an alert.
+                Label {
+                    Text(Self.message(for: warning))
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                }
+            }
             LabeledContent("History size") {
                 Text(verbatim: ByteCount.fileSize(breakdown.totalBytes))
                     .monospacedDigit()
+            }
+            if let diskBytes = usage.diskBytes {
+                LabeledContent("On disk") {
+                    Text(verbatim: ByteCount.fileSize(Int(clamping: diskBytes)))
+                        .monospacedDigit()
+                }
             }
             if !breakdown.parts.isEmpty {
                 StorageBar(breakdown: breakdown)
@@ -59,11 +77,33 @@ struct StorageSection: View {
                     onCancel: cancelPendingSizeLimit
                 )
             } else {
-                sizeLimitNote
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    sizeLimitNote
+                    // Not true while the store on disk cannot be opened; the warning above says so then.
+                    if warning != .notSaved {
+                        Text("Saved on this Mac only. Not synced, not in Time Machine backups.")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    /// Plain words for each problem, without technical details: those are in the log.
+    private static func message(for warning: StorageWarning) -> LocalizedStringKey {
+        switch warning {
+        case .notSaved:
+            "History cannot be saved right now and will be lost when you quit."
+        case .historyReset:
+            "The saved history could not be read, so a new one was started."
+        case .historyNotLoaded:
+            "The saved history could not be loaded."
+        case .changesNotSaved:
+            "Recent changes could not be saved. They are kept until you quit."
+        case .passwordsNotSaved:
+            "Passwords could not be encrypted, so they are not saved on disk."
         }
     }
 

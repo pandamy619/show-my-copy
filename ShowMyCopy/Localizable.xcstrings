@@ -133,16 +133,6 @@
         }
       }
     },
-    "For now, history is kept in memory only." : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пока история хранится только в памяти."
-          }
-        }
-      }
-    },
     "Frees %@." : {
       "localizations" : {
         "ru" : {
@@ -189,6 +179,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "История может занимать до %@."
+          }
+        }
+      }
+    },
+    "History cannot be saved right now and will be lost when you quit." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сейчас историю не удаётся сохранить, и она пропадёт, когда вы закроете приложение."
           }
         }
       }
@@ -283,6 +283,16 @@
         }
       }
     },
+    "On disk" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На диске"
+          }
+        }
+      }
+    },
     "Only the number of items limits the history." : {
       "localizations" : {
         "ru" : {
@@ -333,6 +343,16 @@
         }
       }
     },
+    "Passwords could not be encrypted, so they are not saved on disk." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароли не удалось зашифровать, поэтому они не сохраняются на диске."
+          }
+        }
+      }
+    },
     "Press the shortcut above to show your history." : {
       "localizations" : {
         "ru" : {
@@ -349,6 +369,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Завершить Show My Copy"
+          }
+        }
+      }
+    },
+    "Recent changes could not be saved. They are kept until you quit." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последние изменения не удалось сохранить. Они останутся, пока вы не закроете приложение."
           }
         }
       }
@@ -441,6 +471,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сохранять пароли"
+          }
+        }
+      }
+    },
+    "Saved on this Mac only. Not synced, not in Time Machine backups." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хранится только на этом Mac. Не синхронизируется и не попадает в резервные копии Time Machine."
           }
         }
       }
@@ -561,6 +601,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Скопированный текст появится здесь."
+          }
+        }
+      }
+    },
+    "The saved history could not be loaded." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось загрузить сохранённую историю."
+          }
+        }
+      }
+    },
+    "The saved history could not be read, so a new one was started." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранённую историю не удалось прочитать, поэтому начата новая."
           }
         }
       }
