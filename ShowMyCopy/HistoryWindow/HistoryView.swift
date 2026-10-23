@@ -17,12 +17,18 @@ struct HistoryView: View {
             searchBar
             Divider()
             if items.isEmpty {
+                // Fill the rest of the panel so the search bar stays at the top, as it does above the list.
                 emptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 list(items: items, selectedID: selectedID, now: Date())
             }
         }
-        .frame(width: HistoryPanelPlacement.size.width, height: HistoryPanelPlacement.size.height)
+        .frame(
+            width: HistoryPanelPlacement.size.width,
+            height: HistoryPanelPlacement.size.height,
+            alignment: .top
+        )
         .defaultFocus($isSearchFocused, true)
         .onAppear { isSearchFocused = true }
         .onChange(of: model.presentationCount) { isSearchFocused = true }
@@ -56,6 +62,7 @@ struct HistoryView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder
