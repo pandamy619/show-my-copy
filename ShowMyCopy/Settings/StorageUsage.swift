@@ -60,14 +60,20 @@ struct StorageBreakdown: Equatable, Sendable {
     }
 }
 
-/// What the Storage settings show: how much the history takes by category, the app's memory and what clearing
-/// the history frees.
+/// What the Storage settings show: how much the history takes by category and on disk, the app's memory, what
+/// clearing the history frees and whether saving it works.
 @MainActor
 @Observable
 final class StorageUsage {
     @ObservationIgnored let history: any HistoryStore
     @ObservationIgnored private let memoryReader: any MemoryUsageReading
+    /// The history as a store that reports storage problems and its size on disk; nil for a history in memory.
+    @ObservationIgnored private let errorReporter: (any ReportsStorageErrors)?
+    @ObservationIgnored private let diskUsage: (any ReportsDiskUsage)?
     @ObservationIgnored private var cachedBreakdown: (revision: Int, breakdown: StorageBreakdown)?
+    @ObservationIgnored private var cachedDiskBytes: (revision: Int, bytes: Int64?)?
+    /// Changes when the size on disk should be read again, so views update `diskBytes`.
+    private var diskToken = 0
     /// What the last `clearHistory()` removed and the history's revision right after it.
     @ObservationIgnored private var lastClear: (result: ClearResult, revision: Int)?
     /// How often the breakdown was computed, so tests can check the cache.
@@ -81,6 +87,33 @@ final class StorageUsage {
     init(history: any HistoryStore, memoryReader: any MemoryUsageReading) {
         self.history = history
         self.memoryReader = memoryReader
+        errorReporter = history as? any ReportsStorageErrors
+        diskUsage = history as? any ReportsDiskUsage
+    }
+
+    /// Why the history is not, or not fully, saved, or nil while saving works. Reading it observes the store.
+    var storageWarning: StorageWarning? {
+        errorReporter?.storageError.map(StorageWarning.init)
+    }
+
+    /// How many bytes the saved history takes on disk, or nil when it is not saved in files. Read again after
+    /// `history.revision` changes and after `refreshDiskBytes()`, not on every view update.
+    var diskBytes: Int64? {
+        _ = diskToken
+        let revision = history.revision
+        if let cachedDiskBytes, cachedDiskBytes.revision == revision {
+            return cachedDiskBytes.bytes
+        }
+        let bytes = diskUsage?.storedBytes()
+        cachedDiskBytes = (revision, bytes)
+        return bytes
+    }
+
+    /// Reads the size on disk again, when the settings open: the database can change size without a change to
+    /// the history, for example when SQLite moves its log into the store.
+    func refreshDiskBytes() {
+        cachedDiskBytes = nil
+        diskToken &+= 1
     }
 
     /// The breakdown of the current entries. Computed again only after `history.revision` changes, so a view can

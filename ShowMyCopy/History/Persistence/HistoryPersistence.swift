@@ -49,6 +49,24 @@ protocol HistoryPersistence: AnyObject {
 
     /// Deletes every record, also those this app version could not load.
     func deleteAll() throws(HistoryPersistenceError)
+
+    /// How many bytes the saved history takes on disk, or nil when it is not saved in files or their size is not
+    /// known.
+    func storedBytes() -> Int64?
+}
+
+extension HistoryPersistence {
+    func storedBytes() -> Int64? {
+        nil
+    }
+}
+
+/// A history store that can say how much space the saved history takes on disk.
+@MainActor
+protocol ReportsDiskUsage: AnyObject {
+    /// Bytes on disk, or nil when nothing is saved in files. Reads the file system, so call it only when the
+    /// number is shown.
+    func storedBytes() -> Int64?
 }
 
 /// Keeps records in memory only. Used when the store on disk cannot be opened: the app keeps working with the same

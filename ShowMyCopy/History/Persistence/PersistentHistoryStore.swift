@@ -17,7 +17,7 @@ import os
 /// writes the whole history again, so the disk catches up with memory as soon as writing works.
 @MainActor
 @Observable
-final class PersistentHistoryStore: HistoryStore {
+final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsDiskUsage {
     /// Why the history is not, or not fully, saved. Nil while saving works. A failed write is cleared by the next
     /// successful one; a failure to open or read the saved history stays for the session.
     private(set) var storageError: HistoryPersistenceError?
@@ -148,6 +148,11 @@ final class PersistentHistoryStore: HistoryStore {
 
     func stats() -> HistoryStats {
         memory.stats()
+    }
+
+    /// How many bytes the saved history takes on disk, or nil when it is kept in memory only.
+    func storedBytes() -> Int64? {
+        persistence.storedBytes()
     }
 
     // MARK: - Writing
