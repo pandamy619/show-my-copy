@@ -121,7 +121,7 @@ struct HistorySettingsTests {
         try withDefaults { defaults in
             let settings = makeSettings(history: makeHistory(withEntries: 30), defaults: defaults)
             let change = settings.proposeLimit(500)
-            #expect(change == LimitChange(limit: 500, removedCount: 0))
+            #expect(change == LimitChange(limit: 500, removedCount: 0, freedBytes: 0))
             #expect(!change.needsConfirmation)
         }
     }
@@ -139,7 +139,8 @@ struct HistorySettingsTests {
             let history = makeHistory(withEntries: 40)
             let settings = makeSettings(history: history, defaults: defaults)
             let change = settings.proposeLimit(25)
-            #expect(change == LimitChange(limit: 25, removedCount: 15))
+            // Items 0 to 9 take 6 bytes each, items 10 to 14 take 7.
+            #expect(change == LimitChange(limit: 25, removedCount: 15, freedBytes: 95))
             #expect(change.needsConfirmation)
             // Proposing changes nothing.
             #expect(history.entries.count == 40)
@@ -151,7 +152,7 @@ struct HistorySettingsTests {
     @Test func proposalIsClamped() throws {
         try withDefaults { defaults in
             let settings = makeSettings(history: makeHistory(withEntries: 40), defaults: defaults)
-            #expect(settings.proposeLimit(1) == LimitChange(limit: 10, removedCount: 30))
+            #expect(settings.proposeLimit(1) == LimitChange(limit: 10, removedCount: 30, freedBytes: 200))
         }
     }
 
