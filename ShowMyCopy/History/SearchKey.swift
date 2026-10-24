@@ -12,9 +12,10 @@ enum SearchKey {
         String(text).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
     }
 
-    /// The key for the start of the content's text, or nil for content without text.
+    /// The key for the start of the content's searchable text (the text, or the names of copied files), or nil
+    /// for content without any, such as an image.
     static func text(of content: ClipboardContent) -> String? {
-        content.text.map { fold($0.prefix(searchedCharacters)) }
+        content.searchableText.map { fold($0.prefix(searchedCharacters)) }
     }
 
     /// The key for the app's name, or nil when the app or its name is unknown.

@@ -88,7 +88,7 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
         content.kind
     }
 
-    /// The plain text of the content, or nil for content without text.
+    /// The plain text of the content, or nil for content without text. Rich text gives its plain text.
     var text: String? {
         content.text
     }
@@ -97,6 +97,13 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
         switch content {
         case .text(let text):
             EntryPreview.text(text)
+        case .richText(_, let plain):
+            EntryPreview.text(plain)
+        case .image(let image):
+            // Not localized: a format name and a pixel size read the same in every language.
+            "\(image.formatName) \(image.pixelWidth) × \(image.pixelHeight)"
+        case .files(let files):
+            EntryPreview.text(files.map(\.name).joined(separator: "\n"))
         }
     }
 }

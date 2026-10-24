@@ -1,11 +1,15 @@
 import Foundation
 import Observation
 
-/// A part of the history in the storage breakdown. Images and files get their own cases when the history keeps
-/// them; `init(of:)` switches over `ClipboardContent.Kind` without a `default`, so a new kind does not compile until
-/// it is sorted into a category here.
+/// A part of the history in the storage breakdown. `init(of:)` switches over `ClipboardContent.Kind` without a
+/// `default`, so a new kind does not compile until it is sorted into a category here.
 enum StorageCategory: CaseIterable, Sendable {
     case text
+    case richText
+    /// Counted with their data and thumbnails in the blob store.
+    case images
+    /// Only the stored paths and names: the files themselves are not kept.
+    case files
     case passwords
 
     init(of entry: ClipboardEntry) {
@@ -17,6 +21,12 @@ enum StorageCategory: CaseIterable, Sendable {
         switch entry.kind {
         case .text:
             self = .text
+        case .richText:
+            self = .richText
+        case .image:
+            self = .images
+        case .files:
+            self = .files
         }
     }
 }

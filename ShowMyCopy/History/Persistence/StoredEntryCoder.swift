@@ -24,7 +24,9 @@ struct StoredEntryCoder: Sendable {
     /// The record to write for `entry`, or nil when the entry is kept in memory only: a concealed entry without
     /// a sealer. Throws `sealFailed` when sealing a concealed entry fails.
     func record(for entry: ClipboardEntry) throws(HistoryPersistenceError) -> StoredEntryRecord? {
-        let payload = entry.content.storedPayload
+        guard let payload = entry.content.storedPayload else {
+            return nil
+        }
         var record = StoredEntryRecord(
             id: entry.id,
             kind: entry.kind.rawValue,
@@ -140,11 +142,13 @@ struct StoredEntryCoder: Sendable {
 }
 
 extension ClipboardContent {
-    /// The content's data as it is written to disk, before sealing.
-    var storedPayload: Data {
+    /// The content's data as it is written to disk, before sealing, or nil for content kept in memory only.
+    var storedPayload: Data? {
         switch self {
         case .text(let text):
             Data(text.utf8)
+        case .richText, .image, .files:
+            nil
         }
     }
 
@@ -156,6 +160,8 @@ extension ClipboardContent {
                 return nil
             }
             self = .text(text)
+        case .richText, .image, .files:
+            return nil
         }
     }
 }

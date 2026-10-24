@@ -133,6 +133,16 @@
         }
       }
     },
+    "Files" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файлы"
+          }
+        }
+      }
+    },
     "Frees %@." : {
       "localizations" : {
         "ru" : {
@@ -209,6 +219,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Размер истории"
+          }
+        }
+      }
+    },
+    "Images" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изображения"
           }
         }
       }
@@ -461,6 +481,16 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Rich text" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Форматированный текст"
           }
         }
       }

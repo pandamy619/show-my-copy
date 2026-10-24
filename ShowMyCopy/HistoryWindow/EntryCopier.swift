@@ -43,6 +43,10 @@ final class EntryCopier: EntryCopying {
         switch entry.content {
         case .text(let text):
             written = pasteboard.write(text, concealed: entry.isConcealed)
+        case .richText(_, let plain):
+            written = pasteboard.write(plain, concealed: entry.isConcealed)
+        case .image, .files:
+            written = nil
         }
         guard let changeCount = written else {
             AppLogger.clipboard.info("Could not put the picked entry on the pasteboard")

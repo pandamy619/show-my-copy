@@ -275,6 +275,12 @@ private struct StorageBar: View {
         switch category {
         case .text:
             "Text"
+        case .richText:
+            "Rich text"
+        case .images:
+            "Images"
+        case .files:
+            "Files"
         case .passwords:
             "Passwords"
         }
@@ -285,6 +291,12 @@ private struct StorageBar: View {
         switch category {
         case .text:
             Color(nsColor: .systemBlue)
+        case .richText:
+            Color(nsColor: .systemTeal)
+        case .images:
+            Color(nsColor: .systemPurple)
+        case .files:
+            Color(nsColor: .systemGreen)
         case .passwords:
             Color(nsColor: .systemOrange)
         }
