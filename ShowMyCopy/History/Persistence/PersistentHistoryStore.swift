@@ -17,8 +17,12 @@ import os
 /// passwords that are still wanted are opened: expired ones, and all of them when saving passwords is off, are
 /// deleted unopened, by what their records say in plain text.
 ///
-/// A failed write never loses what is in memory: it is logged, shown through `storageError`, and the next change
-/// writes the whole history again, so the disk catches up with memory as soon as writing works.
+/// Each write is one transaction (`HistoryPersistence.apply`), so a failed one leaves the disk as it was. It never
+/// loses what is in memory either: it is logged, shown through `storageError`, and the next change writes what the
+/// failed ones did not, so the disk catches up with memory as soon as writing works. A write touches only the
+/// records of entries this session loaded or made, never the others on disk: records from a newer app version,
+/// images left unloaded without a blob store, or the whole saved history when it could not be read. Only Clear
+/// History deletes those.
 @MainActor
 @Observable
 final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsDiskUsage {
@@ -34,8 +38,11 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     /// Whether blobs no record references may be deleted: only when `persistence` is the history saved on disk.
     /// After it failed to open, its records are unknown and their images may still be wanted.
     @ObservationIgnored private let sweepsBlobs: Bool
-    /// Set after a failed write: the disk no longer matches memory, so the next write replaces everything.
-    @ObservationIgnored private var needsFullWrite = false
+    /// The entries whose last write failed: the next write saves them as they are in memory then, or deletes their
+    /// records when they are gone.
+    @ObservationIgnored private var unsaved: Set<ClipboardEntry.ID> = []
+    /// Set while a Clear History has not reached the disk: the next write deletes every record first.
+    @ObservationIgnored private var clearPending = false
 
     // Reads go to the wrapped store, which is observable itself, so views that read them here are updated too.
     var entries: [ClipboardEntry] { memory.entries }
@@ -96,9 +103,7 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         let deleted = found.unwanted + found.unreadable + removed
         var isDeleted = true
         if !deleted.isEmpty {
-            isDeleted = write { () throws(HistoryPersistenceError) in
-                try persistence.delete(ids: deleted)
-            }
+            isDeleted = write(StoredChange(deleted: deleted), covering: Set(deleted))
         }
         // Only with every record known: a sweep after a failed open or load would delete the data of every image.
         if sweepsBlobs, isLoaded, let blobs {
@@ -153,13 +158,15 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     }
 
     /// Removes every entry from memory and every record from disk, also records this version could not load,
-    /// and with them every saved image.
+    /// and with them every saved image. When that fails, the next write tries again.
     @discardableResult
     func clear() -> ClearResult {
         let result = memory.clear()
-        if write({ () throws(HistoryPersistenceError) in try persistence.deleteAll() }) {
+        // Every entry is gone, so what earlier writes left unsaved is deleted with the rest.
+        unsaved = []
+        clearPending = true
+        if write(StoredChange(), covering: []) {
             // Memory and disk are both empty, so they match again.
-            needsFullWrite = false
             finishWrite(sealFailed: false)
             if sweepsBlobs, let blobs {
                 // No record is left, so no blob is used: also those of records this version did not load.
@@ -198,56 +205,34 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     }
 
     private func saveChanges(from before: [ClipboardEntry]) {
-        guard !needsFullWrite else {
-            saveEverything()
-            return
-        }
-        var sealFailed = false
         let previous = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let currentIDs = Set(memory.entries.map(\.id))
-        var deleted = before.map(\.id).filter { !currentIDs.contains($0) }
-        var inserted: [StoredEntryRecord] = []
-        var updated: [StoredEntryRecord] = []
+        var changed = Set(before.map(\.id).filter { !currentIDs.contains($0) })
         for entry in memory.entries where previous[entry.id] != entry {
-            let isNew = previous[entry.id] == nil
-            if let record = storedRecord(for: entry, sealFailed: &sealFailed) {
-                if isNew {
-                    inserted.append(record)
-                } else {
-                    updated.append(record)
-                }
-            } else if !isNew {
-                // Now kept in memory only, such as an entry concealed without a sealer: its old record goes.
-                deleted.append(entry.id)
-            }
+            changed.insert(entry.id)
         }
-
-        let saved = write { () throws(HistoryPersistenceError) in
-            if !deleted.isEmpty {
-                try persistence.delete(ids: deleted)
-            }
-            if !inserted.isEmpty {
-                try persistence.insert(inserted)
-            }
-            if !updated.isEmpty {
-                try persistence.update(updated)
-            }
-        }
-        if saved {
-            finishWrite(sealFailed: sealFailed)
-        }
+        saveEntries(changed)
     }
 
-    /// Replaces everything on disk with the history in memory, after a failed write left the two apart.
-    private func saveEverything() {
+    /// Writes the entries with these IDs as they are in memory now, together with those earlier writes did not
+    /// save: an entry in memory is saved, the record of one that is gone or kept in memory only is deleted. Only
+    /// these records are touched, so records this session did not load stay as they are.
+    private func saveEntries(_ ids: Set<ClipboardEntry.ID>) {
+        let pending = ids.union(unsaved)
         var sealFailed = false
-        let records = memory.entries.compactMap { storedRecord(for: $0, sealFailed: &sealFailed) }
-        let saved = write { () throws(HistoryPersistenceError) in
-            try persistence.deleteAll()
-            try persistence.insert(records)
+        var change = StoredChange()
+        var inMemory: Set<ClipboardEntry.ID> = []
+        for entry in memory.entries where pending.contains(entry.id) {
+            inMemory.insert(entry.id)
+            if let record = storedRecord(for: entry, sealFailed: &sealFailed) {
+                change.saved.append(record)
+            } else {
+                // Kept in memory only, such as an entry concealed without a sealer: an old record goes.
+                change.deleted.append(entry.id)
+            }
         }
-        if saved {
-            needsFullWrite = false
+        change.deleted += pending.subtracting(inMemory).sorted { $0.uuidString < $1.uuidString }
+        if write(change, covering: pending) {
             finishWrite(sealFailed: sealFailed)
         }
     }
@@ -271,20 +256,31 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         }
     }
 
-    /// Runs one write. On failure logs it, reports it and makes the next write replace everything.
+    /// Writes `change` in one transaction, deleting every record first while a Clear History has not reached the
+    /// disk. `pending` are the entries it covers: when it fails, they are written with the next change. A failure
+    /// is logged and reported.
     @discardableResult
-    private func write(_ operation: () throws(HistoryPersistenceError) -> Void) -> Bool {
-        do {
-            try operation()
+    private func write(_ change: StoredChange, covering pending: Set<ClipboardEntry.ID>) -> Bool {
+        var change = change
+        change.deletesAll = change.deletesAll || clearPending
+        guard !change.isEmpty else {
             return true
+        }
+        do {
+            try persistence.apply(change)
         } catch {
             AppLogger.history.error("Could not save a change to the history; it is kept in memory")
-            needsFullWrite = true
+            unsaved.formUnion(pending)
             if storageError == nil || storageError?.isWriteFailure == true {
                 storageError = error
             }
             return false
         }
+        unsaved.subtract(pending)
+        if change.deletesAll {
+            clearPending = false
+        }
+        return true
     }
 }
 

@@ -5,8 +5,8 @@ import os
 /// Saves history records with SwiftData. Only create, read, update and delete: the history rules live in
 /// `PersistentHistoryStore` and the mapping (with sealing) in `StoredEntryCoder`.
 ///
-/// Every call saves at once and rolls back on failure, so the store learns about a failed write right away and the
-/// next write does not carry a half-applied one.
+/// Every change is saved at once in one transaction and rolled back on failure, so the store learns about a failed
+/// write right away, the disk keeps what it had, and the next write does not carry a half-applied one.
 @MainActor
 final class SwiftDataHistoryPersistence: HistoryPersistence {
     static let schema = Schema([StoredEntry.self])
@@ -49,26 +49,20 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
         }
     }
 
-    func insert(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError) {
-        try upsert(records)
-    }
-
-    func update(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError) {
-        try upsert(records)
-    }
-
-    func delete(ids: [UUID]) throws(HistoryPersistenceError) {
-        guard !ids.isEmpty else {
+    /// Deletes and saves in one `save()`, so one SQLite transaction: a failure rolls all of it back.
+    func apply(_ change: StoredChange) throws(HistoryPersistenceError) {
+        guard !change.isEmpty else {
             return
         }
+        let savedIDs = Set(change.saved.map(\.id))
+        let deletedIDs = change.deleted.filter { !savedIDs.contains($0) }
         try save { context in
-            try context.delete(model: StoredEntry.self, where: #Predicate<StoredEntry> { ids.contains($0.id) })
-        }
-    }
-
-    func deleteAll() throws(HistoryPersistenceError) {
-        try save { context in
-            try context.delete(model: StoredEntry.self)
+            if change.deletesAll {
+                try deleteModels(in: context, keeping: savedIDs)
+            } else if !deletedIDs.isEmpty {
+                try deleteModels(in: context, with: deletedIDs)
+            }
+            try upsert(change.saved, in: context)
         }
     }
 
@@ -78,25 +72,41 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
         storeURL.flatMap(StoreFiles.totalBytes(ofStoreAt:))
     }
 
+    /// Marks every saved model except those with `kept` IDs as deleted. Fetched with their IDs only, so the
+    /// payloads are not read; deleted through the context, so the deletion is part of the same save.
+    private func deleteModels(in context: ModelContext, keeping kept: Set<UUID>) throws {
+        var descriptor = FetchDescriptor<StoredEntry>()
+        descriptor.propertiesToFetch = [\.id]
+        for model in try context.fetch(descriptor) where !kept.contains(model.id) {
+            context.delete(model)
+        }
+    }
+
+    private func deleteModels(in context: ModelContext, with ids: [UUID]) throws {
+        var descriptor = FetchDescriptor<StoredEntry>(predicate: #Predicate<StoredEntry> { ids.contains($0.id) })
+        descriptor.propertiesToFetch = [\.id]
+        for model in try context.fetch(descriptor) {
+            context.delete(model)
+        }
+    }
+
     /// Changes the saved models with the records' IDs and adds the others. Done by hand rather than left to the
-    /// unique constraint, so inserting and updating behave the same whatever SwiftData does on a conflict.
-    private func upsert(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError) {
+    /// unique constraint, so a new and a changed record behave the same whatever SwiftData does on a conflict.
+    private func upsert(_ records: [StoredEntryRecord], in context: ModelContext) throws {
         guard !records.isEmpty else {
             return
         }
         let ids = records.map(\.id)
-        try save { context in
-            let saved = FetchDescriptor<StoredEntry>(predicate: #Predicate<StoredEntry> { ids.contains($0.id) })
-            let existing = try context.fetch(saved)
-            var models = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            for record in records {
-                if let model = models[record.id] {
-                    model.update(from: record)
-                } else {
-                    let model = StoredEntry(record: record)
-                    context.insert(model)
-                    models[record.id] = model
-                }
+        let saved = FetchDescriptor<StoredEntry>(predicate: #Predicate<StoredEntry> { ids.contains($0.id) })
+        let existing = try context.fetch(saved)
+        var models = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for record in records {
+            if let model = models[record.id] {
+                model.update(from: record)
+            } else {
+                let model = StoredEntry(record: record)
+                context.insert(model)
+                models[record.id] = model
             }
         }
     }

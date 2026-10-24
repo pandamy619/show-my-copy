@@ -25,6 +25,21 @@ enum HistoryPersistenceError: Error, Equatable, Sendable {
     }
 }
 
+/// One change to the saved records, written as a whole or not at all.
+struct StoredChange: Equatable, Sendable {
+    /// Deletes every saved record first, also those this app version could not load: only for Clear History.
+    var deletesAll = false
+    /// Records to delete. IDs that are not saved are ignored.
+    var deleted: [UUID] = []
+    /// Records to save. A record whose ID is already saved replaces the saved one; it is kept even when its ID is
+    /// also in `deleted`.
+    var saved: [StoredEntryRecord] = []
+
+    var isEmpty: Bool {
+        !deletesAll && deleted.isEmpty && saved.isEmpty
+    }
+}
+
 /// Where `PersistentHistoryStore` keeps the history between launches: plain records, no history rules.
 ///
 /// Main-actor isolated and synchronous on purpose. The store writes each change right after making it, in order,
@@ -38,17 +53,8 @@ protocol HistoryPersistence: AnyObject {
     /// Every saved record, in any order.
     func loadAll() throws(HistoryPersistenceError) -> [StoredEntryRecord]
 
-    /// Saves new records. A record whose ID is already saved replaces the saved one.
-    func insert(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError)
-
-    /// Saves changed records in place of the saved ones with the same IDs. A record that is not saved yet is added.
-    func update(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError)
-
-    /// Deletes the records with these IDs. IDs that are not saved are ignored.
-    func delete(ids: [UUID]) throws(HistoryPersistenceError)
-
-    /// Deletes every record, also those this app version could not load.
-    func deleteAll() throws(HistoryPersistenceError)
+    /// Writes `change` in one transaction: when it throws, the saved records are as they were before the call.
+    func apply(_ change: StoredChange) throws(HistoryPersistenceError)
 
     /// How many bytes the saved history takes on disk, or nil when it is not saved in files or their size is not
     /// known.
@@ -81,26 +87,14 @@ final class InMemoryHistoryPersistence: HistoryPersistence {
         Array(records.values)
     }
 
-    func insert(_ records: [StoredEntryRecord]) {
-        save(records)
-    }
-
-    func update(_ records: [StoredEntryRecord]) {
-        save(records)
-    }
-
-    func delete(ids: [UUID]) {
-        for id in ids {
+    func apply(_ change: StoredChange) {
+        if change.deletesAll {
+            records.removeAll()
+        }
+        for id in change.deleted {
             records[id] = nil
         }
-    }
-
-    func deleteAll() {
-        records.removeAll()
-    }
-
-    private func save(_ newRecords: [StoredEntryRecord]) {
-        for record in newRecords {
+        for record in change.saved {
             records[record.id] = record
         }
     }
