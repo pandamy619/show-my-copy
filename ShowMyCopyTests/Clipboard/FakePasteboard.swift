@@ -16,7 +16,10 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     var copiedFileURLs: [URL] = []
     /// How often the file URLs were read, to check that too many files are not read at all.
     private(set) var fileURLReadCount = 0
+    /// The text of every plain-text write.
     private(set) var writtenTexts: [String] = []
+    /// Every write, of any kind.
+    private(set) var writtenPayloads: [PasteboardPayload] = []
     /// For each write, whether it was marked as concealed.
     private(set) var writtenConcealed: [Bool] = []
     /// How often the text was read, as a string or as data, to check that secrets are not read when they are not
@@ -128,13 +131,24 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         copy([.rtf: rtf, .string: Data(plain.utf8)], markers: markers)
     }
 
-    func write(_ text: String, concealed: Bool) -> Int? {
+    func write(_ payload: PasteboardPayload, concealed: Bool) -> Int? {
         guard !writeFails else {
             return nil
         }
-        writtenTexts.append(text)
+        writtenPayloads.append(payload)
         writtenConcealed.append(concealed)
-        copy(text, markers: concealed ? [PasteboardMarker.concealed] : [])
+        let markers = concealed ? [PasteboardMarker.concealed] : []
+        switch payload {
+        case .text(let text):
+            writtenTexts.append(text)
+            copy(text, markers: markers)
+        case .richText(let rtf, let plain):
+            copyRichText(plain, rtf: rtf, markers: markers)
+        case .image(let data, let typeIdentifier):
+            copy([NSPasteboard.PasteboardType(typeIdentifier): data], markers: markers)
+        case .files(let urls):
+            copyFiles(urls, markers: markers)
+        }
         return changeCount
     }
 }

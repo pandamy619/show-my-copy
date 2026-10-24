@@ -9,6 +9,11 @@ final class FakePasteboardBackend: PasteboardBackend {
     var changeCount = 0
     var types: [NSPasteboard.PasteboardType]? = []
     private(set) var strings: [NSPasteboard.PasteboardType: String] = [:]
+    private(set) var datas: [NSPasteboard.PasteboardType: Data] = [:]
+    /// What `writeObjects` wrote, one item each.
+    private(set) var writtenObjects: [any NSPasteboardWriting] = []
+    /// When true, `writeObjects` fails.
+    var writeObjectsFails = false
     private(set) var preparedOptions: [NSPasteboard.ContentsOptions] = []
     /// Types whose `setString` fails.
     var failingTypes: Set<NSPasteboard.PasteboardType> = []
@@ -28,6 +33,8 @@ final class FakePasteboardBackend: PasteboardBackend {
         preparedOptions.append(options)
         changeCount += 1
         strings = [:]
+        datas = [:]
+        writtenObjects = []
         types = []
         let count = changeCount
         ownedChangeCount = count
@@ -51,13 +58,31 @@ final class FakePasteboardBackend: PasteboardBackend {
         return true
     }
 
+    func setData(_ data: Data?, forType dataType: NSPasteboard.PasteboardType) -> Bool {
+        guard !failingTypes.contains(dataType), ownedChangeCount == changeCount, let data else {
+            return false
+        }
+        datas[dataType] = data
+        types = (types ?? []) + [dataType]
+        return true
+    }
+
+    func writeObjects(_ objects: [any NSPasteboardWriting]) -> Bool {
+        guard !writeObjectsFails, ownedChangeCount == changeCount else {
+            return false
+        }
+        writtenObjects += objects
+        types = (types ?? []) + [.fileURL]
+        return true
+    }
+
     func string(forType dataType: NSPasteboard.PasteboardType) -> String? {
         strings[dataType]
     }
 
     /// Text as UTF-8 data, as `NSPasteboard` returns it for `.string`.
     func data(forType dataType: NSPasteboard.PasteboardType) -> Data? {
-        strings[dataType].map { Data($0.utf8) }
+        datas[dataType] ?? strings[dataType].map { Data($0.utf8) }
     }
 
     func readObjects(forClasses classArray: [AnyClass], options: [NSPasteboard.ReadingOptionKey: Any]?) -> [Any]? {
