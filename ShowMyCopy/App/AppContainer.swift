@@ -53,6 +53,7 @@ final class AppContainer {
         isSessionActive: @escaping @MainActor () -> Bool = { ConsoleSession.isActive() },
         blobs: (any BlobStore)? = nil,
         thumbnails: (any ThumbnailMaking)? = nil,
+        fileThumbnails: (any FileThumbnailMaking)? = nil,
         previewImages: (any PreviewImageDecoding)? = nil,
         previewRichText: (any RichTextRendering)? = nil,
         makeSettingsWindow: SettingsWindowFactory
@@ -69,6 +70,13 @@ final class AppContainer {
             } else {
                 nil
             }
+        // Copied photo and video files get thumbnails only with somewhere to keep them, in the same `blobs`.
+        let fileThumbnailIngestor: FileThumbnailIngestor? =
+            if let blobs, let fileThumbnails {
+                FileThumbnailIngestor(blobs: blobs, maker: fileThumbnails)
+            } else {
+                nil
+            }
         // The monitor reads the password setting on every change, so a new choice applies to the next copy.
         let monitor = ClipboardMonitor(
             pasteboard: pasteboard,
@@ -78,7 +86,8 @@ final class AppContainer {
             sleep: sleep,
             activity: pollingActivity,
             passwordPolicy: { [passwordSettings] in passwordSettings.policy },
-            imageIngestor: imageIngestor
+            imageIngestor: imageIngestor,
+            fileThumbnailIngestor: fileThumbnailIngestor
         )
         let copier = EntryCopier(history: store, pasteboard: pasteboard, monitor: monitor, blobs: blobs, now: now)
         // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.

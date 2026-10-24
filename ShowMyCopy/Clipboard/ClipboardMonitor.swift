@@ -6,8 +6,9 @@ import AppKit
 /// on a timer and reads the contents only when the count changes. It decides when to read, who copied and what
 /// the password settings allow; `PasteboardSnapshotReader` decides what the item is.
 ///
-/// A copied image is stored by `imageIngestor` off the main actor before it is recorded. Until then the monitor
-/// reads no further change, so copies are recorded in the order they were made.
+/// A copied image is stored by `imageIngestor` off the main actor before it is recorded, and copied photo and video
+/// files get their thumbnails from `fileThumbnailIngestor` the same way. Until then the monitor reads no further
+/// change, so copies are recorded in the order they were made.
 @MainActor
 final class ClipboardMonitor: PasteboardChangeTracking {
     enum PauseReason: Hashable, Sendable {
@@ -35,8 +36,10 @@ final class ClipboardMonitor: PasteboardChangeTracking {
     private let passwordPolicy: @MainActor () -> PasswordPolicy
     /// Stores copied images. Without it images are not read.
     private let imageIngestor: ImageIngestor?
-    /// Storing the image read last, or nil.
-    private var pendingImage: Task<Void, Never>?
+    /// Makes thumbnails of copied photo and video files. Without it files are recorded at once, with their icons.
+    private let fileThumbnailIngestor: FileThumbnailIngestor?
+    /// Storing the image or the file thumbnails read last, or nil.
+    private var pendingIngestion: Task<Void, Never>?
     private var lastChangeCount: Int?
     /// True until the monitor has looked at the pasteboard while running. A change found then was made before
     /// launch or while the monitor was stopped or paused, so the app in front now did not necessarily make it.
@@ -54,13 +57,15 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         activity: any PollingActivity = ProcessPollingActivity(),
         passwordPolicy: @escaping @MainActor () -> PasswordPolicy = { .default },
-        imageIngestor: ImageIngestor? = nil
+        imageIngestor: ImageIngestor? = nil,
+        fileThumbnailIngestor: FileThumbnailIngestor? = nil
     ) {
         self.pasteboard = pasteboard
         self.reader = PasteboardSnapshotReader(
             pasteboard: pasteboard,
             contentReaders: PasteboardSnapshotReader.standardReaders(readsImages: imageIngestor != nil))
         self.imageIngestor = imageIngestor
+        self.fileThumbnailIngestor = fileThumbnailIngestor
         self.history = history
         self.interval = interval
         self.frontmostApp = frontmostApp
@@ -140,8 +145,8 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         let date = now()
         // Checked on every poll, not only on a change, so a password leaves the history on time.
         history.removeExpired(at: date)
-        guard pendingImage == nil else {
-            // The next change is read once the image is recorded, so it ends up above the image.
+        guard pendingIngestion == nil else {
+            // The next change is read once the image or files are recorded, so it ends up above them.
             return
         }
         let changeCount = pasteboard.changeCount
@@ -178,6 +183,8 @@ final class ClipboardMonitor: PasteboardChangeTracking {
             storeImage(image, copy: copy)
         case .cleared:
             clipboardWasCleared(at: date, policy: policy)
+        case .content(.files(let files), isSecret: false) where fileThumbnailIngestor != nil:
+            storeFileThumbnails(files, copy: copy)
         case .content(let content, let isSecret):
             record(content, isSecret: isSecret, copy: copy, policy: policy)
         }
@@ -210,9 +217,9 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         }
     }
 
-    /// Waits until the image read last is stored and recorded. For tests and for quitting cleanly.
+    /// Waits until the image or files read last are stored and recorded. For tests and for quitting cleanly.
     func finishStoringImages() async {
-        await pendingImage?.value
+        await pendingIngestion?.value
     }
 
     // MARK: - Images
@@ -228,7 +235,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         let known = Dictionary(
             history.entries.compactMap { entry in entry.content.image.map { ($0.contentHash, $0) } },
             uniquingKeysWith: { first, _ in first })
-        pendingImage = Task { [weak self] in
+        pendingIngestion = Task { [weak self] in
             let result: Result<IngestedImage, ImageIngestError>
             do throws(ImageIngestError) {
                 result = .success(try await imageIngestor.ingest(image, known: known))
@@ -241,7 +248,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
                 }
                 return
             }
-            self.pendingImage = nil
+            self.pendingIngestion = nil
             self.recordImage(result, ingestor: imageIngestor, copy: copy)
         }
     }
@@ -274,6 +281,43 @@ final class ClipboardMonitor: PasteboardChangeTracking {
             return
         }
         history.record(content, sourceApp: copy.sourceApp, at: copy.date)
+    }
+
+    // MARK: - File thumbnails
+
+    /// Makes thumbnails of the copied photos and videos off the main actor, then records the files. Like an image,
+    /// nothing is current meanwhile. Files still on the pasteboard at launch that are the newest entry already are
+    /// not read again: the entry keeps what it has.
+    private func storeFileThumbnails(_ files: [FileReference], copy: Copy) {
+        guard let fileThumbnailIngestor else {
+            return
+        }
+        if copy.isFirstRead, history.markNewestCurrent(ifItHolds: .files(files)) != nil {
+            return
+        }
+        history.markCurrentSkipped()
+        pendingIngestion = Task { [weak self] in
+            let ingested = await fileThumbnailIngestor.ingest(files)
+            guard let self else {
+                fileThumbnailIngestor.discard(ingested)
+                return
+            }
+            self.pendingIngestion = nil
+            self.recordFiles(ingested, ingestor: fileThumbnailIngestor, copy: copy)
+        }
+    }
+
+    private func recordFiles(_ files: [FileReference], ingestor: FileThumbnailIngestor, copy: Copy) {
+        // This app wrote to the pasteboard meanwhile (an entry was copied back), so the files are no longer there
+        // and the entry the user picked must stay on top.
+        guard lastChangeCount == copy.changeCount else {
+            AppLogger.clipboard.debug(
+                "The pasteboard changed while file thumbnails were made; the files are not recorded")
+            ingestor.discard(files)
+            return
+        }
+        // The store deletes the thumbnails it does not keep, such as those of files it already has thumbnails for.
+        history.record(.files(files), sourceApp: copy.sourceApp, at: copy.date)
     }
 
     /// Password managers empty the clipboard a while after copying a password. A password copied without a marker,
