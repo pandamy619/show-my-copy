@@ -88,22 +88,6 @@ struct PersistentHistoryStoreKeyTests {
         #expect(store.storageError == nil)
     }
 
-    /// A newer app version may read a record differently, so it decides about that record, also with saving off.
-    @Test func aPasswordFromANewerVersionIsLeftOnDiskWithoutAskingForTheKey() throws {
-        let earlier = disk.makeStore(now: start)
-        let id = earlier.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
-        var record = try #require(disk.record(id))
-        record.schemaVersion = StoredEntryRecord.currentSchemaVersion + 1
-        disk.records[id] = record
-        let factory = SealerFactorySpy()
-
-        let store = disk.makeStore(sealer: factory.makeLazySealer(), savesPasswords: false, now: start + 600)
-
-        #expect(factory.calls == 0)
-        #expect(store.entries.isEmpty)
-        #expect(disk.record(id) == record)
-    }
-
     @Test func withoutTheKeyPasswordsStayInMemoryAndTheKeyIsNotAskedForAgain() {
         let factory = SealerFactorySpy(fails: true)
         let store = disk.makeStore(sealer: factory.makeLazySealer(), now: start)

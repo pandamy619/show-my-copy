@@ -98,16 +98,14 @@ struct FileThumbnailPayloadTests {
         ClipboardEntry(content: content, contentHash: hasher.hash(content), date: date, sourceApp: nil)
     }
 
-    @Test func filesWithoutThumbnailsKeepTheFormatOlderVersionsRead() throws {
+    @Test func fileWithoutThumbnailEndsWithAnEmptyThumbnailFlag() throws {
         let content = ClipboardContent.files([FileReference(url: URL(filePath: "/a"), byteSize: 42)])
-        // Saved on disk by earlier versions: changing it makes saved entries unreadable.
+        // Saved on disk: changing it makes saved entries unreadable.
         var expected = Data([1, 0, 0, 0, 0, 0, 0, 0, 1])
         expected.appendLengthPrefixed(Data("file:///a".utf8))
         expected.appendLengthPrefixed(Data("a".utf8))
-        expected.append(contentsOf: [1, 0, 0, 0, 0, 0, 0, 0, 42])
+        expected.append(contentsOf: [1, 0, 0, 0, 0, 0, 0, 0, 42, 0])
         #expect(content.storedPayload == expected)
-        let record = try #require(try coder.record(for: entry(content)))
-        #expect(record.schemaVersion == 2)
         #expect(ClipboardContent(kind: .files, storedPayload: expected) == content)
     }
 
@@ -116,19 +114,10 @@ struct FileThumbnailPayloadTests {
         let video = ContentFixtures.fileWithThumbnail("/Users/me/clip.mov", kind: .movie, bytes: 30_000)
         let original = entry(.files([photo, ContentFixtures.file("/Users/me/notes.txt"), video]))
         let record = try #require(try coder.record(for: original))
-        #expect(record.schemaVersion == 3)
-        #expect(record.payload.first == StoredPayload.filesWithThumbnailsFormatVersion)
+        #expect(record.payload.first == StoredPayload.format)
         #expect(record.blobIDs == original.content.blobIDs.map(\.uuid))
         #expect(record.byteSize == original.byteSize)
         #expect(coder.decode(record) == .entry(original))
-    }
-
-    @Test func recordWithThumbnailsIsLeftAloneByVersionsBeforeThem() throws {
-        let record = try #require(
-            try coder.record(for: entry(.files([ContentFixtures.fileWithThumbnail("/a.jpg")]))))
-        // Version 2 apps read up to schema 2, so they leave this record on disk instead of deleting it.
-        #expect(record.schemaVersion > 2)
-        #expect(coder.supports(record))
     }
 
     @Test func damagedThumbnailsAreUnreadable() throws {
@@ -145,14 +134,6 @@ struct FileThumbnailPayloadTests {
         badKind[flagIndex + 1] = 9
         #expect(coder.decode(record.replacingPayload(with: badKind)) == .unreadable)
         #expect(coder.decode(record.replacingPayload(with: payload.dropLast())) == .unreadable)
-    }
-
-    @Test(arguments: [ClipboardContent.Kind.richText, .image])
-    func formatTwoIsOnlyForFiles(kind: ClipboardContent.Kind) throws {
-        let content = kind == .image ? ContentFixtures.image() : ContentFixtures.richText()
-        var payload = content.storedPayload
-        payload[payload.startIndex] = StoredPayload.filesWithThumbnailsFormatVersion
-        #expect(ClipboardContent(kind: kind, storedPayload: payload) == nil)
     }
 }
 
@@ -306,7 +287,6 @@ struct FileThumbnailPersistenceTests {
         store.record(.files([photo]), sourceApp: nil, at: start + 1)
         let record = try #require(disk.records.values.first)
         #expect(record.blobIDs == photo.thumbnailBlobIDs.map(\.uuid))
-        #expect(record.schemaVersion == 3)
         #expect(makeStore(now: start + 2).entries.map(\.content) == [.files([photo])])
     }
 

@@ -221,19 +221,6 @@ struct PersistentHistoryStoreBlobTests {
         #expect(!blobs.contains(orphan))
     }
 
-    @Test func blobsOfRecordsFromANewerVersionAreKept() throws {
-        let store = makeStore()
-        let image = try ContentFixtures.storedImage(in: blobs)
-        store.record(.image(image), sourceApp: nil, at: start)
-        let id = try #require(disk.records.keys.first)
-        disk.records[id]?.schemaVersion = StoredEntryRecord.currentSchemaVersion + 1
-
-        let restarted = makeStore(now: start + 1)
-        #expect(restarted.entries.isEmpty)
-        #expect(disk.records.count == 1)
-        #expect(blobs.allIDs() == Set(image.blobIDs))
-    }
-
     @Test func nothingIsSweptWhenTheHistoryCannotBeRead() throws {
         let store = makeStore()
         let image = try ContentFixtures.storedImage(in: blobs)
@@ -277,22 +264,6 @@ struct PersistentHistoryStoreBlobTests {
         let restarted = makeStore(blobs: blobs, retention: RetentionPolicy(entryLimit: 10), now: start + 20)
         #expect(restarted.entries.count == 10)
         #expect(disk.records.count == 10)
-        #expect(blobs.allIDs().isEmpty)
-    }
-
-    @Test func clearDeletesEveryBlobAlsoThoseOfUnloadedRecords() throws {
-        let older = makeStore()
-        let newer = try ContentFixtures.storedImage(in: blobs, bytes: Data([1]))
-        older.record(.image(newer), sourceApp: nil, at: start)
-        let newerID = try #require(disk.records.keys.first)
-        disk.records[newerID]?.schemaVersion = StoredEntryRecord.currentSchemaVersion + 1
-
-        let store = makeStore(now: start + 1)
-        let image = try ContentFixtures.storedImage(in: blobs)
-        store.record(.image(image), sourceApp: nil, at: start + 1)
-        let result = store.clear()
-        #expect(result == ClearResult(removedCount: 1, freedBytes: 1100))
-        #expect(disk.records.isEmpty)
         #expect(blobs.allIDs().isEmpty)
     }
 

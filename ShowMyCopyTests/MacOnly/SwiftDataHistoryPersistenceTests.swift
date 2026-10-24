@@ -26,8 +26,7 @@ struct SwiftDataHistoryPersistenceTests {
             sourceAppName: "Notes",
             isConcealed: isConcealed,
             expiresAt: isConcealed ? self.date + 600 : nil,
-            isPinned: false,
-            schemaVersion: StoredEntryRecord.currentSchemaVersion
+            isPinned: false
         )
     }
 
@@ -56,7 +55,7 @@ struct SwiftDataHistoryPersistenceTests {
         let noApp = StoredEntryRecord(
             id: UUID(), kind: "text", payload: Data(), contentHash: "ab", byteSize: 0, previewText: "",
             date: date - 1, sourceAppBundleIdentifier: nil, sourceAppName: nil, isConcealed: false,
-            expiresAt: nil, isPinned: true, schemaVersion: 1)
+            expiresAt: nil, isPinned: true)
 
         try persistence.insert([plain, concealed, noApp])
         #expect(sorted(try persistence.loadAll()) == [plain, concealed, noApp])

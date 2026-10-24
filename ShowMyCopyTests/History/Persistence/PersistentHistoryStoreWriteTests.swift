@@ -74,7 +74,7 @@ struct PersistentHistoryStoreWriteTests {
         let store = makeStore()
         store.record(text: "a", sourceApp: nil, at: start)
         store.record(text: "hunter2", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 600)
-        // Also records this version could not load.
+        // Also records it did not load, such as images while there was no blob store.
         disk.records[UUID()] = try #require(disk.records.values.first).replacingKind(with: "hologram")
 
         #expect(store.clear() == ClearResult(removedCount: 2, freedBytes: 8))

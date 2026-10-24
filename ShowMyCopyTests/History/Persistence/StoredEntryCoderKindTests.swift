@@ -25,7 +25,6 @@ struct StoredEntryCoderKindTests {
     @Test func richTextRoundTrips() throws {
         let record = try roundTrip(ContentFixtures.richText("Жирный текст"))
         #expect(record.kind == "richText")
-        #expect(record.schemaVersion == 2)
         #expect(record.blobIDs.isEmpty)
         #expect(record.previewText == "Жирный текст")
         #expect(record.byteSize == ContentFixtures.richText("Жирный текст").byteSize)
@@ -35,7 +34,6 @@ struct StoredEntryCoderKindTests {
         let reference = ContentFixtures.imageReference(byteSize: 5_000_000, thumbnailBytes: 30_000)
         let record = try roundTrip(.image(reference))
         #expect(record.kind == "image")
-        #expect(record.schemaVersion == 2)
         let thumbnail = try #require(reference.thumbnail)
         #expect(record.blobIDs == [reference.blobID.uuid, thumbnail.blobID.uuid])
         #expect(record.byteSize == 5_030_000)
@@ -73,8 +71,24 @@ struct StoredEntryCoderKindTests {
         #expect(payload == Data([1, 0, 0, 0, 1, 0xAA, 0, 0, 0, 1, 0x62]))
     }
 
-    @Test func textPayloadIsStillPlainUTF8() {
-        #expect(ClipboardContent.text("hi").storedPayload == Data("hi".utf8))
+    @Test func textPayloadIsTheFormatByteAndUTF8() {
+        #expect(ClipboardContent.text("hi").storedPayload == Data([1, 0x68, 0x69]))
+        #expect(StoredPayload.format == 1)
+    }
+
+    @Test(arguments: [ClipboardContent.Kind.text, .richText, .image, .files])
+    func anotherFormatByteIsUnreadable(kind: ClipboardContent.Kind) {
+        let content: ClipboardContent =
+            switch kind {
+            case .text: .text("a")
+            case .richText: ContentFixtures.richText()
+            case .image: ContentFixtures.image()
+            case .files: ContentFixtures.files("/a")
+            }
+        var payload = content.storedPayload
+        #expect(ClipboardContent(kind: kind, storedPayload: payload) == content)
+        payload[payload.startIndex] = 2
+        #expect(ClipboardContent(kind: kind, storedPayload: payload) == nil)
     }
 
     @Test(arguments: [ClipboardContent.Kind.richText, .image, .files])
@@ -108,12 +122,6 @@ struct StoredEntryCoderKindTests {
         let record = try #require(try coder.record(for: entry(ContentFixtures.files("/a"))))
         let payload = Data([1, 0, 0, 0, 0, 0, 0, 0, 0])
         #expect(coder.decode(record.replacingPayload(with: payload)) == .unreadable)
-    }
-
-    @Test func versionTwoIsReadAndNewerIsLeftAlone() throws {
-        let record = try #require(try coder.record(for: entry(ContentFixtures.image())))
-        #expect(coder.supports(record))
-        #expect(!coder.supports(record.replacingSchemaVersion(with: StoredEntryRecord.currentSchemaVersion + 1)))
     }
 }
 

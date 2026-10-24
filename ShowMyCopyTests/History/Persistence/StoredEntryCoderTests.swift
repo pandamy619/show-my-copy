@@ -27,7 +27,7 @@ struct StoredEntryCoderTests {
 
         #expect(record.id == original.id)
         #expect(record.kind == "text")
-        #expect(record.payload == Data("Hello, мир".utf8))
+        #expect(record.payload == Data([StoredPayload.format]) + Data("Hello, мир".utf8))
         #expect(record.contentHash == original.contentHash.description)
         #expect(record.byteSize == original.byteSize)
         #expect(record.previewText == original.previewText)
@@ -37,8 +37,6 @@ struct StoredEntryCoderTests {
         #expect(!record.isConcealed)
         #expect(record.expiresAt == nil)
         #expect(!record.isPinned)
-        // Version 1, so an older app version still reads text records.
-        #expect(record.schemaVersion == 1)
         #expect(record.blobIDs.isEmpty)
     }
 
@@ -127,14 +125,18 @@ struct StoredEntryCoderTests {
 
     @Test func invalidTextIsUnreadable() throws {
         let record = try #require(try coder.record(for: entry("plain")))
-        #expect(coder.decode(record.replacingPayload(with: Data([0xFF, 0xFE]))) == .unreadable)
+        #expect(coder.decode(record.replacingPayload(with: Data([StoredPayload.format, 0xFF, 0xFE]))) == .unreadable)
+        #expect(coder.decode(record.replacingPayload(with: Data())) == .unreadable)
     }
 
-    @Test func unknownKindOrNewerSchemaIsUnsupported() throws {
+    @Test func textWithoutTheFormatByteIsUnreadable() throws {
         let record = try #require(try coder.record(for: entry("plain")))
-        #expect(coder.decode(record.replacingKind(with: "hologram")) == .unsupported)
-        let newer = record.replacingSchemaVersion(with: StoredEntryRecord.currentSchemaVersion + 1)
-        #expect(coder.decode(newer) == .unsupported)
+        #expect(coder.decode(record.replacingPayload(with: Data("plain".utf8))) == .unreadable)
+    }
+
+    @Test func unknownKindIsUnreadable() throws {
+        let record = try #require(try coder.record(for: entry("plain")))
+        #expect(coder.decode(record.replacingKind(with: "hologram")) == .unreadable)
     }
 }
 
@@ -145,10 +147,6 @@ extension StoredEntryRecord {
 
     func replacingKind(with kind: String) -> StoredEntryRecord {
         changed { $0.kind = kind }
-    }
-
-    func replacingSchemaVersion(with version: Int) -> StoredEntryRecord {
-        changed { $0.schemaVersion = version }
     }
 
     private func changed(_ change: (inout StoredEntryRecord) -> Void) -> StoredEntryRecord {

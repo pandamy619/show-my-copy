@@ -90,7 +90,7 @@ struct PersistentHistoryStoreTests {
     @Test func concealingAnEntryReplacesItsPlainRecord() throws {
         let store = makeStore()
         let id = store.record(text: "hunter2", sourceApp: nil, at: start)
-        #expect(disk.record(id)?.payload == Data("hunter2".utf8))
+        #expect(disk.record(id)?.payload == Data([StoredPayload.format]) + Data("hunter2".utf8))
 
         store.conceal(id: id, expiresAt: start + 60)
         let record = try #require(disk.record(id))
@@ -155,13 +155,13 @@ struct PersistentHistoryStoreTests {
         #expect(disk.record(plainID) != nil)
     }
 
-    @Test func aRecordFromANewerVersionIsLeftOnDisk() throws {
-        let id = makeStore().record(text: "future", sourceApp: nil, at: start)
+    @Test func aRecordOfAnUnknownKindIsDeleted() throws {
+        let id = makeStore().record(text: "hologram", sourceApp: nil, at: start)
         let record = try #require(disk.record(id))
         disk.records[id] = record.replacingKind(with: "hologram")
 
         #expect(makeStore().entries.isEmpty)
-        #expect(disk.record(id) != nil)
+        #expect(disk.record(id) == nil)
     }
 
     // MARK: - Removing on load
