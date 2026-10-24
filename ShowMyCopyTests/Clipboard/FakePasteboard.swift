@@ -111,6 +111,15 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         types = []
     }
 
+    /// The app that emptied the pasteboard writes text into it now, without a new change count, like an app that
+    /// calls `clearContents()` and fills the item a moment later.
+    func fillWithoutNewChangeCount(_ text: String) {
+        contents = [:]
+        copiedFileURLs = []
+        self.text = text
+        types = [.string]
+    }
+
     func copyImage() {
         copy([.png: Data([0x89, 0x50, 0x4E, 0x47]), .tiff: Data([0x4D, 0x4D])])
     }
