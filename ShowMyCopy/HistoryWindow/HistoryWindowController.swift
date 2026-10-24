@@ -52,6 +52,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         panel?.orderOut(nil)
         // A revealed password must not be on screen the next time the window opens.
         model.concealAll()
+        // Drop the preview, and with it a full image, while the window is closed.
+        model.preview.close()
     }
 
     func toggle() {

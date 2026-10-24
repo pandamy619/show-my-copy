@@ -53,6 +53,8 @@ final class AppContainer {
         isSessionActive: @escaping @MainActor () -> Bool = { ConsoleSession.isActive() },
         blobs: (any BlobStore)? = nil,
         thumbnails: (any ThumbnailMaking)? = nil,
+        previewImages: (any PreviewImageDecoding)? = nil,
+        previewRichText: (any RichTextRendering)? = nil,
         makeSettingsWindow: SettingsWindowFactory
     ) {
         let historySettings = HistorySettings(history: store, defaults: defaults)
@@ -79,8 +81,11 @@ final class AppContainer {
             imageIngestor: imageIngestor
         )
         let copier = EntryCopier(history: store, pasteboard: pasteboard, monitor: monitor, blobs: blobs, now: now)
+        // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.
+        let previews = PreviewServices(blobs: blobs, images: previewImages, richText: previewRichText)
         let historyWindow = HistoryWindowController(
             history: store,
+            model: HistoryWindowModel(history: store, previews: previews),
             copier: copier,
             monitor: monitor,
             onOpenSettings: { [weak settingsWindow] in

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// State of the history window: the search query and the selected entry.
+/// State of the history window: the search query, the selected entry and its preview.
 @MainActor
 @Observable
 final class HistoryWindowModel {
@@ -10,12 +10,41 @@ final class HistoryWindowModel {
         case down
     }
 
+    /// The keys the history window handles, whether the search field or the list has focus.
+    enum Key: Sendable {
+        case up
+        case down
+        case left
+        case right
+        case `return`
+        case escape
+    }
+
+    /// What the view does after the model handled a key.
+    enum KeyResult: Equatable {
+        /// The model handled it; nothing else to do.
+        case handled
+        /// Not for the history window: the search field gets it, for example to move the caret.
+        case ignored
+        /// Copy this entry back to the clipboard.
+        case choose(ClipboardEntry)
+        /// Close the history window.
+        case close
+    }
+
     let history: any HistoryStore
+    /// The large preview of the selected entry.
+    let preview: EntryPreviewModel
+    /// Thumbnails for image rows, loaded as rows appear.
+    let thumbnails: ThumbnailProvider
+    private let fileAvailability: any FileAvailabilityChecking
 
     var query = "" {
         didSet {
             if query != oldValue {
                 selectFirst()
+                // The list changes under the preview: close it rather than show an entry that may be filtered out.
+                preview.close()
             }
         }
     }
@@ -34,8 +63,11 @@ final class HistoryWindowModel {
     /// Concealed entries the user revealed with the eye button. Hidden again when the window closes or opens.
     private var revealedIDs: Set<ClipboardEntry.ID> = []
 
-    init(history: any HistoryStore) {
+    init(history: any HistoryStore, previews: PreviewServices = PreviewServices()) {
         self.history = history
+        preview = EntryPreviewModel(services: previews)
+        thumbnails = ThumbnailProvider(blobs: previews.blobs, decoder: previews.images)
+        fileAvailability = previews.fileAvailability
     }
 
     /// What the cached search result was computed from. While it stays the same, so do the entries that match.
@@ -130,12 +162,84 @@ final class HistoryWindowModel {
         }
     }
 
-    /// Clears the search, hides revealed passwords and selects the first row. Called each time the window is shown.
+    /// Clears the search, hides revealed passwords, closes the preview and selects the first row. Called each time
+    /// the window is shown.
     func prepareForPresentation() {
         query = ""
         concealAll()
+        preview.close()
         selectFirst()
         presentationCount += 1
+    }
+
+    /// Handles a key press. `isCaretAtEnd` is false while the caret of the search field is not after its last
+    /// character: then Left and Right Arrow move the caret instead.
+    ///
+    /// Up and Down Arrow move the selection, and the open preview follows it. Right Arrow opens the preview, like
+    /// opening a folder in a column view; Left Arrow and Esc close it. Esc with no preview closes the window, and
+    /// Return copies the selected entry back.
+    func handleKey(_ key: Key, isCaretAtEnd: Bool) -> KeyResult {
+        switch key {
+        case .up, .down:
+            moveSelection(key == .up ? .up : .down)
+            if preview.isOpen {
+                showPreviewOfSelection()
+            }
+            return .handled
+        case .right:
+            guard !preview.isOpen, isCaretAtEnd, let entry = selectedEntry, EntryPreviewModel.canPreview(entry) else {
+                return .ignored
+            }
+            preview.open(entry)
+            return .handled
+        case .left:
+            guard preview.isOpen else {
+                return .ignored
+            }
+            preview.close()
+            return .handled
+        case .escape:
+            guard preview.isOpen else {
+                return .close
+            }
+            preview.close()
+            return .handled
+        case .return:
+            return selectedEntry.map { .choose($0) } ?? .handled
+        }
+    }
+
+    /// Opens the preview of the selected entry, or closes it when there is none or it cannot be previewed. For the
+    /// row's "Show Preview" action and the arrow keys.
+    func showPreviewOfSelection() {
+        if let entry = selectedEntry {
+            preview.open(entry)
+        } else {
+            preview.close()
+        }
+    }
+
+    /// Selects `entry` and shows its preview, for the row's "Show Preview" action.
+    func showPreview(of entry: ClipboardEntry) {
+        let items = items
+        if let row = items.firstIndex(where: { $0.id == entry.id }) {
+            select(row: row, in: items)
+        }
+        preview.open(entry)
+    }
+
+    /// The preview to show: the open preview's entry while it is still listed. An entry removed from the history
+    /// or filtered out while its preview is open is not shown.
+    var previewedEntry: ClipboardEntry? {
+        guard let id = preview.entryID else {
+            return nil
+        }
+        return items.first { $0.id == id }
+    }
+
+    /// Whether the copied files of a row may be unavailable, checked off the main actor when the row appears.
+    func availability(of files: [FileReference]) async -> FileAvailability {
+        FileAvailabilityProbe.summary(await FileAvailabilityProbe.check(files, with: fileAvailability))
     }
 
     func isRevealed(_ id: ClipboardEntry.ID) -> Bool {
