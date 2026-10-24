@@ -6,7 +6,7 @@ First version, 0.1.0. Not released yet.
 
 - Clipboard history of text in the background, with the app it was copied from.
 - History survives quitting the app: it is saved on your Mac only, in the app's sandbox container, never synced and left out of Time Machine backups. Saved passwords are encrypted with a key kept in your Keychain; without Keychain access they are kept in memory only. Settings → Storage says it is saved on this Mac only and warns when the history or a password cannot be saved.
-- History window on a global shortcut (⌥⌘V by default, changeable in Settings), on top of any app.
+- History window on a global shortcut (⌥⌘V by default, changeable in Settings), on top of any app, with the search field at its top edge, like Spotlight.
 - Search, arrow keys to select, Enter to copy an entry back, Esc to close.
 - With nothing to list (empty history or no matches) the history window shrinks to the search field and a one-line message, like Spotlight, and grows downward when items appear; the search field stays in place.
 - Settings: history limit from 10 to 1000 entries with confirmation before removing old ones, clear history (also deletes it from disk).

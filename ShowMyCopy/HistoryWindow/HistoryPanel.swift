@@ -15,6 +15,8 @@ final class HistoryPanel: NSPanel {
         )
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
+        // The content runs under the hidden title bar, so the search field sits at the top edge. No line under it.
+        titlebarSeparatorStyle = .none
         standardWindowButton(.closeButton)?.isHidden = true
         standardWindowButton(.miniaturizeButton)?.isHidden = true
         standardWindowButton(.zoomButton)?.isHidden = true
@@ -58,7 +60,9 @@ enum HistoryPanelPlacement {
     static let fullSize = CGSize(width: 480, height: 420)
 
     /// Heights of the rows `HistoryView` lays out. The compact panel is exactly these rows tall.
-    static let searchBarHeight: CGFloat = 52
+    /// The search bar's height leaves about as much space above and below the search field as its 14 pt side
+    /// padding, like Spotlight.
+    static let searchBarHeight: CGFloat = 48
     static let dividerHeight: CGFloat = 1
     static let messageRowHeight: CGFloat = 44
 
@@ -68,10 +72,10 @@ enum HistoryPanelPlacement {
     /// Fraction of the visible screen height between its top edge and the panel's top edge.
     static let topOffsetFraction: CGFloat = 0.2
 
-    /// The panel's frame size. `topInset` is the part of the panel the transparent title bar keeps the content out
-    /// of; the compact panel adds it, so its rows are not cut off.
-    static func size(showsEntries: Bool, topInset: CGFloat = 0) -> CGSize {
-        showsEntries ? fullSize : CGSize(width: fullSize.width, height: compactHeight + max(topInset, 0))
+    /// The panel's frame size. The content starts at the panel's top edge (`HistoryContentFactory` turns off the
+    /// title bar's safe area), so the compact panel is exactly its rows tall.
+    static func size(showsEntries: Bool) -> CGSize {
+        showsEntries ? fullSize : CGSize(width: fullSize.width, height: compactHeight)
     }
 
     static func origin(for size: CGSize, in visibleFrame: CGRect) -> CGPoint {

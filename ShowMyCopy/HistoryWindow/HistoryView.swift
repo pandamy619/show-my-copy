@@ -26,6 +26,9 @@ struct HistoryView: View {
         // Follow the panel's size: compact with nothing to list, full with entries. Pinned to the top, so the
         // search bar stays in place while the panel catches up with a change.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // The panel's title bar is hidden and transparent. Start at the top edge instead of below it; the list
+        // scrolls inside the content under the search bar, so it keeps its own insets.
+        .ignoresSafeArea()
         .defaultFocus($isSearchFocused, true)
         .onAppear { isSearchFocused = true }
         .onChange(of: model.presentationCount) { isSearchFocused = true }
@@ -264,6 +267,8 @@ enum HistoryContentFactory {
         // The panel sets the size, not the SwiftUI content: the window controller switches between the compact and
         // the full size, and the hosting view follows through its autoresizing mask.
         hostingView.sizingOptions = []
+        // The hidden title bar would otherwise count as a top safe-area inset and push the search field down.
+        hostingView.safeAreaRegions = []
         hostingView.frame = NSRect(origin: .zero, size: HistoryPanelPlacement.fullSize)
         return hostingView
     }

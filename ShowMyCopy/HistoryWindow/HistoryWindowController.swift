@@ -40,7 +40,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         // Unhide without activating, so the app the user copied from stays in front.
         NSApplication.shared.unhideWithoutActivation()
         // Size for what the list shows now, then place, so the first frame on screen is already right.
-        let size = Self.size(of: panel, showsEntries: model.showsEntries)
+        let size = HistoryPanelPlacement.size(showsEntries: model.showsEntries)
         panel.setFrame(NSRect(origin: Self.origin(for: size), size: size), display: false)
         panel.makeKeyAndOrderFront(nil)
     }
@@ -114,7 +114,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
             // `show()` sizes the panel before it appears.
             return
         }
-        let size = Self.size(of: panel, showsEntries: model.showsEntries)
+        let size = HistoryPanelPlacement.size(showsEntries: model.showsEntries)
         guard panel.frame.size != size else {
             return
         }
@@ -158,13 +158,6 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         panel.contentView = background
         observeShowsEntries()
         return panel
-    }
-
-    /// The frame size for the list's state. When the transparent title bar keeps the content out of the top of the
-    /// panel, the compact panel is taller by that much, so its message row is not cut off.
-    static func size(of panel: HistoryPanel, showsEntries: Bool) -> CGSize {
-        let topInset = panel.frame.height - panel.contentLayoutRect.height
-        return HistoryPanelPlacement.size(showsEntries: showsEntries, topInset: topInset)
     }
 
     /// The screen with the mouse pointer is the one the user is looking at.
