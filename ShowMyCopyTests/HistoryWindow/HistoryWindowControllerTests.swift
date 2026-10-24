@@ -148,6 +148,19 @@ struct HistoryWindowControllerTests {
         #expect(!controller.model.isRevealed(password.id))
     }
 
+    @Test func closingTheWindowClosesThePreview() {
+        pasteboard.copy("older")
+        monitor.poll()
+        let controller = makeController()
+        controller.show()
+        #expect(controller.model.handleKey(.right, isCaretAtEnd: true) == .handled)
+        #expect(controller.model.preview.isOpen)
+
+        controller.hide()
+        #expect(!controller.model.preview.isOpen)
+        #expect(controller.model.preview.content == nil)
+    }
+
     @Test func showRemovesExpiredPasswords() {
         let environment = MonitorEnvironment()
         let monitor = environment.makeMonitor(pasteboard: pasteboard, history: history)
