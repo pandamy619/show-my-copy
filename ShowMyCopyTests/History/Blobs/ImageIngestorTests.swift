@@ -75,7 +75,7 @@ struct ImageIngestorTests {
         with ingestor: ImageIngestor,
         in blobs: InFlightBlobStore,
         known: [ContentHash: ImageReference] = [:]
-    ) async throws(ImageIngestError) -> IngestedImage {
+    ) async throws(ImageIngestError) -> ImageReference {
         let reservation = blobs.reservation()
         return try await ingestor.ingest(image, as: reservation.newID(), known: known, reservation: reservation)
     }
@@ -85,10 +85,8 @@ struct ImageIngestorTests {
         let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker())
         let reservation = blobs.reservation()
         let blobID = reservation.newID()
-        let ingested = try await ingestor.ingest(captured(), as: blobID, known: [:], reservation: reservation)
-        let reference = ingested.reference
+        let reference = try await ingestor.ingest(captured(), as: blobID, known: [:], reservation: reservation)
 
-        #expect(ingested.isNew)
         #expect(reference.blobID == blobID)
         #expect(reference.typeIdentifier == "public.png")
         #expect(reference.pixelWidth == 640)
@@ -113,7 +111,7 @@ struct ImageIngestorTests {
         let ingested = try await store(
             captured(), with: ingestor, in: InFlightBlobStore(base: base),
             known: [hasher.digest(of: data): existing])
-        #expect(ingested == IngestedImage(reference: existing, isNew: false))
+        #expect(ingested == existing)
         #expect(base.writeCount == 0)
     }
 
@@ -135,15 +133,15 @@ struct ImageIngestorTests {
         }
         #expect(base.allIDs().isEmpty)
         let ingested = try await store(captured(as: "public.tiff"), with: ingestor, in: blobs)
-        #expect(ingested.reference.typeIdentifier == "public.tiff")
+        #expect(ingested.typeIdentifier == "public.tiff")
     }
 
     @Test func imageWithoutThumbnailIsStillStored() async throws {
         let base = InMemoryBlobStore()
         let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker(makesThumbnail: false))
         let ingested = try await store(captured(), with: ingestor, in: InFlightBlobStore(base: base))
-        #expect(ingested.reference.thumbnail == nil)
-        #expect(base.allIDs() == [ingested.reference.blobID])
+        #expect(ingested.thumbnail == nil)
+        #expect(base.allIDs() == [ingested.blobID])
     }
 
     @Test func failedImageWriteLeavesNothing() async {

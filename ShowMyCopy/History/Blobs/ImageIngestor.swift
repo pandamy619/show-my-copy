@@ -1,14 +1,6 @@
 import Foundation
 import os
 
-/// An image after `ImageIngestor` stored it.
-struct IngestedImage: Equatable, Sendable {
-    let reference: ImageReference
-    /// False when the same image data was already in the history and its reference is used again: nothing was
-    /// written.
-    let isNew: Bool
-}
-
 enum ImageIngestError: Error, Equatable, Sendable {
     /// The data could not be read as an image. Nothing was stored.
     case notAnImage
@@ -39,10 +31,10 @@ struct ImageIngestor: Sendable {
         as blobID: BlobID,
         known: [ContentHash: ImageReference],
         reservation: BlobReservation
-    ) async throws(ImageIngestError) -> IngestedImage {
+    ) async throws(ImageIngestError) -> ImageReference {
         let contentHash = hasher.digest(of: image.data)
         if let existing = known[contentHash] {
-            return IngestedImage(reference: existing, isNew: false)
+            return existing
         }
         let inspection: ImageInspection
         do {
@@ -63,10 +55,9 @@ struct ImageIngestor: Sendable {
         } catch {
             throw .storageFailed
         }
-        let reference = ImageReference(
+        return ImageReference(
             blobID: blobID, typeIdentifier: image.typeIdentifier, pixelWidth: inspection.pixelWidth,
             pixelHeight: inspection.pixelHeight, byteSize: image.data.count, contentHash: contentHash,
             thumbnail: thumbnail)
-        return IngestedImage(reference: reference, isNew: true)
     }
 }

@@ -77,7 +77,7 @@ final class CaptureEnrichment {
             uniquingKeysWith: { first, _ in first })
         reservation.hold(known.values.flatMap(\.blobIDs))
         let history = history
-        enqueue(reservation) { () -> Result<IngestedImage, ImageIngestError> in
+        enqueue(reservation) { () -> Result<ImageReference, ImageIngestError> in
             do throws(ImageIngestError) {
                 return .success(try await images.ingest(image, as: blobID, known: known, reservation: reservation))
             } catch {
@@ -85,8 +85,8 @@ final class CaptureEnrichment {
             }
         } handOn: { result in
             switch result {
-            case .success(let ingested):
-                history.completeImage(unsaved, with: ingested.reference, keepsEarlierCopy: copy.isFirstRead)
+            case .success(let saved):
+                history.completeImage(unsaved, with: saved, keepsEarlierCopy: copy.isFirstRead)
             case .failure(let error):
                 if error == .storageFailed {
                     AppLogger.clipboard.error("Could not save a copied image; it is removed from the history")

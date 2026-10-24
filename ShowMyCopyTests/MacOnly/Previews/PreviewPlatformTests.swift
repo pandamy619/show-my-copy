@@ -68,8 +68,7 @@ struct ImageIOPreviewDecoderTests {
         let captured = CapturedImage(data: try png(width: 800, height: 600), typeIdentifier: "public.png")
         let reservation = InFlightBlobStore(base: blobs).reservation()
         let reference = try await ingestor.ingest(
-            captured, as: reservation.newID(), known: [:], reservation: reservation
-        ).reference
+            captured, as: reservation.newID(), known: [:], reservation: reservation)
         let provider = ThumbnailProvider(blobs: blobs, decoder: decoder)
         let thumbnail = try #require(await provider.thumbnail(for: reference))
         #expect(thumbnail.pixelWidth == 256)

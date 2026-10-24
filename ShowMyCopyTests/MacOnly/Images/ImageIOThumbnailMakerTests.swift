@@ -86,9 +86,9 @@ struct ImageIOThumbnailMakerTests {
         let ingested = try await ingestor.ingest(
             CapturedImage(data: data, typeIdentifier: "public.png"), as: reservation.newID(), known: [:],
             reservation: reservation)
-        #expect(ingested.reference.pixelWidth == 11000)
-        #expect(ingested.reference.thumbnail == nil)
-        #expect(blobs.allIDs() == [ingested.reference.blobID])
+        #expect(ingested.pixelWidth == 11000)
+        #expect(ingested.thumbnail == nil)
+        #expect(blobs.allIDs() == [ingested.blobID])
     }
 
     @Test func dataOfAnotherFormatThanItWasCopiedAsIsRejected() throws {
@@ -123,10 +123,10 @@ struct ImageIOThumbnailMakerTests {
         let ingested = try await ingestor.ingest(
             CapturedImage(data: data, typeIdentifier: "public.png"), as: reservation.newID(), known: [:],
             reservation: reservation)
-        #expect(ingested.reference.pixelWidth == 800)
-        #expect(ingested.reference.pixelHeight == 600)
-        #expect(try blobs.read(ingested.reference.blobID) == data)
-        let thumbnail = try #require(ingested.reference.thumbnail)
+        #expect(ingested.pixelWidth == 800)
+        #expect(ingested.pixelHeight == 600)
+        #expect(try blobs.read(ingested.blobID) == data)
+        let thumbnail = try #require(ingested.thumbnail)
         #expect(thumbnail.pixelWidth == 256)
         #expect(thumbnail.pixelHeight == 192)
     }
