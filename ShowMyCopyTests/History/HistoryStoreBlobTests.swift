@@ -174,7 +174,7 @@ struct PersistentHistoryStoreBlobTests {
         now: Date? = nil,
         leftovers: (any HistoryLeftovers)? = nil
     ) -> PersistentHistoryStore {
-        PersistentHistoryStore(
+        PersistentHistoryStore.loadedNow(
             persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true, retention: retention,
             now: now ?? start, blobs: blobs, leftovers: leftovers)
     }
@@ -236,7 +236,7 @@ struct PersistentHistoryStoreBlobTests {
     func nothingIsSweptWhenTheSavedHistoryCouldNotBeOpened(error: HistoryPersistenceError) throws {
         // The history on disk could not be opened (or was moved aside), so its images may still be wanted.
         let image = try ContentFixtures.storedImage(in: blobs)
-        _ = PersistentHistoryStore(
+        _ = PersistentHistoryStore.loadedNow(
             persistence: InMemoryHistoryPersistence(), sealer: nil, savesPasswords: false, now: start,
             openError: error, blobs: blobs)
         #expect(blobs.allIDs() == Set(image.blobIDs))

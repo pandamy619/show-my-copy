@@ -250,12 +250,12 @@ struct SwiftDataHistoryPersistenceTests {
 
     @Test func persistentStoreRoundTripsThroughSwiftData() throws {
         let persistence = try SwiftDataHistoryPersistence.inMemory()
-        let first = PersistentHistoryStore(
+        let first = PersistentHistoryStore.loadedNow(
             persistence: persistence, sealer: FakeSecretSealer(), savesPasswords: true, now: date)
         first.record(text: "plain", sourceApp: nil, at: date)
         first.record(text: "hunter2", sourceApp: nil, at: date + 1, concealed: true, expiresAt: date + 600)
 
-        let second = PersistentHistoryStore(
+        let second = PersistentHistoryStore.loadedNow(
             persistence: persistence, sealer: FakeSecretSealer(), savesPasswords: true, now: date + 2)
         #expect(second.entries == first.entries)
         #expect(second.storageError == nil)

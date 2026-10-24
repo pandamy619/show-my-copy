@@ -246,7 +246,7 @@ struct FileThumbnailPersistenceTests {
     private let blobs = InMemoryBlobStore()
 
     private func makeStore(now: Date? = nil) -> PersistentHistoryStore {
-        PersistentHistoryStore(
+        PersistentHistoryStore.loadedNow(
             persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true, now: now ?? start, blobs: blobs)
     }
 

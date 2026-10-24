@@ -15,7 +15,7 @@ struct HistoryLeftoversTests {
         openError: HistoryPersistenceError? = nil,
         persistence: (any HistoryPersistence)? = nil
     ) -> PersistentHistoryStore {
-        PersistentHistoryStore(
+        PersistentHistoryStore.loadedNow(
             persistence: persistence ?? disk, sealer: FakeSecretSealer(), savesPasswords: true, now: start,
             openError: openError, blobs: blobs, leftovers: leftovers)
     }

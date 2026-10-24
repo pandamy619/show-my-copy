@@ -22,7 +22,8 @@ struct HistoryStoreImageCompletionTests {
         case .inMemory:
             InMemoryHistoryStore(blobs: blobs)
         case .persistent:
-            PersistentHistoryStore(persistence: disk, sealer: nil, savesPasswords: false, now: start, blobs: blobs)
+            PersistentHistoryStore.loadedNow(
+                persistence: disk, sealer: nil, savesPasswords: false, now: start, blobs: blobs)
         }
     }
 

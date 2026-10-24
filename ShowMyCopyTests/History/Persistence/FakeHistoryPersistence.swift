@@ -88,7 +88,7 @@ extension FakeHistoryPersistence {
         blobs: (any BlobStore)? = nil,
         leftovers: (any HistoryLeftovers)? = nil
     ) -> PersistentHistoryStore {
-        PersistentHistoryStore(
+        PersistentHistoryStore.loadedNow(
             persistence: self, sealer: sealer, savesPasswords: savesPasswords, retention: retention, now: now,
             openError: openError, blobs: blobs, leftovers: leftovers)
     }

@@ -23,7 +23,7 @@ struct ClipboardMonitorBlobsInFlightTests {
     }
 
     private func makeStore() -> PersistentHistoryStore {
-        PersistentHistoryStore(persistence: disk, sealer: nil, savesPasswords: false, blobs: blobs)
+        PersistentHistoryStore.loadedNow(persistence: disk, sealer: nil, savesPasswords: false, blobs: blobs)
     }
 
     private func makeMonitor(history: any HistoryStore) -> ClipboardMonitor {
