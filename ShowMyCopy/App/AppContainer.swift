@@ -50,7 +50,7 @@ final class AppContainer {
         defaults: UserDefaults = .standard,
         now: @escaping @MainActor () -> Date = { Date() },
         frontmostApp: @escaping @MainActor () -> SourceApp? = { SourceApp.frontmost() },
-        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        sleep: @escaping @Sendable (Duration) async throws -> Void = PollingSchedule.sleepWithTolerance,
         pollingActivity: any PollingActivity = ProcessPollingActivity(),
         workspaceNotifications: any NotificationObserving = NotificationCenterObserver(
             center: NSWorkspace.shared.notificationCenter

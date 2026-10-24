@@ -90,6 +90,16 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         schedule.resumeAll()
     }
 
+    /// The history window opened or closed: while it is open, polling keeps App Nap away (`PollingActivityPolicy`).
+    func historyWindowOpened(_ isOpen: Bool) {
+        schedule.setHistoryWindowOpen(isOpen)
+    }
+
+    /// The user switched to another app, which usually comes with copying and pasteboard changes.
+    func userSwitchedApps() {
+        schedule.noteActivity()
+    }
+
     /// Marks a pasteboard change made by this app as seen, so it is not recorded again as a copy
     /// from whichever app is in front.
     func acknowledge(changeCount: Int) {
@@ -133,6 +143,8 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         }
         // A new change, or the emptied clipboard was filled: either way it was not left empty.
         clearedClipboard.dismiss()
+        // More copies are likely soon: keep the timer on time for a while.
+        schedule.noteActivity()
         let copy = CopyEvent(sourceApp: sourceApp, date: date, isFirstRead: lastChangeCount == nil)
         sourceOfNextChangeIsUnknown = false
         lastChangeCount = changeCount

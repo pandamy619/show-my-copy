@@ -1,7 +1,7 @@
 import AppKit
 
 /// Pauses the clipboard monitor while the Mac sleeps, the displays sleep, the screen is locked
-/// or another user is active.
+/// or another user is active, and tells it when the user switches apps (see `PollingActivityPolicy`).
 @MainActor
 final class SystemActivityObserver {
     nonisolated static let screenIsLockedNotification = Notification.Name("com.apple.screenIsLocked")
@@ -51,6 +51,10 @@ final class SystemActivityObserver {
         observe(workspace, NSWorkspace.sessionDidBecomeActiveNotification, back: .sessionInactive)
         observe(distributed, Self.screenIsLockedNotification, away: .screenLocked)
         observe(distributed, Self.screenIsUnlockedNotification, back: .screenLocked)
+        // Switching apps usually comes with copying: polling keeps App Nap away for a while.
+        workspace.observe(NSWorkspace.didActivateApplicationNotification) { [weak self] in
+            self?.monitor.userSwitchedApps()
+        }
     }
 
     /// Clears pause reasons that are no longer true.

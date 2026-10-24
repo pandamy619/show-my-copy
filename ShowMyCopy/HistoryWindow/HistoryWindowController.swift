@@ -46,10 +46,15 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         let size = HistoryPanelPlacement.size(showsEntries: model.showsEntries)
         panel.setFrame(NSRect(origin: Self.origin(for: size), size: size), display: false)
         panel.makeKeyAndOrderFront(nil)
+        monitor.historyWindowOpened(true)
     }
 
     func hide() {
+        let wasVisible = isVisible
         panel?.orderOut(nil)
+        if wasVisible {
+            monitor.historyWindowOpened(false)
+        }
         // A revealed password must not be on screen the next time the window opens.
         model.concealAll()
         // Drop the preview, and with it a full image, while the window is closed.
