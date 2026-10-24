@@ -32,12 +32,14 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// A plain copy of concealed content keeps the entry concealed with its expiry, for example after the user
     /// pasted a password into a note and copied it from there: it is still a password.
     ///
-    /// The store owns the blobs of the content it keeps (image data): they are deleted with the entry. Blobs of a
-    /// copy of content the history already holds are deleted at once. Content that cannot be concealed (images,
-    /// files) is not recorded as a concealed copy: it and any entry holding it are removed, and the returned ID
-    /// belongs to no entry.
+    /// The store owns the blobs of the content it keeps (image data and thumbnails, thumbnails of copied photos and
+    /// videos): they are deleted with the entry. Blobs of a copy of content the history already holds are deleted
+    /// at once, except the thumbnails of files the entry had none for, which the entry takes over. Content that
+    /// cannot be concealed (images, files) is not recorded as a concealed copy: it and any entry holding it are
+    /// removed, and the returned ID belongs to no entry.
     ///
-    /// Any `stats()` and `ClearResult` count the blobs: an image's `byteSize` is its data and thumbnail.
+    /// Any `stats()` and `ClearResult` count the blobs: an image's `byteSize` is its data and thumbnail, and a file
+    /// entry's includes its thumbnails.
     @discardableResult
     func record(
         _ content: ClipboardContent,

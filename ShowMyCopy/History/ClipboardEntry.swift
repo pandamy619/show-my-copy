@@ -3,7 +3,8 @@ import Foundation
 /// One item in the clipboard history.
 ///
 /// The content and what is derived from it (hash, size, preview) are fixed when the entry is made. A repeated copy
-/// of the same content changes only the date, the source app and the concealed state.
+/// of the same content changes only the date, the source app and the concealed state, and gives copied files the
+/// thumbnails they lacked (`replacingContent`).
 struct ClipboardEntry: Identifiable, Equatable, Sendable {
     let id: UUID
     let content: ClipboardContent
@@ -82,6 +83,14 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
             isConcealed: isConcealed,
             expiresAt: expiresAt
         )
+    }
+
+    /// The same entry holding `content`, which must have the same hash, such as files that got thumbnails. The
+    /// size and preview are made again from it; everything else stays.
+    func replacingContent(_ content: ClipboardContent) -> ClipboardEntry {
+        ClipboardEntry(
+            id: id, content: content, contentHash: contentHash, date: date, sourceApp: sourceApp,
+            isConcealed: isConcealed, expiresAt: expiresAt, isPinned: isPinned)
     }
 
     var kind: ClipboardContent.Kind {

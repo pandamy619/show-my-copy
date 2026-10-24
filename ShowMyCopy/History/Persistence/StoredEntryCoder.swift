@@ -38,7 +38,7 @@ struct StoredEntryCoder: Sendable {
             isConcealed: entry.isConcealed,
             expiresAt: entry.expiresAt,
             isPinned: entry.isPinned,
-            schemaVersion: StoredEntryRecord.schemaVersion(for: entry.kind),
+            schemaVersion: StoredEntryRecord.schemaVersion(for: entry.content),
             blobIDs: entry.content.blobIDs.map(\.uuid)
         )
         guard entry.isConcealed else {

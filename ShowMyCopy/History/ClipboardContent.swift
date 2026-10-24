@@ -59,7 +59,8 @@ enum ClipboardContent: Equatable, Sendable {
 
     /// The size of the content's data in bytes, for size limits and statistics: the UTF-8 length for text, the
     /// RTF data and its plain text for rich text, the image data and its thumbnail in the blob store for an image,
-    /// and the stored paths and names for files (not the files themselves, which the history does not keep).
+    /// and the stored paths, names and thumbnails for files (not the files themselves, which the history does not
+    /// keep).
     var byteSize: Int {
         switch self {
         case .text(let text):
@@ -69,18 +70,56 @@ enum ClipboardContent: Equatable, Sendable {
         case .image(let image):
             image.storedBytes
         case .files(let files):
-            files.reduce(0) { $0 + $1.path.utf8.count + $1.name.utf8.count }
+            files.reduce(0) {
+                $0 + $1.path.utf8.count + $1.name.utf8.count + ($1.thumbnail?.reference.byteSize ?? 0)
+            }
         }
     }
 
-    /// The blobs the content keeps in a `BlobStore`. Whoever removes the content deletes them.
+    /// The blobs the content keeps in a `BlobStore`: an image's data and thumbnail, the thumbnails of copied photos
+    /// and videos. Whoever removes the content deletes them.
     var blobIDs: [BlobID] {
         switch self {
-        case .text, .richText, .files:
+        case .text, .richText:
             []
         case .image(let image):
             image.blobIDs
+        case .files(let files):
+            files.compactMap(\.thumbnail?.blobID)
         }
+    }
+
+    /// The content with the blobs that are gone dropped, or nil when it cannot do without them. An image is
+    /// nothing without its data, and its record has always been deleted when any of its blobs was gone. A file
+    /// entry only loses the thumbnails: the files are still worth keeping.
+    func droppingBlobs(_ missing: Set<BlobID>) -> ClipboardContent? {
+        guard !missing.isEmpty else {
+            return self
+        }
+        switch self {
+        case .text, .richText:
+            return self
+        case .image(let image):
+            return image.blobIDs.contains(where: missing.contains) ? nil : self
+        case .files(let files):
+            return .files(
+                files.map { file in
+                    file.thumbnail.map { missing.contains($0.blobID) } == true ? file.withThumbnail(nil) : file
+                })
+        }
+    }
+
+    /// For the same files copied again: this content with the thumbnails it lacks taken from `newer`, file by
+    /// file. Thumbnails it has stay, so a thumbnail that already belongs to the entry is never replaced. Other
+    /// kinds, and files whose paths differ, are returned unchanged.
+    func addingMissingThumbnails(from newer: ClipboardContent) -> ClipboardContent {
+        guard case .files(let files) = self, case .files(let newFiles) = newer, files.count == newFiles.count,
+            zip(files, newFiles).allSatisfy({ $0.path == $1.path })
+        else {
+            return self
+        }
+        return .files(
+            zip(files, newFiles).map { old, new in old.thumbnail == nil ? old.withThumbnail(new.thumbnail) : old })
     }
 
     /// The image, for content that is one.

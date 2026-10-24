@@ -287,7 +287,7 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
 /// What `PersistentHistoryStore.sort` found in the saved records.
 private struct FoundRecords {
     var entries: [ClipboardEntry] = []
-    /// Damaged, not to be opened, or an image whose data is gone: deleted.
+    /// Damaged, not to be opened, or an image whose data or thumbnail is gone: deleted.
     var unreadable: [UUID] = []
     /// Passwords that are expired or no longer saved: deleted unopened.
     var unwanted: [UUID] = []
@@ -312,19 +312,22 @@ extension PersistentHistoryStore {
                 found.unwanted.append(record.id)
                 continue
             }
+            var missing: Set<BlobID> = []
             if !record.blobIDs.isEmpty, coder.supports(record) {
                 guard let blobs else {
                     // Nowhere to read the data from now; a later launch with the blob store loads it.
                     continue
                 }
-                if record.blobIDs.contains(where: { !blobs.contains(BlobID(uuid: $0)) }) {
-                    found.unreadable.append(record.id)
-                    continue
-                }
+                missing = Set(record.blobIDs.map { BlobID(uuid: $0) }.filter { !blobs.contains($0) })
             }
             switch coder.decode(record) {
             case .entry(let entry):
-                found.entries.append(entry)
+                // An image whose data is gone is deleted; files whose thumbnails are gone keep their icons.
+                guard let content = entry.content.droppingBlobs(missing) else {
+                    found.unreadable.append(record.id)
+                    continue
+                }
+                found.entries.append(content == entry.content ? entry : entry.replacingContent(content))
             case .unreadable:
                 found.unreadable.append(record.id)
             case .unsupported:

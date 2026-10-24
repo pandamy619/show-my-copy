@@ -70,6 +70,12 @@ final class InMemoryHistoryStore: HistoryStore {
         var entry: ClipboardEntry
         if let index = entries.firstIndex(where: { $0.contentHash == contentHash }) {
             entry = entries.remove(at: index)
+            // Files copied again may bring the thumbnails the first copy could not make, such as for an entry from
+            // before thumbnails or after a timeout. Those it has stay.
+            let filled = entry.content.addingMissingThumbnails(from: content)
+            if filled != entry.content {
+                entry = entry.replacingContent(filled)
+            }
             entry.date = date
             entry.sourceApp = sourceApp
             // The entry keeps its own content, so blobs written for this copy of the same content are not needed.

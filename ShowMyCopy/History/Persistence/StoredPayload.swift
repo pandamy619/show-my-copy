@@ -8,10 +8,22 @@ import Foundation
 /// without guessing. Integers are big-endian; strings are UTF-8; variable-length parts are length-prefixed.
 enum StoredPayload {
     static let formatVersion: UInt8 = 1
+    /// File lists with thumbnails: each file also has its thumbnail, if any. A file list without thumbnails keeps
+    /// format 1, so app versions from before thumbnails still read it.
+    static let filesWithThumbnailsFormatVersion: UInt8 = 2
+
+    /// The format `content` is written in.
+    static func formatVersion(for content: ClipboardContent) -> UInt8 {
+        if case .files(let files) = content, files.contains(where: { $0.thumbnail != nil }) {
+            return filesWithThumbnailsFormatVersion
+        }
+        return formatVersion
+    }
 
     static func encode(_ content: ClipboardContent) -> Data {
         var writer = Writer()
-        writer.byte(formatVersion)
+        let format = formatVersion(for: content)
+        writer.byte(format)
         switch content {
         case .text(let text):
             // Text records keep the plain UTF-8 layout of the first version, without a format byte, so older app
@@ -48,6 +60,9 @@ enum StoredPayload {
                 } else {
                     writer.byte(0)
                 }
+                if format == filesWithThumbnailsFormatVersion {
+                    writer.fileThumbnail(file.thumbnail)
+                }
             }
         }
         return writer.data
@@ -59,7 +74,9 @@ enum StoredPayload {
             return String(data: payload, encoding: .utf8).map { .text($0) }
         }
         var reader = Reader(payload)
-        guard reader.byte() == formatVersion else {
+        guard let format = reader.byte(),
+            format == formatVersion || (kind == .files && format == filesWithThumbnailsFormatVersion)
+        else {
             return nil
         }
         let content: ClipboardContent?
@@ -71,7 +88,7 @@ enum StoredPayload {
         case .image:
             content = decodeImage(&reader).map { .image($0) }
         case .files:
-            content = decodeFiles(&reader).map { .files($0) }
+            content = decodeFiles(&reader, hasThumbnails: format == filesWithThumbnailsFormatVersion).map { .files($0) }
         }
         // Trailing bytes mean the layout is not the one this version writes.
         guard reader.isAtEnd else {
@@ -115,7 +132,7 @@ enum StoredPayload {
             byteSize: byteSize, contentHash: ContentHash(bytes: [UInt8](hash)), thumbnail: thumbnail)
     }
 
-    private static func decodeFiles(_ reader: inout Reader) -> [FileReference]? {
+    private static func decodeFiles(_ reader: inout Reader, hasThumbnails: Bool) -> [FileReference]? {
         guard let count = reader.integer(), count > 0 else {
             return nil
         }
@@ -138,10 +155,42 @@ enum StoredPayload {
             default:
                 return nil
             }
-            files.append(FileReference(url: url, name: name, byteSize: byteSize))
+            var thumbnail: FileThumbnail?
+            if hasThumbnails {
+                do {
+                    thumbnail = try decodeFileThumbnail(&reader)
+                } catch {
+                    return nil
+                }
+            }
+            files.append(FileReference(url: url, name: name, byteSize: byteSize, thumbnail: thumbnail))
         }
         return files
     }
+
+    /// A file's thumbnail in format 2: a 0 byte for none, or a 1 byte, the kind, the blob ID, the pixel size and
+    /// the byte size. Throws when the data is damaged.
+    private static func decodeFileThumbnail(_ reader: inout Reader) throws(DamagedPayload) -> FileThumbnail? {
+        switch reader.byte() {
+        case 0:
+            return nil
+        case 1:
+            guard let kindByte = reader.byte(), let kind = FileThumbnail.Kind(rawValue: kindByte),
+                let blob = reader.uuid(), let width = reader.integer(), let height = reader.integer(),
+                let byteSize = reader.integer()
+            else {
+                throw DamagedPayload()
+            }
+            let reference = ThumbnailReference(
+                blobID: BlobID(uuid: blob), pixelWidth: width, pixelHeight: height, byteSize: byteSize)
+            return FileThumbnail(kind: kind, reference: reference)
+        default:
+            throw DamagedPayload()
+        }
+    }
+
+    /// A payload that does not have the layout its format byte says.
+    private struct DamagedPayload: Error {}
 
     private struct Writer {
         private(set) var data = Data()
@@ -171,6 +220,19 @@ enum StoredPayload {
 
         mutating func uuid(_ value: UUID) {
             withUnsafeBytes(of: value.uuid) { data.append(contentsOf: $0) }
+        }
+
+        mutating func fileThumbnail(_ thumbnail: FileThumbnail?) {
+            guard let thumbnail else {
+                byte(0)
+                return
+            }
+            byte(1)
+            byte(thumbnail.kind.rawValue)
+            uuid(thumbnail.blobID.uuid)
+            integer(thumbnail.reference.pixelWidth)
+            integer(thumbnail.reference.pixelHeight)
+            integer(thumbnail.reference.byteSize)
         }
     }
 
