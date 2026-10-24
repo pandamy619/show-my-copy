@@ -140,6 +140,19 @@ struct SystemActivityObserverTests {
         #expect(away.count == 1)
     }
 
+    @Test(arguments: reasons)
+    func comingBackIsReported(_ reason: PollingSchedule.PauseReason) {
+        let pair = Self.pair(for: reason)
+        let observer = makeObserver()
+        let back = CallCounter()
+        observer.onUserBack = { back.call() }
+        observer.start()
+
+        post(pair.away, to: pair.center)
+        post(pair.back, to: pair.center)
+        #expect(back.count == 1)
+    }
+
     @Test func startTwiceObservesOnce() {
         let observer = makeObserver()
         observer.start()

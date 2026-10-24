@@ -117,6 +117,15 @@ struct StoredEntryCoderTests {
         #expect(StoredEntryCoder(sealer: nil, hasher: hasher).decode(record) == .unreadable)
     }
 
+    @Test func concealedRecordWaitsWhileTheKeyCannotBeUsed() throws {
+        let record = try #require(try coder.record(for: entry("hunter2", concealed: true)))
+        let locked = StoredEntryCoder(sealer: KeyTroubleSealer(failure: .keyNotLoaded), hasher: hasher)
+        let denied = StoredEntryCoder(
+            sealer: KeyTroubleSealer(failure: .keyUnavailable(.accessDenied)), hasher: hasher)
+        #expect(locked.decode(record) == .waitsForKey)
+        #expect(denied.decode(record) == .waitsForKey)
+    }
+
     @Test func tamperedSealedPayloadIsUnreadable() throws {
         let record = try #require(try coder.record(for: entry("hunter2", concealed: true)))
         let truncated = record.replacingPayload(with: record.payload.prefix(3))

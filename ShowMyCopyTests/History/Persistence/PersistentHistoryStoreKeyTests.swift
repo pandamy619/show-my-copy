@@ -4,13 +4,13 @@ import Testing
 @testable import ShowMyCopy
 
 /// When the store needs the key for saved passwords. Getting the key can show a Keychain prompt, so a history
-/// without passwords must never ask for it.
+/// without passwords must never ask for it, and the key is loaded off the main actor (`loadPasswordKey()`).
 @MainActor
 struct PersistentHistoryStoreKeyTests {
     private let disk = FakeHistoryPersistence()
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
-    @Test func plainHistoryNeverAsksForTheKey() {
+    @Test func plainHistoryNeverAsksForTheKey() async {
         let earlier = disk.makeStore(now: start)
         earlier.record(text: "saved", sourceApp: nil, at: start)
         let factory = SealerFactorySpy()
@@ -23,31 +23,37 @@ struct PersistentHistoryStoreKeyTests {
         store.removeConcealed()
         store.removeExpired(at: start + 4)
         store.clear()
+        await store.loadPasswordKey()
 
         #expect(factory.calls == 0)
         #expect(store.storageError == nil)
     }
 
-    @Test func savingPasswordsAsksForTheKeyOnce() {
+    @Test func savingPasswordsAsksForTheKeyOnce() async {
         let factory = SealerFactorySpy()
         let store = disk.makeStore(sealer: factory.makeLazySealer(), now: start)
 
         store.record(text: "plain", sourceApp: nil, at: start)
+        await store.loadPasswordKey()
         #expect(factory.calls == 0)
         store.record(text: "hunter2", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 600)
         store.record(text: "swordfish", sourceApp: nil, at: start + 2, concealed: true, expiresAt: start + 600)
+        await store.loadPasswordKey()
 
         #expect(factory.calls == 1)
         #expect(disk.savedTexts() == ["plain", "hunter2", "swordfish"])
     }
 
-    @Test func loadingSavedPasswordsAsksForTheKeyOnce() {
+    @Test func loadingSavedPasswordsAsksForTheKeyOnceAndNotDuringTheLoad() async {
         let earlier = disk.makeStore(now: start)
         earlier.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
         earlier.record(text: "swordfish", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 600)
         let factory = SealerFactorySpy()
 
         let store = disk.makeStore(sealer: factory.makeLazySealer(), savesPasswords: true, now: start + 2)
+        #expect(factory.calls == 0)
+        #expect(store.entries.isEmpty)
+        await store.loadPasswordKey()
 
         #expect(factory.calls == 1)
         #expect(store.entries.map(\.text) == ["swordfish", "hunter2"])
@@ -55,7 +61,7 @@ struct PersistentHistoryStoreKeyTests {
 
     /// Saved passwords live an hour at most, so after a restart they have usually expired. Deleting them must not
     /// show a Keychain prompt.
-    @Test func expiredSavedPasswordsAreDeletedWithoutAskingForTheKey() {
+    @Test func expiredSavedPasswordsAreDeletedWithoutAskingForTheKey() async {
         let earlier = disk.makeStore(now: start)
         let expiredID = earlier.record(
             text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
@@ -64,6 +70,7 @@ struct PersistentHistoryStoreKeyTests {
 
         // Expiring exactly now counts as expired, as in `removeExpired(at:)`.
         let store = disk.makeStore(sealer: factory.makeLazySealer(), savesPasswords: true, now: start + 600)
+        await store.loadPasswordKey()
 
         #expect(factory.calls == 0)
         #expect(store.entries.map(\.id) == [plainID])
@@ -72,7 +79,7 @@ struct PersistentHistoryStoreKeyTests {
         #expect(store.storageError == nil)
     }
 
-    @Test func savedPasswordsAreDeletedWithoutAskingForTheKeyWhenSavingThemIsOff() {
+    @Test func savedPasswordsAreDeletedWithoutAskingForTheKeyWhenSavingThemIsOff() async {
         let earlier = disk.makeStore(now: start)
         let passwordID = earlier.record(
             text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
@@ -80,6 +87,7 @@ struct PersistentHistoryStoreKeyTests {
         let factory = SealerFactorySpy()
 
         let store = disk.makeStore(sealer: factory.makeLazySealer(), savesPasswords: false, now: start + 2)
+        await store.loadPasswordKey()
 
         #expect(factory.calls == 0)
         #expect(store.entries.map(\.id) == [plainID])
@@ -88,13 +96,15 @@ struct PersistentHistoryStoreKeyTests {
         #expect(store.storageError == nil)
     }
 
-    @Test func withoutTheKeyPasswordsStayInMemoryAndTheKeyIsNotAskedForAgain() {
+    @Test func withoutTheKeyPasswordsStayInMemoryAndTheKeyIsNotAskedForAgain() async {
         let factory = SealerFactorySpy(fails: true)
         let store = disk.makeStore(sealer: factory.makeLazySealer(), now: start)
 
         store.record(text: "plain", sourceApp: nil, at: start)
         store.record(text: "hunter2", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 600)
+        await store.loadPasswordKey()
         store.record(text: "swordfish", sourceApp: nil, at: start + 2, concealed: true, expiresAt: start + 600)
+        await store.loadPasswordKey()
 
         #expect(store.storageError == .sealFailed)
         #expect(store.entries.map(\.text) == ["swordfish", "hunter2", "plain"])
