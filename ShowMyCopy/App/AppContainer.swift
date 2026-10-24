@@ -7,8 +7,8 @@ import Foundation
 /// which notification centers are observed. Everything else takes protocols. The initializer has no side effects:
 /// nothing reads the pasteboard, changes the history or observes notifications until `start()`.
 ///
-/// The operations below are what the app offers to the outside: the global shortcut, reopening the app and, from
-/// v2, App Intents. An intent reaches the container through App Intents dependencies, without a global:
+/// The operations below are what the app offers to the outside: the global shortcut, reopening the app and, once
+/// they are added, App Intents. An intent reaches the container through App Intents dependencies, without a global:
 /// the app registers it once at launch with `AppDependencyManager.shared.add { container }`, and the intent declares
 /// `@Dependency private var container: AppContainer` and calls `container.toggleHistory()` on the main actor.
 /// The intent must run in the app's process, not in a widget extension, because the container lives here.

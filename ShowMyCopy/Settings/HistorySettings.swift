@@ -16,9 +16,8 @@ struct LimitChange<Limit: Equatable & Sendable>: Equatable, Sendable {
 
 /// The size limits offered in Settings. Decimal units, as Finder counts file sizes.
 ///
-/// 1 GB is the default: images can make the history several gigabytes, and the entry limit alone does not stop
-/// that. A saved choice, including No limit, stays; see `HistorySettings.settleSizeLimitDefault(in:isNewInstall:)`
-/// for installs from before this default.
+/// 1 GB is the default, for everyone who has not chosen: images can make the history several gigabytes, and the
+/// entry limit alone does not stop that. A saved choice, including No limit, stays.
 enum HistorySizeLimit: Int, CaseIterable, Identifiable, Sendable {
     case noLimit = 0
     case megabytes100 = 100_000_000
@@ -82,22 +81,6 @@ final class HistorySettings {
             return .default
         }
         return value == 0 ? .noLimit : HistorySizeLimit(byteLimit: value)
-    }
-
-    /// Saves the size limit this install starts with, when none is saved yet. Call it at launch, before the
-    /// history is loaded with `storedRetention(in:)`.
-    ///
-    /// A new install saves the default, 1 GB. An install from before that default had no size limit and never
-    /// saved one, so nothing tells "never chose" from "chose No limit" apart there: it saves No limit, which keeps
-    /// its history as it is. Applying 1 GB to it would delete the oldest entries and their images at launch,
-    /// without the confirmation Settings ask for. Saving on the first launch also keeps later launches, when the
-    /// install is no longer new, from treating the missing value as an old install. A saved value is never changed.
-    nonisolated static func settleSizeLimitDefault(in defaults: UserDefaults, isNewInstall: Bool) {
-        guard defaults.object(forKey: SettingsKey.historyByteLimit) == nil else {
-            return
-        }
-        let limit: HistorySizeLimit = isNewInstall ? .default : .noLimit
-        defaults.set(limit.rawValue, forKey: SettingsKey.historyByteLimit)
     }
 
     /// Both saved limits as one policy. Load the saved history with it, so loading deletes exactly what

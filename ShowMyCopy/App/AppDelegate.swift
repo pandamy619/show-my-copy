@@ -13,9 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !Self.isRunningTests else {
             return
         }
-        // Settings show on the first launch only, so their flag also tells a new install from an older one.
         let firstLaunch = FirstLaunch()
-        HistorySettings.settleSizeLimitDefault(in: .standard, isNewInstall: firstLaunch.shouldShowSettings)
         // Before anything opens the history: development builds saved it in a format that is gone.
         if let applicationSupport = HistoryFolder.applicationSupport() {
             LegacyHistoryFiles(appFolder: HistoryFolder.appFolder(inApplicationSupport: applicationSupport)).delete()
@@ -68,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Keychain prompt, which users who never save passwords should not see. Saved passwords that have expired, or
     /// all of them when saving passwords is off, are deleted at load without the key. Without the key, passwords
     /// are kept in memory only and everything else is still saved. When the store on disk cannot be opened, the
-    /// history is kept in memory only, as before v2, and `storageError` tells why. Image data is in `blobs`; the
+    /// history is kept in memory only and `storageError` tells why. Image data is in `blobs`; the
     /// store deletes it with its entries and sweeps what no entry uses at launch.
     private static func makeHistoryStore(blobs: (any BlobStore)?) -> any HistoryStore {
         let sealer = LazySecretSealer {
