@@ -71,7 +71,7 @@ struct StorageUsageTests {
         history.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
         history.record(text: "plain", sourceApp: nil, at: start + 1)
         let breakdown = makeUsage(history: history).breakdown
-        #expect(breakdown.parts.map(\.category) == StorageCategory.allCases)
+        #expect(breakdown.parts.map(\.category) == [.text, .passwords])
     }
 
     @Test func fractionsShareTheTotalSize() {
