@@ -37,11 +37,27 @@ struct HistoryStoreOpenerTests {
     static let sqliteHeader = Data("SQLite format 3\0".utf8) + Data(count: 84)
     private let spy = StoreOpeningSpy()
 
-    private func open(in folder: URL, defaults: UserDefaults) -> OpenedHistory {
-        HistoryStoreOpener(directory: folder, defaults: defaults) { [spy] url throws(HistoryPersistenceError) in
+    private let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func open(in folder: URL, defaults: UserDefaults, at date: Date? = nil) -> OpenedHistory {
+        let spy = spy
+        let openStore: (URL) throws(HistoryPersistenceError) -> any HistoryPersistence = { url in
             try spy.open(url)
         }
-        .open()
+        return HistoryStoreOpener(directory: folder, defaults: defaults, now: date ?? now, openStore: openStore).open()
+    }
+
+    private func damagedCopy(in folder: URL, movedAsideAt date: Date) throws {
+        try TemporaryFolder.write(to: "History.store.damaged", in: folder)
+        try TemporaryFolder.write(to: "History.store.damaged-wal", in: folder)
+        try FileManager.default.setAttributes(
+            [.modificationDate: date],
+            ofItemAtPath: folder.appending(path: "History.store.damaged").path(percentEncoded: false))
+    }
+
+    private func modificationDate(of name: String, in folder: URL) throws -> Date? {
+        let path = folder.appending(path: name).path(percentEncoded: false)
+        return try FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date
     }
 
     private func savedStore(in folder: URL, data: Data = sqliteHeader + Data("history".utf8)) throws {
@@ -188,6 +204,48 @@ struct HistoryStoreOpenerTests {
                 #expect(open(in: folder, defaults: defaults).leftovers?.hasFiles() == false)
                 try TemporaryFolder.write(to: "History.store.damaged", in: folder)
                 #expect(open(in: folder, defaults: defaults).leftovers?.hasFiles() == true)
+            }
+        }
+    }
+
+    // MARK: - Age of the damaged copy
+
+    @Test func aDamagedCopyIsDeletedAtTheFirstLaunchAWeekAfterItWasMovedAside() throws {
+        try TemporaryFolder.with { folder in
+            try TemporaryFolder.withDefaults { defaults in
+                try damagedCopy(in: folder, movedAsideAt: now - HistoryStoreOpener.damagedCopyLifetime - 1)
+                let opened = open(in: folder, defaults: defaults)
+                #expect(!TemporaryFolder.exists("History.store.damaged", in: folder))
+                #expect(!TemporaryFolder.exists("History.store.damaged-wal", in: folder))
+                #expect(opened.leftovers?.hasFiles() == false)
+            }
+        }
+    }
+
+    @Test func aYoungerDamagedCopyIsKept() throws {
+        try TemporaryFolder.with { folder in
+            try TemporaryFolder.withDefaults { defaults in
+                try damagedCopy(in: folder, movedAsideAt: now - HistoryStoreOpener.damagedCopyLifetime + 60)
+                #expect(open(in: folder, defaults: defaults).leftovers?.hasFiles() == true)
+                #expect(TemporaryFolder.exists("History.store.damaged-wal", in: folder))
+            }
+        }
+    }
+
+    /// The store's own date is when it was last written; the week counts from when it was moved aside.
+    @Test func aCopyIsDatedWhenItIsMovedAside() throws {
+        try TemporaryFolder.with { folder in
+            try TemporaryFolder.withDefaults { defaults in
+                try savedStore(in: folder, data: Data("damaged".utf8))
+                try FileManager.default.setAttributes(
+                    [.modificationDate: now - 30 * 24 * 3600],
+                    ofItemAtPath: folder.appending(path: "History.store").path(percentEncoded: false))
+                spy.failsWhileTheStoreExists = true
+
+                #expect(open(in: folder, defaults: defaults).error == .storeReset)
+                let date = try #require(try modificationDate(of: "History.store.damaged", in: folder))
+                #expect(abs(date.timeIntervalSince(now)) < 1)
+                #expect(open(in: folder, defaults: defaults, at: now + 3600).leftovers?.hasFiles() == true)
             }
         }
     }
