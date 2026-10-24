@@ -48,7 +48,8 @@ struct ImageIngestor: Sendable {
         }
         let inspection: ImageInspection
         do {
-            inspection = try thumbnails.inspect(image.data, maximumPixelSize: ThumbnailReference.maximumPixelSize)
+            inspection = try thumbnails.inspect(
+                image.data, declaredType: image.typeIdentifier, maximumPixelSize: ThumbnailReference.maximumPixelSize)
         } catch {
             AppLogger.clipboard.info("Skipped image data that could not be read as an image")
             throw .notAnImage

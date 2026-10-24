@@ -20,15 +20,17 @@ struct CGPreviewImage: PreviewImage, @unchecked Sendable {
 
 /// Decodes thumbnails and full images with ImageIO, at most at the size the history window draws them.
 ///
-/// `kCGImageSourceThumbnailMaxPixelSize` makes ImageIO decode at a reduced size instead of decoding the whole image
-/// and scaling it, so a 50-megapixel photo never takes its full size in memory. The pixels are decoded here
-/// (`kCGImageSourceShouldCacheImmediately`), off the main actor, rather than when the image is first drawn.
+/// The data is opened through `CheckedImageSource`, so only an allowed format that ImageIO reads as the format its
+/// bytes start with is decoded, and only within `ImageDecodingPolicy.maximumPixelCount`: an image recorded over the
+/// limit shows a placeholder. `kCGImageSourceThumbnailMaxPixelSize` makes ImageIO decode at a reduced size instead
+/// of decoding the whole image and scaling it, so a 50-megapixel photo never takes its full size in memory. The
+/// pixels are decoded here (`kCGImageSourceShouldCacheImmediately`), off the main actor, rather than when the image
+/// is first drawn.
 struct ImageIOPreviewDecoder: PreviewImageDecoding {
     func decode(_ data: Data, maximumPixelSize: Int) -> (any PreviewImage)? {
-        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
-        guard maximumPixelSize > 0,
-            let source = CGImageSourceCreateWithData(data as CFData, sourceOptions),
-            CGImageSourceGetCount(source) > 0
+        // The blob does not carry its type, so the bytes alone decide the format, and ImageIO must agree.
+        guard maximumPixelSize > 0, let checked = CheckedImageSource.open(data, declaredType: nil),
+            checked.isWithinPixelLimit
         else {
             return nil
         }
@@ -39,7 +41,7 @@ struct ImageIOPreviewDecoder: PreviewImageDecoding {
                 kCGImageSourceThumbnailMaxPixelSize: maximumPixelSize,
                 kCGImageSourceShouldCacheImmediately: true,
             ] as CFDictionary
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else {
+        guard let image = CGImageSourceCreateThumbnailAtIndex(checked.source, 0, options) else {
             return nil
         }
         return CGPreviewImage(cgImage: image)

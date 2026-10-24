@@ -19,7 +19,8 @@ extension PreviewImage {
 /// Decodes image data for the history window. Called off the main actor.
 protocol PreviewImageDecoding: Sendable {
     /// The image in `data`, scaled down so its longer side is at most `maximumPixelSize` pixels (never scaled up),
-    /// or nil when the data is not an image the system can read.
+    /// or nil when the data is not an image the system can read or fails `ImageDecodingPolicy` (a format that is
+    /// not allowed, or more pixels than it allows).
     func decode(_ data: Data, maximumPixelSize: Int) -> (any PreviewImage)?
 }
 
