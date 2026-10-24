@@ -31,6 +31,9 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     @ObservationIgnored private let coder: StoredEntryCoder
     /// Where image data is kept, or nil when there is no such store: then records with blobs stay on disk unloaded.
     @ObservationIgnored private let blobs: (any BlobStore)?
+    /// Whether blobs no record references may be deleted: only when `persistence` is the history saved on disk.
+    /// After it failed to open, its records are unknown and their images may still be wanted.
+    @ObservationIgnored private let sweepsBlobs: Bool
     /// Set after a failed write: the disk no longer matches memory, so the next write replaces everything.
     @ObservationIgnored private var needsFullWrite = false
 
@@ -80,6 +83,7 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         self.persistence = persistence
         self.coder = coder
         self.blobs = blobs
+        self.sweepsBlobs = openError == nil
         self.storageError = storageError
 
         let kept = Set(memory.entries.map(\.id))
@@ -96,8 +100,8 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
                 try persistence.delete(ids: deleted)
             }
         }
-        // Only with every record known: a sweep after a failed load would delete the data of every image.
-        if isLoaded, let blobs {
+        // Only with every record known: a sweep after a failed open or load would delete the data of every image.
+        if sweepsBlobs, isLoaded, let blobs {
             let gone = isDeleted ? Set(deleted) : []
             let referenced = records.filter { !gone.contains($0.id) }.flatMap(\.blobIDs).map { BlobID(uuid: $0) }
             Self.deleteOrphans(in: blobs, keeping: Set(referenced))
@@ -153,7 +157,7 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
             // Memory and disk are both empty, so they match again.
             needsFullWrite = false
             finishWrite(sealFailed: false)
-            if let blobs {
+            if sweepsBlobs, let blobs {
                 // No record is left, so no blob is used: also those of records this version did not load.
                 Self.deleteOrphans(in: blobs, keeping: [])
             }
