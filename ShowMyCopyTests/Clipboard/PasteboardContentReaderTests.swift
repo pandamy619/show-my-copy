@@ -10,18 +10,17 @@ struct FileURLContentReaderTests {
     private let photos = URL(filePath: "/Users/me/Photos", directoryHint: .isDirectory)
 
     private func reader(maximumCount: Int = FileURLContentReader.defaultMaximumCount) -> FileURLContentReader {
-        FileURLContentReader(maximumCount: maximumCount) { url in
-            url.lastPathComponent == "Photos" ? nil : 1234
-        }
+        FileURLContentReader(maximumCount: maximumCount)
     }
 
-    @Test func readsTheFilesWithNamesAndSizes() {
+    /// Sizes are read later, off the main actor (`FileSizeReader`): reading the pasteboard touches no file.
+    @Test func readsTheFilesWithNamesButNoSizes() {
         pasteboard.copyFiles([report, photos])
         #expect(
             reader().read(from: pasteboard)
                 == .content(
                     .files([
-                        FileReference(url: report, name: "Отчёт.pdf", byteSize: 1234),
+                        FileReference(url: report, name: "Отчёт.pdf", byteSize: nil),
                         FileReference(url: photos, name: "Photos", byteSize: nil),
                     ])))
     }
@@ -73,9 +72,9 @@ struct FileURLContentReaderTests {
                 Issue.record("Could not remove the temporary file: \(error)")
             }
         }
-        #expect(FileURLContentReader.sizeOfFile(at: url) == 321)
-        #expect(FileURLContentReader.sizeOfFile(at: url.deletingLastPathComponent()) == nil)
-        #expect(FileURLContentReader.sizeOfFile(at: url.appending(path: "missing")) == nil)
+        #expect(FileSizeReader.sizeOfFile(at: url) == 321)
+        #expect(FileSizeReader.sizeOfFile(at: url.deletingLastPathComponent()) == nil)
+        #expect(FileSizeReader.sizeOfFile(at: url.appending(path: "missing")) == nil)
     }
 }
 

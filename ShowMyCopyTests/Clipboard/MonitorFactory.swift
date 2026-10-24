@@ -22,6 +22,7 @@ enum MonitorFactory {
         activity: any PollingActivity = CountingActivity(),
         blobs: InFlightBlobStore? = nil,
         imageIngestor: ImageIngestor? = nil,
+        fileSizes: FileSizeReader = MonitorFactory.noFileSizes,
         fileThumbnailIngestor: FileThumbnailIngestor? = nil
     ) -> ClipboardMonitor {
         ClipboardMonitor(
@@ -32,13 +33,18 @@ enum MonitorFactory {
             clearedClipboard: ClearedClipboardCheck(history: history),
             capture: blobs.map { blobs in
                 CaptureEnrichment(
-                    history: history, blobs: blobs, images: imageIngestor, fileThumbnails: fileThumbnailIngestor)
+                    history: history, blobs: blobs, images: imageIngestor, fileSizes: fileSizes,
+                    fileThumbnails: fileThumbnailIngestor)
             },
             frontmostApp: frontmostApp,
             now: now,
             passwordPolicy: passwordPolicy
         )
     }
+
+    /// Reads no file: every size is unknown, as for files the sandbox hides.
+    nonisolated static let noFileSizes = FileSizeReader(
+        paths: CopiedPaths(volumes: FakeVolumes.startupDiskOnly), size: { _ in nil })
 
     /// A sleep that never ends on its own: it returns only by throwing when its task is cancelled, as when the
     /// monitor stops. Tests that need the loop to run use `ManualSleeper`.

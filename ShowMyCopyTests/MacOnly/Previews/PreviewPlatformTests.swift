@@ -166,4 +166,12 @@ struct WorkspaceFileIconProviderTests {
         #expect(icons.icon(forPath: url.path(percentEncoded: false)).size.width > 0)
         #expect(icons.icon(forPath: "/no/such/file-\(UUID().uuidString).pdf").size.width > 0)
     }
+
+    /// A path under `/net` is never looked up (that would make automountd contact the host): the icon comes from
+    /// the extension.
+    @Test func givesAnIconForAnAutomountedPathFromItsExtension() {
+        let icons = WorkspaceFileIconProvider()
+        #expect(icons.icon(forPath: "/net/example.invalid/share/report.pdf").size.width > 0)
+        #expect(icons.icon(forPath: "/Network/Servers/example.invalid/folder").size.width > 0)
+    }
 }

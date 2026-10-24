@@ -246,17 +246,37 @@ struct FileThumbnailIngestorTests {
         #expect(try inFlight.allIDs() == made)
     }
 
-    @Test func runGivesTheResultOrNilAfterTheTimeout() async {
-        let sleep = timers.sleep
-        #expect(await FileThumbnailIngestor.run(within: .seconds(10), sleep: sleep) { 7 } == 7)
-        let running = Task {
-            await FileThumbnailIngestor.run(within: .milliseconds(50), sleep: sleep) { () -> Int in
-                await suspendUntilCancelled()
-                return 7
-            }
-        }
-        await timers.waitForSleep(of: .milliseconds(50))
-        timers.fire(.milliseconds(50))
-        #expect(await running.value == nil)
+    /// A check that cannot be cancelled, like the synchronous metadata reads of `mediaKind` on a stuck disk, does not
+    /// hold the copy past its budget, and so does not hold the thumbnails of the copies after it.
+    @Test func workThatCannotBeStoppedDoesNotHoldTheCopyPastItsBudget() async {
+        let gate = AsyncGate()
+        gate.arm()
+        let stuck = FakeFileThumbnailMaker(gate: gate)
+        let ingestor = ingestor(maker: stuck, timeoutPerFile: .seconds(10), totalBudget: .milliseconds(300))
+        let ingesting = Task { await ingestor.ingest(files("a.jpg", "b.jpg")) }
+        await gate.waitUntilReached()
+        await timers.waitForSleep(of: .milliseconds(300))
+        timers.fire(.milliseconds(300))
+
+        let result = await ingesting.value
+        #expect(result.allSatisfy { $0.thumbnail == nil })
+        #expect(blobs.writeCount == 0)
+        gate.open()
+    }
+
+    @Test func filesOnNetworkVolumesAreNeverLookedAt() async {
+        let volumes = FakeVolumes([
+            MountedVolume(mountPoint: "/", fileSystem: "apfs", isLocal: true),
+            MountedVolume(mountPoint: "/Volumes/share", fileSystem: "smbfs", isLocal: false),
+        ])
+        let ingestor = FileThumbnailIngestor(
+            maker: maker, paths: CopiedPaths(volumes: volumes), sleep: timers.sleep)
+        let copied = [
+            ContentFixtures.file("/Volumes/share/a.jpg"), ContentFixtures.file("/net/host/b.jpg"),
+            ContentFixtures.file("/Users/me/c.jpg"),
+        ]
+        let result = await ingestor.ingest(copied, reservation: InFlightBlobStore(base: blobs).reservation())
+        #expect(maker.askedNames == ["c.jpg"])
+        #expect(result.map { $0.thumbnail != nil } == [false, false, true])
     }
 }

@@ -78,14 +78,29 @@ struct FileThumbnailContentTests {
         let lacked = ContentFixtures.file("/b.jpg")
         let newerA = ContentFixtures.fileWithThumbnail("/a.jpg")
         let newerB = ContentFixtures.fileWithThumbnail("/b.jpg")
-        let filled = ClipboardContent.files([had, lacked]).addingMissingThumbnails(from: .files([newerA, newerB]))
+        let filled = ClipboardContent.files([had, lacked]).addingMissingFileDetails(from: .files([newerA, newerB]))
         #expect(filled == .files([had, newerB]))
+    }
+
+    @Test func sizesReadLaterAreTakenAndKnownOnesStay() {
+        let content = ClipboardContent.files([
+            ContentFixtures.file("/a.txt", byteSize: nil), ContentFixtures.file("/b.txt", byteSize: 7),
+        ])
+        let read = ClipboardContent.files([
+            ContentFixtures.file("/a.txt", byteSize: 100), ContentFixtures.file("/b.txt", byteSize: 200),
+        ])
+        guard case .files(let files) = content.addingMissingFileDetails(from: read) else {
+            Issue.record("Expected files")
+            return
+        }
+        #expect(files.map(\.byteSize) == [100, 7])
     }
 
     @Test func otherFilesOrKindsTakeNoThumbnails() {
         let content = ContentFixtures.files("/a.jpg")
-        #expect(content.addingMissingThumbnails(from: .files([ContentFixtures.fileWithThumbnail("/b.jpg")])) == content)
-        #expect(ClipboardContent.text("a").addingMissingThumbnails(from: content) == .text("a"))
+        #expect(
+            content.addingMissingFileDetails(from: .files([ContentFixtures.fileWithThumbnail("/b.jpg")])) == content)
+        #expect(ClipboardContent.text("a").addingMissingFileDetails(from: content) == .text("a"))
     }
 }
 
@@ -294,7 +309,7 @@ struct FileThumbnailPersistenceTests {
         let store = makeStore()
         let id = store.record(ContentFixtures.files("/a.jpg"), sourceApp: nil, at: start)
         let photo = try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)
-        store.addThumbnails([photo], toEntry: id)
+        store.addFileDetails([photo], toEntry: id)
         let record = try #require(disk.records.values.first)
         #expect(record.blobIDs == photo.thumbnailBlobIDs.map(\.uuid))
         #expect(makeStore(now: start + 1).entries.map(\.content) == [.files([photo])])
@@ -318,7 +333,7 @@ struct FileThumbnailAddingTests {
         let revision = store.revision
         let photo = try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)
 
-        store.addThumbnails([photo, ContentFixtures.file("/b.txt")], toEntry: id)
+        store.addFileDetails([photo, ContentFixtures.file("/b.txt")], toEntry: id)
         #expect(store.entries.map(\.id) == [textID, id])
         #expect(store.currentEntryID == textID)
         let entry = store.entries[1]
@@ -336,7 +351,7 @@ struct FileThumbnailAddingTests {
         let store = makeStore()
         let id = store.record(ContentFixtures.files("/a.jpg"), sourceApp: nil, at: start)
         store.remove(id: id)
-        store.addThumbnails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: id)
+        store.addFileDetails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: id)
         #expect(store.entries.isEmpty)
         #expect(blobs.allIDs().isEmpty)
     }
@@ -346,7 +361,7 @@ struct FileThumbnailAddingTests {
         let first = try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)
         let id = store.record(.files([first]), sourceApp: nil, at: start)
         let revision = store.revision
-        store.addThumbnails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: id)
+        store.addFileDetails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: id)
         #expect(store.entries.map(\.content) == [.files([first])])
         #expect(store.revision == revision)
         #expect(blobs.allIDs() == first.thumbnailBlobIDs)
@@ -355,9 +370,9 @@ struct FileThumbnailAddingTests {
     @Test func thumbnailsOfOtherFilesAreDeleted() throws {
         let store = makeStore()
         let id = store.record(ContentFixtures.files("/a.jpg"), sourceApp: nil, at: start)
-        store.addThumbnails([try ContentFixtures.fileWithThumbnail("/other.jpg", in: blobs)], toEntry: id)
+        store.addFileDetails([try ContentFixtures.fileWithThumbnail("/other.jpg", in: blobs)], toEntry: id)
         let textID = store.record(text: "text", sourceApp: nil, at: start + 1)
-        store.addThumbnails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: textID)
+        store.addFileDetails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: textID)
         #expect(store.entries.map(\.content) == [.text("text"), ContentFixtures.files("/a.jpg")])
         #expect(blobs.allIDs().isEmpty)
     }
@@ -365,7 +380,7 @@ struct FileThumbnailAddingTests {
     @Test func thumbnailsThatPassTheByteLimitTrimTheHistory() throws {
         let store = makeStore(retention: RetentionPolicy(byteLimit: 3000))
         let id = store.record(ContentFixtures.files("/a.jpg"), sourceApp: nil, at: start)
-        store.addThumbnails(
+        store.addFileDetails(
             [try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs, thumbnail: Data(count: 4000))], toEntry: id)
         // Too large with its thumbnail: it goes, and its thumbnail with it.
         #expect(store.entries.isEmpty)

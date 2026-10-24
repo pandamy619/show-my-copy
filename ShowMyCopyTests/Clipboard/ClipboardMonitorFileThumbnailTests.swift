@@ -35,6 +35,37 @@ struct ClipboardMonitorFileThumbnailTests {
         )
     }
 
+    /// Reading a size can wait for a disk or a server, so the monitor records the files without and their sizes are
+    /// read in the background, with or without thumbnails.
+    @Test(arguments: [true, false])
+    func recordsCopiedFilesAtOnceAndAddsTheirSizesWhenRead(makesThumbnails: Bool) async throws {
+        let monitor = MonitorFactory.make(
+            pasteboard: pasteboard,
+            history: history,
+            blobs: inFlight,
+            fileSizes: FileSizeReader(
+                paths: CopiedPaths(volumes: FakeVolumes.startupDiskOnly),
+                size: { $0.pathExtension == "txt" ? 12 : nil }),
+            fileThumbnailIngestor: makesThumbnails ? FileThumbnailIngestor(maker: maker, sleep: timers.sleep) : nil
+        )
+        pasteboard.copyFiles([photo, document])
+        monitor.poll()
+        guard case .files(let recorded)? = history.entries.first?.content else {
+            Issue.record("Expected files")
+            return
+        }
+        #expect(recorded.map(\.byteSize) == [nil, nil])
+
+        await monitor.finishEnriching()
+        guard case .files(let files)? = history.entries.first?.content else {
+            Issue.record("Expected files")
+            return
+        }
+        #expect(files.map(\.byteSize) == [nil, 12])
+        #expect(files.map { $0.thumbnail != nil } == [makesThumbnails, false])
+        #expect(history.entries.count == 1)
+    }
+
     @Test func recordsCopiedFilesAtOnceAndAddsTheirThumbnailsWhenMade() async throws {
         let monitor = makeMonitor()
         monitor.poll()

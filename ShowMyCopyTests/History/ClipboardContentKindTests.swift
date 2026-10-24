@@ -184,4 +184,34 @@ struct FileAvailabilityTests {
         let missing = url.deletingLastPathComponent().appending(path: "missing-\(UUID().uuidString)")
         #expect(checker.availability(of: FileReference(url: missing)) == .mayBeUnavailable)
     }
+
+    @Test func filesOnNetworkVolumesAndAutomountedPathsAreNotChecked() {
+        let checker = FileSystemAvailabilityChecker(
+            paths: CopiedPaths(
+                volumes: FakeVolumes([
+                    MountedVolume(mountPoint: "/", fileSystem: "apfs", isLocal: true),
+                    MountedVolume(mountPoint: "/Volumes/share", fileSystem: "smbfs", isLocal: false),
+                ])))
+        #expect(checker.availability(of: ContentFixtures.file("/Volumes/share/a.txt")) == .notChecked)
+        #expect(checker.availability(of: ContentFixtures.file("/net/tracker.example/x")) == .notChecked)
+    }
+}
+
+/// Availability is checked off the main actor, within a budget (`TimeLimit`, tested on its own) that holds even when a
+/// check is stuck.
+struct FileAvailabilityProbeTests {
+    @Test func everyFileGetsAnAnswer() async {
+        let files = [ContentFixtures.file("/Users/me/a.txt"), ContentFixtures.file("/Users/me/gone.txt")]
+        let checker = FakeAvailabilityChecker(missing: ["/Users/me/gone.txt"])
+        #expect(await FileAvailabilityProbe.check(files, with: checker) == [.available, .mayBeUnavailable])
+    }
+
+    @Test func theBudgetIsShort() {
+        #expect(FileAvailabilityProbe.budget == .seconds(2))
+    }
+
+    @Test func aRowWithFilesNotCheckedHasNoMark() {
+        #expect(FileAvailabilityProbe.summary([.available, .notChecked]) == .available)
+        #expect(FileAvailabilityProbe.summary([.notChecked, .mayBeUnavailable]) == .mayBeUnavailable)
+    }
 }
