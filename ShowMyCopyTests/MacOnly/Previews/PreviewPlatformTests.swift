@@ -109,7 +109,8 @@ struct AppKitRichTextRendererTests {
     }
 
     @Test func removesDirectionOverrides() throws {
-        let text = try render(#"{\rtf1\ansi abc舸?def}"#)
+        // `\u8238` is U+202E (right-to-left override) written as an RTF Unicode escape.
+        let text = try render(#"{\rtf1\ansi abc\u8238?def}"#)
         #expect(text.string == "abcdef")
     }
 
