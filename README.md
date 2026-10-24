@@ -19,7 +19,7 @@
 
 Show My Copy is in early development. There are no releases yet; build it from source. What works now:
 
-- **Background history of text, rich text, images and files.** What you copy is collected quietly, with the app it came from. Styled text keeps its formatting when copied back. Images (up to 20 MB each) are kept as files in the app's sandbox with a small thumbnail; copied files are kept as references (path and name), never as copies. The history window shows thumbnails of images and icons of files, with a mark on files that may have been moved or deleted.
+- **Background history of text, rich text, images and files.** What you copy is collected quietly, with the app it came from. Styled text keeps its formatting when copied back. Images (up to 20 MB each) are kept as files in the app's sandbox with a small thumbnail; copied files are kept as references (path and name), never as copies. Copied photos and videos get a small thumbnail when you copy them (a frame for a video). The history window shows thumbnails of images, photos and videos and icons of other files, with a mark on files that may have been moved or deleted.
 - **History survives a restart.** It is saved only on your Mac, in the app's sandbox, and left out of backups. Saved passwords are encrypted with a key kept in your Keychain, which is used only if you save passwords.
 - **Hotkey window.** ⌥⌘V by default, changeable in Settings, opens your recent copies on top of any app.
 - **Search and keyboard navigation.** Type to filter, arrow keys to move, Enter to copy the entry back to the clipboard, Esc to close.
