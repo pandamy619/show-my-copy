@@ -38,10 +38,6 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     @ObservationIgnored private let coder: StoredEntryCoder
     /// Where image data is kept, or nil when there is no such store: then records with blobs stay on disk unloaded.
     @ObservationIgnored private let blobs: (any BlobStore)?
-    /// Whether blobs no record references may be deleted: only when `persistence` is the history saved on disk and
-    /// no other copy of a history is left. After the store failed to open, its records are unknown, and a damaged
-    /// copy may reference any image, so their images may still be wanted.
-    @ObservationIgnored private let sweepsBlobs: Bool
     /// Whether every store that may reference blobs is either `persistence` or in `leftovers`: then, once both are
     /// deleted, no blob is used. Not after the store failed to open without a folder to find it in.
     @ObservationIgnored private let knowsEveryStore: Bool
@@ -62,19 +58,19 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     var retention: RetentionPolicy { memory.retention }
     var revision: Int { memory.revision }
 
-    /// Loads the saved history. Concealed entries whose time is up at `now`, and all of them unless
-    /// `savesPasswords`, are deleted without being opened. Then the entries `retention` does not allow are removed,
-    /// also from disk, so pass the limits and the password choice the user saved, not the defaults.
-    /// `openError` is what went wrong opening the store on disk, if anything, to show in `storageError`.
-    /// `leftovers` are the files of a saved history this session does not use, such as a damaged copy.
+    /// Starts from the saved history as `loaded` found it (see `LoadedHistory` and `load`): the entries `retention`
+    /// does not allow are removed, also from disk, and the records loading found unreadable or unwanted are deleted,
+    /// so load with the limits and the password choice the user saved, not the defaults. `openError` is what went
+    /// wrong opening the store on disk, if anything, to show in `storageError`. `leftovers` are the files of a saved
+    /// history this session does not use, such as a damaged copy.
     ///
     /// Image data lives in `blobs`. An entry whose data is gone is deleted, and blobs that no saved record
     /// references (written for an entry that was never saved, or left by a failed delete) are deleted too. Without
     /// `blobs`, records that reference blobs are left on disk and not loaded.
     init(
         persistence: any HistoryPersistence,
+        loaded: LoadedHistory,
         sealer: (any SecretSealing)?,
-        savesPasswords: Bool,
         retention: RetentionPolicy = .default,
         hasher: any ContentHasher = SHA256ContentHasher(),
         now: Date = Date(),
@@ -82,33 +78,18 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         blobs: (any BlobStore)? = nil,
         leftovers: (any HistoryLeftovers)? = nil
     ) {
-        let coder = StoredEntryCoder(sealer: sealer, hasher: hasher)
-        var storageError = openError
-        var records: [StoredEntryRecord] = []
-        var isLoaded = false
-        do {
-            records = try persistence.loadAll()
-            isLoaded = true
-        } catch {
-            AppLogger.history.error("Could not read the saved history; starting with an empty one")
-            storageError = storageError ?? error
-        }
-
-        var found = SavedRecords.sort(records, coder: coder, savesPasswords: savesPasswords, at: now, blobs: blobs)
-        // Each copy moves its entry to the top with the copy's date, so newest first is by date.
-        found.entries.sort { $0.date > $1.date }
+        let found = loaded.found
         let memory = InMemoryHistoryStore(
             restoring: found.entries, at: now, retention: retention, hasher: hasher, blobs: blobs)
 
         self.memory = memory
         self.persistence = persistence
-        self.coder = coder
+        self.coder = StoredEntryCoder(sealer: sealer, hasher: hasher)
         self.blobs = blobs
-        self.sweepsBlobs = openError == nil && leftovers?.hasFiles() != true
         self.knowsEveryStore = openError == nil || leftovers != nil
         self.leftovers = leftovers
         self.damagedHistoryBytes = leftovers?.damagedCopyBytes()
-        self.storageError = storageError
+        self.storageError = openError ?? loaded.loadError
         self.unopened = WaitingPasswords(found.unopened)
 
         let kept = Set(memory.entries.map(\.id))
@@ -123,12 +104,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         if !deleted.isEmpty {
             isDeleted = write(StoredChange(deleted: deleted), covering: Set(deleted))
         }
-        // Only with every record known: a sweep after a failed open or load, or while a damaged copy is kept, would
-        // delete the data of images that may still be wanted.
-        if sweepsBlobs, isLoaded, let blobs {
-            let gone = isDeleted ? Set(deleted) : []
-            let referenced = records.filter { !gone.contains($0.id) }.flatMap(\.blobIDs).map { BlobID(uuid: $0) }
-            SavedRecords.deleteOrphans(in: blobs, keeping: Set(referenced))
+        // `loaded` listed the blobs only with every record known (`LoadedHistory.Read.sweepsBlobs`). Those of records
+        // that could not be deleted stay.
+        if let blobs {
+            SavedRecords.delete(loaded.orphans(deleted: isDeleted ? Set(deleted) : []), from: blobs)
         }
     }
 

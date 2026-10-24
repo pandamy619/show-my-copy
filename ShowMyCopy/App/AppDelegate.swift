@@ -21,8 +21,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // One store for the history and the work that saves images in the background, so neither deletes what the
         // other is about to use.
         let blobs = Self.openBlobStore().map { InFlightBlobStore(base: $0) }
+        // The saved history is decoded in the background; the app starts watching the clipboard once it is loaded.
+        Task {
+            let store = await Self.loadHistoryStore(blobs: blobs)
+            finishLaunching(store: store, blobs: blobs, firstLaunch: firstLaunch)
+        }
+    }
+
+    private func finishLaunching(store: any HistoryStore, blobs: InFlightBlobStore?, firstLaunch: FirstLaunch) {
         let container = AppContainer(
-            store: Self.makeHistoryStore(blobs: blobs),
+            store: store,
             blobs: blobs,
             thumbnails: ImageIOThumbnailMaker(),
             fileThumbnails: QuickLookFileThumbnailMaker(),
@@ -85,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// memory only, saved ones stay on disk for the next try, and everything else is still saved. When the store on
     /// disk cannot be opened, the history is kept in memory only and `storageError` tells why. Image data is in
     /// `blobs`; the store deletes it with its entries and sweeps what no entry uses at launch.
-    private static func makeHistoryStore(blobs: (any BlobStore)?) -> any HistoryStore {
+    private static func loadHistoryStore(blobs: (any BlobStore)?) async -> any HistoryStore {
         let sealer = LazySecretSealer { () throws(SecretSealingError) -> any SecretSealing in
             do throws(SecretSealingError) {
                 return try KeychainSecretSealer()
@@ -99,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Loading deletes the entries the limits do not allow, and saved passwords when saving them is off, so
         // load with the limits and the password choice the user saved, not the defaults. `AppContainer.start()`
         // applies the same limits and removes passwords again.
-        return PersistentHistoryStore(
+        return await PersistentHistoryStore.load(
             persistence: opened.persistence,
             sealer: sealer,
             savesPasswords: PasswordSettings.storedSavesPasswords(in: .standard),
