@@ -1,10 +1,13 @@
 import AppKit
 
-/// Polls the pasteboard and records new text in the history.
+/// Polls the pasteboard and records new copies in the history.
 ///
 /// macOS has no notification for pasteboard changes, so the monitor compares `changeCount`
 /// on a timer and reads the contents only when the count changes. It decides when to read, who copied and what
 /// the password settings allow; `PasteboardSnapshotReader` decides what the item is.
+///
+/// A copied image is stored by `imageIngestor` off the main actor before it is recorded. Until then the monitor
+/// reads no further change, so copies are recorded in the order they were made.
 @MainActor
 final class ClipboardMonitor: PasteboardChangeTracking {
     enum PauseReason: Hashable, Sendable {
@@ -30,6 +33,10 @@ final class ClipboardMonitor: PasteboardChangeTracking {
     private let sleep: @Sendable (Duration) async throws -> Void
     private let activity: any PollingActivity
     private let passwordPolicy: @MainActor () -> PasswordPolicy
+    /// Stores copied images. Without it images are not read.
+    private let imageIngestor: ImageIngestor?
+    /// Storing the image read last, or nil.
+    private var pendingImage: Task<Void, Never>?
     private var lastChangeCount: Int?
     /// True until the monitor has looked at the pasteboard while running. A change found then was made before
     /// launch or while the monitor was stopped or paused, so the app in front now did not necessarily make it.
@@ -46,10 +53,14 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         now: @escaping @MainActor () -> Date = { Date() },
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         activity: any PollingActivity = ProcessPollingActivity(),
-        passwordPolicy: @escaping @MainActor () -> PasswordPolicy = { .default }
+        passwordPolicy: @escaping @MainActor () -> PasswordPolicy = { .default },
+        imageIngestor: ImageIngestor? = nil
     ) {
         self.pasteboard = pasteboard
-        self.reader = PasteboardSnapshotReader(pasteboard: pasteboard)
+        self.reader = PasteboardSnapshotReader(
+            pasteboard: pasteboard,
+            contentReaders: PasteboardSnapshotReader.standardReaders(readsImages: imageIngestor != nil))
+        self.imageIngestor = imageIngestor
         self.history = history
         self.interval = interval
         self.frontmostApp = frontmostApp
@@ -129,6 +140,10 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         let date = now()
         // Checked on every poll, not only on a change, so a password leaves the history on time.
         history.removeExpired(at: date)
+        guard pendingImage == nil else {
+            // The next change is read once the image is recorded, so it ends up above the image.
+            return
+        }
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else {
             if isStarted, pauseReasons.isEmpty {
@@ -152,30 +167,113 @@ final class ClipboardMonitor: PasteboardChangeTracking {
             AppLogger.clipboard.debug("The pasteboard changed while it was read; reading it again on the next poll")
             return
         }
-        let isFirstRead = lastChangeCount == nil
+        let copy = Copy(
+            sourceApp: sourceApp, date: date, isFirstRead: lastChangeCount == nil, changeCount: changeCount)
         sourceOfNextChangeIsUnknown = false
         lastChangeCount = changeCount
         switch item {
-        case .skipped, .image:
+        case .skipped:
             history.markCurrentSkipped()
+        case .image(let image):
+            storeImage(image, copy: copy)
         case .cleared:
             clipboardWasCleared(at: date, policy: policy)
         case .content(let content, let isSecret):
-            if isFirstRead, let newestID = history.markNewestCurrent(ifItHolds: content) {
-                // At launch the pasteboard usually still holds the newest entry. Nothing says it was copied again,
-                // so keep its date and source app. A password marker still conceals it; an earlier expiry stays.
-                if isSecret {
-                    history.conceal(id: newestID, expiresAt: date + policy.lifetime)
+            record(content, isSecret: isSecret, copy: copy, policy: policy)
+        }
+    }
+
+    /// When and how the item being recorded was copied.
+    private struct Copy {
+        let sourceApp: SourceApp?
+        let date: Date
+        /// The first read after launch: the item may be the newest entry, still on the pasteboard.
+        let isFirstRead: Bool
+        let changeCount: Int
+    }
+
+    private func record(_ content: ClipboardContent, isSecret: Bool, copy: Copy, policy: PasswordPolicy) {
+        if copy.isFirstRead, let newestID = history.markNewestCurrent(ifItHolds: content) {
+            // At launch the pasteboard usually still holds the newest entry. Nothing says it was copied again,
+            // so keep its date and source app. A password marker still conceals it; an earlier expiry stays.
+            if isSecret {
+                history.conceal(id: newestID, expiresAt: copy.date + policy.lifetime)
+            }
+            return
+        }
+        if isSecret {
+            history.record(
+                content, sourceApp: copy.sourceApp, at: copy.date, concealed: true,
+                expiresAt: copy.date + policy.lifetime)
+        } else {
+            history.record(content, sourceApp: copy.sourceApp, at: copy.date)
+        }
+    }
+
+    /// Waits until the image read last is stored and recorded. For tests and for quitting cleanly.
+    func finishStoringImages() async {
+        await pendingImage?.value
+    }
+
+    // MARK: - Images
+
+    /// Stores the image off the main actor, then records it. Nothing is current meanwhile: the pasteboard no longer
+    /// holds the entry that was current, and the image is not an entry yet.
+    private func storeImage(_ image: CapturedImage, copy: Copy) {
+        history.markCurrentSkipped()
+        guard let imageIngestor else {
+            return
+        }
+        // Images already in the history, so copying one again writes nothing.
+        let known = Dictionary(
+            history.entries.compactMap { entry in entry.content.image.map { ($0.contentHash, $0) } },
+            uniquingKeysWith: { first, _ in first })
+        pendingImage = Task { [weak self] in
+            let result: Result<IngestedImage, ImageIngestError>
+            do throws(ImageIngestError) {
+                result = .success(try await imageIngestor.ingest(image, known: known))
+            } catch {
+                result = .failure(error)
+            }
+            guard let self else {
+                if case .success(let ingested) = result {
+                    imageIngestor.discard(ingested)
                 }
                 return
             }
-            if isSecret {
-                history.record(
-                    content, sourceApp: sourceApp, at: date, concealed: true, expiresAt: date + policy.lifetime)
-            } else {
-                history.record(content, sourceApp: sourceApp, at: date)
-            }
+            self.pendingImage = nil
+            self.recordImage(result, ingestor: imageIngestor, copy: copy)
         }
+    }
+
+    private func recordImage(_ result: Result<IngestedImage, ImageIngestError>, ingestor: ImageIngestor, copy: Copy) {
+        let ingested: IngestedImage
+        switch result {
+        case .success(let value):
+            ingested = value
+        case .failure(.notAnImage):
+            // Logged by the ingestor; nothing to record.
+            return
+        case .failure(.storageFailed):
+            AppLogger.clipboard.error("Could not save a copied image; it is not recorded")
+            return
+        }
+        // This app wrote to the pasteboard meanwhile (an entry was copied back), so the image is no longer there
+        // and the entry the user picked must stay on top.
+        guard lastChangeCount == copy.changeCount else {
+            AppLogger.clipboard.debug("The pasteboard changed while an image was saved; it is not recorded")
+            ingestor.discard(ingested)
+            return
+        }
+        // A known image whose entry was removed meanwhile lost its data with it.
+        guard ingested.isNew || history.entries.contains(where: { $0.content.image == ingested.reference }) else {
+            return
+        }
+        let content = ClipboardContent.image(ingested.reference)
+        if copy.isFirstRead, history.markNewestCurrent(ifItHolds: content) != nil {
+            return
+        }
+        history.record(content, sourceApp: copy.sourceApp, at: copy.date)
     }
 
     /// Password managers empty the clipboard a while after copying a password. A password copied without a marker,
