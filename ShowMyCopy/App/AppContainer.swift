@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Synchronization
 
 /// Builds the app's objects, connects them and owns them for as long as the app runs.
 ///
@@ -36,6 +37,11 @@ final class AppContainer {
     let copier: EntryCopier
     let historyWindow: HistoryWindowController
     let settingsWindow: any SettingsWindowShowing
+    private let sleep: @Sendable (Duration) async throws -> Void
+
+    /// How long quitting waits for the images and thumbnails of copies made just before. Logging out waits for
+    /// the app too, so this stays short.
+    nonisolated static let quitBudget: Duration = .seconds(2)
 
     /// The defaults are the real system services. Tests pass fakes.
     init(
@@ -63,13 +69,8 @@ final class AppContainer {
         let passwordSettings = PasswordSettings(history: store, defaults: defaults, now: now)
         let settingsWindow = makeSettingsWindow(store, historySettings, passwordSettings)
 
-        // Images are recorded only with a way to make thumbnails, and copied photo and video files get thumbnails
-        // only with a way to make them; both also need somewhere to keep them.
-        let capture = blobs.map { blobs in
-            CaptureEnrichment(
-                history: store, blobs: blobs, images: thumbnails.map { ImageIngestor(thumbnails: $0) },
-                fileThumbnails: fileThumbnails.map { FileThumbnailIngestor(maker: $0) })
-        }
+        let capture = Self.makeCapture(
+            store: store, blobs: blobs, thumbnails: thumbnails, fileThumbnails: fileThumbnails)
         // The monitor reads the password setting on every change, so a new choice applies to the next copy.
         let monitor = ClipboardMonitor(
             pasteboard: pasteboard,
@@ -118,6 +119,22 @@ final class AppContainer {
         self.copier = copier
         self.historyWindow = historyWindow
         self.settingsWindow = settingsWindow
+        self.sleep = sleep
+    }
+
+    /// Images are recorded only with a way to make thumbnails, and copied photo and video files get thumbnails only
+    /// with a way to make them; both also need somewhere to keep them.
+    private static func makeCapture(
+        store: any HistoryStore,
+        blobs: InFlightBlobStore?,
+        thumbnails: (any ThumbnailMaking)?,
+        fileThumbnails: (any FileThumbnailMaking)?
+    ) -> CaptureEnrichment? {
+        blobs.map { blobs in
+            CaptureEnrichment(
+                history: store, blobs: blobs, images: thumbnails.map { ImageIngestor(thumbnails: $0) },
+                fileThumbnails: fileThumbnails.map { FileThumbnailIngestor(maker: $0) })
+        }
     }
 
     /// Starts watching the clipboard and the system.
@@ -147,5 +164,50 @@ final class AppContainer {
 
     func showSettings() {
         settingsWindow.show()
+    }
+
+    /// Whether the data or thumbnails of a recorded copy are still being saved.
+    var isCapturing: Bool {
+        monitor.isEnriching
+    }
+
+    /// Waits until the images and thumbnails of the copies recorded so far are in the history, so quitting right
+    /// after a copy does not lose it, but no longer than `budget`. What is not done by then is lost with the quit.
+    func finishCapturing(within budget: Duration) async {
+        guard isCapturing else {
+            return
+        }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let finished = FinishOnce { continuation.resume() }
+            Task { @MainActor [monitor] in
+                await monitor.finishEnriching()
+                finished.run()
+            }
+            Task { [sleep] in
+                do {
+                    try await sleep(budget)
+                } catch {
+                    // Cancelled: the app quits anyway.
+                }
+                finished.run()
+            }
+        }
+    }
+}
+
+/// Runs an action once, whichever of several callers comes first.
+private final class FinishOnce: Sendable {
+    private let action: Mutex<(@Sendable () -> Void)?>
+
+    init(_ action: @escaping @Sendable () -> Void) {
+        self.action = Mutex(action)
+    }
+
+    func run() {
+        let action = action.withLock { action in
+            defer { action = nil }
+            return action
+        }
+        action?()
     }
 }

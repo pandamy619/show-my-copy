@@ -46,6 +46,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         container?.showSettings()
     }
 
+    /// Images and thumbnails of copies made just before quitting or logging out are still being saved: let them
+    /// reach the history first, for at most `AppContainer.quitBudget`.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let container, container.isCapturing else {
+            return .terminateNow
+        }
+        Task {
+            await container.finishCapturing(within: AppContainer.quitBudget)
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
     /// The app has no Dock or menu bar icon. Opening it again from Finder, Spotlight or Launchpad shows Settings.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showSettings()
