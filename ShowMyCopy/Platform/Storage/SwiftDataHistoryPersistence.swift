@@ -126,49 +126,31 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
 // MARK: - Opening the app's store
 
 extension SwiftDataHistoryPersistence {
-    /// A persistence to use, and what went wrong opening the store on disk, if anything.
-    struct Opened {
-        let persistence: any HistoryPersistence
-        let error: HistoryPersistenceError?
-    }
-
-    static let storeFileName = "History.store"
-    /// Where a store that could not be opened is moved. Only the latest one is kept.
-    static let damagedStoreFileName = "History.store.damaged"
+    typealias Opened = OpenedHistory
 
     /// Opens the history in `HistoryFolder`, inside the app's sandbox container.
     static func openDefault() -> Opened {
         guard let applicationSupport = HistoryFolder.applicationSupport() else {
-            return Opened(persistence: InMemoryHistoryPersistence(), error: .openFailed)
+            return Opened(persistence: InMemoryHistoryPersistence(), error: .openFailed, leftovers: nil)
         }
         return open(in: HistoryFolder.directory(inApplicationSupport: applicationSupport))
     }
 
-    /// Opens or creates `History.store` in `directory`. A store that cannot be opened (damaged, or from a format
-    /// this version cannot migrate) is moved aside and a new, empty one is started (`storeReset`). When even that
-    /// fails, the history is kept in memory only (`openFailed`): the app still works, it just forgets on quit.
-    static func open(in directory: URL) -> Opened {
+    /// Opens or creates `History.store` in `directory`. What happens when it cannot be opened is decided by
+    /// `HistoryStoreOpener`: it is tried again, kept where it is while it may open later (`openFailed`, the history
+    /// is kept in memory only), and moved aside for a new, empty store only when it is not a database or failed on
+    /// several launches in a row (`storeReset`).
+    static func open(in directory: URL, defaults: UserDefaults = .standard) -> Opened {
         do {
             try prepare(directory)
         } catch {
-            AppLogger.history.error(
-                "Could not create the history folder: \(String(describing: error), privacy: .private)")
-            return Opened(persistence: InMemoryHistoryPersistence(), error: .openFailed)
+            AppLogger.history.error("Could not create the history folder; keeping the history in memory only")
+            return Opened(persistence: InMemoryHistoryPersistence(), error: .openFailed, leftovers: nil)
         }
-        let storeURL = directory.appending(path: storeFileName, directoryHint: .notDirectory)
-        do {
-            return Opened(persistence: try openStore(at: storeURL), error: nil)
-        } catch {
-            // What failed is logged by `init(configuration:)`.
-            AppLogger.history.error("Moving the history store aside and starting a new one")
+        return HistoryStoreOpener(directory: directory, defaults: defaults) { url throws(HistoryPersistenceError) in
+            try openStore(at: url)
         }
-        do {
-            try moveAside(in: directory)
-            return Opened(persistence: try openStore(at: storeURL), error: .storeReset)
-        } catch {
-            AppLogger.history.error("Could not start a new history store; keeping the history in memory only")
-            return Opened(persistence: InMemoryHistoryPersistence(), error: .openFailed)
-        }
+        .open()
     }
 
     private static func openStore(at url: URL) throws(HistoryPersistenceError) -> SwiftDataHistoryPersistence {
@@ -191,22 +173,6 @@ extension SwiftDataHistoryPersistence {
             // Not a reason to stop saving: the history is still in the sandbox container.
             AppLogger.history.error(
                 "Could not exclude the history from backups: \(String(describing: error), privacy: .private)")
-        }
-    }
-
-    /// Moves the store and its SQLite side files to `damagedStoreFileName`, replacing an older damaged copy. Kept,
-    /// not deleted, so the history can still be recovered by hand; it stays in the folder excluded from backups.
-    private static func moveAside(in directory: URL) throws {
-        let fileManager = FileManager.default
-        for suffix in StoreFiles.suffixes {
-            let source = directory.appending(path: storeFileName + suffix, directoryHint: .notDirectory)
-            let destination = directory.appending(path: damagedStoreFileName + suffix, directoryHint: .notDirectory)
-            if fileManager.fileExists(atPath: destination.path(percentEncoded: false)) {
-                try fileManager.removeItem(at: destination)
-            }
-            if fileManager.fileExists(atPath: source.path(percentEncoded: false)) {
-                try fileManager.moveItem(at: source, to: destination)
-            }
         }
     }
 }

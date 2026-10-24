@@ -88,7 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             savesPasswords: PasswordSettings.storedSavesPasswords(in: .standard),
             retention: HistorySettings.storedRetention(in: .standard),
             openError: opened.error,
-            blobs: blobs
+            blobs: blobs,
+            leftovers: opened.leftovers
         )
     }
 
