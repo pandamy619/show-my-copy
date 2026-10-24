@@ -93,36 +93,45 @@ struct StorageUsagePersistenceTests {
 
     // MARK: - Size on disk
 
-    @Test func diskSizeComesFromTheStoreFiles() {
+    @Test func diskSizeComesFromTheStoreFiles() async {
         disk.bytesOnDisk = 32_768
         let usage = makeUsage(disk.makeStore(now: start))
+        #expect(usage.diskBytes == nil)
+        await usage.refreshDiskBytes()
         #expect(usage.diskBytes == 32_768)
     }
 
-    @Test func historyThatIsNotSavedHasNoDiskSize() {
+    @Test func historyThatIsNotSavedHasNoDiskSize() async {
         disk.bytesOnDisk = nil
         let usage = makeUsage(disk.makeStore(now: start))
+        await usage.refreshDiskBytes()
         #expect(usage.diskBytes == nil)
     }
 
-    @Test func diskSizeIsReadAgainOnlyAfterTheHistoryChanges() {
+    /// Settings read the size on disk without touching the file system on the main thread, and only when asked:
+    /// reading `diskBytes`, in a view update or after a change, reads nothing.
+    @Test func diskSizeIsMeasuredOffTheMainThreadAndOnlyWhenAsked() async {
         disk.bytesOnDisk = 4096
         let store = disk.makeStore(now: start)
         let usage = makeUsage(store)
+        await usage.refreshDiskBytes()
         #expect(usage.diskBytes == 4096)
+        #expect(usage.diskBytes == 4096)
+        disk.bytesOnDisk = 8192
+        store.record(text: "a", sourceApp: nil, at: start)
         #expect(usage.diskBytes == 4096)
         #expect(disk.storedBytesReadCount == 1)
 
-        disk.bytesOnDisk = 8192
-        store.record(text: "a", sourceApp: nil, at: start)
+        await usage.refreshDiskBytes()
         #expect(usage.diskBytes == 8192)
         #expect(disk.storedBytesReadCount == 2)
+        #expect(disk.storedBytesReadsOnMainThread == 0)
     }
 
-    @Test func refreshingReadsTheDiskSizeAgainAndNotifiesViews() {
+    @Test func refreshingNotifiesViews() async {
         disk.bytesOnDisk = 4096
         let usage = makeUsage(disk.makeStore(now: start))
-        #expect(usage.diskBytes == 4096)
+        await usage.refreshDiskBytes()
 
         let changed = ChangeFlag()
         withObservationTracking {
@@ -131,10 +140,30 @@ struct StorageUsagePersistenceTests {
             changed.set()
         }
         disk.bytesOnDisk = 12_288
-        usage.refreshDiskBytes()
+        await usage.refreshDiskBytes(recountingImages: true)
 
         #expect(changed.value)
         #expect(usage.diskBytes == 12_288)
-        #expect(disk.storedBytesReadCount == 2)
+    }
+
+    /// The saved images are counted from the blob store's running total after a change, and counted again from the
+    /// disk only when asked (when the settings open).
+    @Test func imagesAreCountedFromARunningTotalAndRecountedWhenAsked() async throws {
+        disk.bytesOnDisk = 0
+        let files = ListingCountingBlobStore()
+        let blobs = MeasuredBlobStore(base: files)
+        let store = disk.makeStore(now: start, blobs: blobs)
+        let usage = makeUsage(store)
+        await usage.refreshDiskBytes(recountingImages: true)
+        let listings = files.listings
+
+        store.record(.image(try ContentFixtures.storedImage(in: blobs)), sourceApp: nil, at: start)
+        await usage.refreshDiskBytes()
+        #expect(usage.diskBytes == 1100)
+        #expect(files.listings == listings)
+
+        await usage.refreshDiskBytes(recountingImages: true)
+        #expect(usage.diskBytes == 1100)
+        #expect(files.listings == listings + 1)
     }
 }

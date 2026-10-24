@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 @testable import ShowMyCopy
 
@@ -20,10 +21,22 @@ final class FakeHistoryPersistence: HistoryPersistence {
     private(set) var calls: [Operation] = []
     /// Every change passed to `apply`, also the failed ones.
     private(set) var changes: [StoredChange] = []
-    /// What `storedBytes()` returns, like the size of the files on disk.
-    var bytesOnDisk: Int64?
-    /// How often `storedBytes()` was called.
-    private(set) var storedBytesReadCount = 0
+    /// What `storedBytes()` returns, like the size of the files on disk, how often it was called, and how many of
+    /// those calls ran on the main thread. Read off the main actor, so kept under a lock.
+    private let measured = Mutex((bytes: Int64?.none, reads: 0, readsOnMainThread: 0))
+
+    var bytesOnDisk: Int64? {
+        get { measured.withLock { $0.bytes } }
+        set { measured.withLock { $0.bytes = newValue } }
+    }
+
+    var storedBytesReadCount: Int {
+        measured.withLock { $0.reads }
+    }
+
+    var storedBytesReadsOnMainThread: Int {
+        measured.withLock { $0.readsOnMainThread }
+    }
     private var callCount = 0
 
     /// The number the next call gets, for `failingCalls`.
@@ -55,9 +68,13 @@ final class FakeHistoryPersistence: HistoryPersistence {
         }
     }
 
-    func storedBytes() -> Int64? {
-        storedBytesReadCount += 1
-        return bytesOnDisk
+    nonisolated func storedBytes() -> Int64? {
+        let isMainThread = Thread.isMainThread
+        return measured.withLock { measured in
+            measured.reads += 1
+            measured.readsOnMainThread += isMainThread ? 1 : 0
+            return measured.bytes
+        }
     }
 
     func resetCalls() {

@@ -283,17 +283,26 @@ struct PersistentHistoryStoreBlobTests {
         #expect(blobs.allIDs().isEmpty)
     }
 
-    @Test func sizeOnDiskIncludesTheBlobs() throws {
+    @Test func sizeOnDiskIncludesTheBlobs() async throws {
         disk.bytesOnDisk = 4096
         let store = makeStore()
         store.record(.image(try ContentFixtures.storedImage(in: blobs)), sourceApp: nil, at: start)
-        #expect(store.storedBytes() == Int64(4096 + 1100))
+        #expect(await store.storedBytes(recountingBlobs: false) == Int64(4096 + 1100))
+        #expect(await store.storedBytes(recountingBlobs: true) == Int64(4096 + 1100))
     }
 
-    @Test func sizeOnDiskIsUnknownWithoutFilesForTheRecords() throws {
+    @Test func sizeOnDiskIsUnknownWithoutFilesForTheRecords() async throws {
         disk.bytesOnDisk = nil
         let store = makeStore()
         store.record(.image(try ContentFixtures.storedImage(in: blobs)), sourceApp: nil, at: start)
-        #expect(store.storedBytes() == nil)
+        #expect(await store.storedBytes(recountingBlobs: false) == nil)
+    }
+
+    @Test func sizeOnDiskIsMeasuredOffTheMainThread() async {
+        disk.bytesOnDisk = 4096
+        let store = makeStore()
+        _ = await store.storedBytes(recountingBlobs: true)
+        #expect(disk.storedBytesReadCount == 1)
+        #expect(disk.storedBytesReadsOnMainThread == 0)
     }
 }

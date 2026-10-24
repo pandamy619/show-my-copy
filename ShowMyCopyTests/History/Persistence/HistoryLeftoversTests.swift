@@ -36,7 +36,7 @@ struct HistoryLeftoversTests {
     }
 
     /// The store that could not be opened is the saved history: Clear History deletes it too.
-    @Test func clearDeletesTheStoreThatCouldNotBeOpened() throws {
+    @Test func clearDeletesTheStoreThatCouldNotBeOpened() async throws {
         let leftovers = FakeHistoryLeftovers(hasDamagedCopy: false, hasUnopenedStore: true)
         _ = try ContentFixtures.storedImage(in: blobs)
         let store = makeStore(leftovers: leftovers, openError: .openFailed, persistence: InMemoryHistoryPersistence())
@@ -45,7 +45,7 @@ struct HistoryLeftoversTests {
         store.clear()
         #expect(!leftovers.hasFiles())
         #expect(blobs.allIDs().isEmpty)
-        #expect(store.storedBytes() == nil)
+        #expect(await store.storedBytes(recountingBlobs: false) == nil)
     }
 
     @Test func imagesAreKeptWhenTheCopyCannotBeDeleted() throws {
@@ -111,16 +111,16 @@ struct HistoryLeftoversTests {
 
     // MARK: - Size
 
-    @Test func sizeOnDiskIncludesTheLeftovers() throws {
+    @Test func sizeOnDiskIncludesTheLeftovers() async throws {
         disk.bytesOnDisk = 4096
         let leftovers = FakeHistoryLeftovers()
         let store = makeStore(leftovers: leftovers)
-        #expect(store.storedBytes() == Int64(4096 + 3000))
+        #expect(await store.storedBytes(recountingBlobs: false) == Int64(4096 + 3000))
 
         let notOpened = FakeHistoryLeftovers(hasDamagedCopy: false, hasUnopenedStore: true)
         let inMemory = makeStore(
             leftovers: notOpened, openError: .openFailed, persistence: InMemoryHistoryPersistence())
-        #expect(inMemory.storedBytes() == 5000)
+        #expect(await inMemory.storedBytes(recountingBlobs: false) == 5000)
     }
 
     @Test func storageSettingsShowTheDamagedCopy() {
