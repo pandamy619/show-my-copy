@@ -17,18 +17,15 @@ struct HistoryView: View {
             searchBar
             Divider()
             if items.isEmpty {
-                // Fill the rest of the panel so the search bar stays at the top, as it does above the list.
+                // The window controller shrinks the panel to exactly these rows.
                 emptyState
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 list(items: items, selectedID: selectedID, now: Date())
             }
         }
-        .frame(
-            width: HistoryPanelPlacement.size.width,
-            height: HistoryPanelPlacement.size.height,
-            alignment: .top
-        )
+        // Follow the panel's size: compact with nothing to list, full with entries. Pinned to the top, so the
+        // search bar stays in place while the panel catches up with a change.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .defaultFocus($isSearchFocused, true)
         .onAppear { isSearchFocused = true }
         .onChange(of: model.presentationCount) { isSearchFocused = true }
@@ -61,21 +58,22 @@ struct HistoryView: View {
             .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(height: HistoryPanelPlacement.searchBarHeight)
     }
 
-    @ViewBuilder
+    /// One slim row under the search bar, like Spotlight with no results.
     private var emptyState: some View {
-        if model.history.entries.isEmpty {
-            ContentUnavailableView(
-                "Nothing copied yet",
-                systemImage: "doc.on.clipboard",
-                description: Text("Text you copy will appear here.")
-            )
-        } else {
-            ContentUnavailableView("No matches", systemImage: "magnifyingglass")
+        let isHistoryEmpty = model.history.entries.isEmpty
+        return HStack(spacing: 8) {
+            Image(systemName: isHistoryEmpty ? "doc.on.clipboard" : "magnifyingglass")
+                .accessibilityHidden(true)
+            (isHistoryEmpty ? Text("Nothing copied yet") : Text("No matches"))
+                .lineLimit(1)
+            Spacer(minLength: 0)
         }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14)
+        .frame(height: HistoryPanelPlacement.messageRowHeight)
     }
 
     private func list(items: [ClipboardEntry], selectedID: ClipboardEntry.ID?, now: Date) -> some View {
@@ -263,8 +261,10 @@ enum HistoryContentFactory {
     ) -> NSView {
         let view = HistoryView(model: model, onChoose: onChoose, onClose: onClose, onOpenSettings: onOpenSettings)
         let hostingView = NSHostingView(rootView: view)
+        // The panel sets the size, not the SwiftUI content: the window controller switches between the compact and
+        // the full size, and the hosting view follows through its autoresizing mask.
         hostingView.sizingOptions = []
-        hostingView.frame = NSRect(origin: .zero, size: HistoryPanelPlacement.size)
+        hostingView.frame = NSRect(origin: .zero, size: HistoryPanelPlacement.fullSize)
         return hostingView
     }
 }

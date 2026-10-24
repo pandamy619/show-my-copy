@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 
 /// Shows the clipboard history in a floating panel over the app the user is working in.
 @MainActor
@@ -7,7 +8,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     private let monitor: any PasteboardChangeTracking
     private let copier: any EntryCopying
     private let onOpenSettings: @MainActor () -> Void
-    private var panel: HistoryPanel?
+    /// Read by tests to check the panel's frame.
+    private(set) var panel: HistoryPanel?
 
     init(
         history: any HistoryStore,
@@ -37,7 +39,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         // Closing Settings hides the app to return focus to the previous app, and a hidden app shows no windows.
         // Unhide without activating, so the app the user copied from stays in front.
         NSApplication.shared.unhideWithoutActivation()
-        panel.setFrameOrigin(Self.origin(for: panel.frame.size))
+        // Size for what the list shows now, then place, so the first frame on screen is already right.
+        let size = Self.size(of: panel, showsEntries: model.showsEntries)
+        panel.setFrame(NSRect(origin: Self.origin(for: size), size: size), display: false)
         panel.makeKeyAndOrderFront(nil)
     }
 
@@ -89,16 +93,47 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         onOpenSettings()
     }
 
+    /// Watches whether the list has entries, for as long as the controller lives. A copy can arrive, the query can
+    /// change or the history can be cleared from Settings while the panel is open.
+    private func observeShowsEntries() {
+        withObservationTracking {
+            _ = model.showsEntries
+        } onChange: { [weak self] in
+            // Called once, before the new value is stored. Re-arm and resize after the change, on the main actor.
+            Task { @MainActor [weak self] in
+                self?.observeShowsEntries()
+                self?.fitPanelToContent()
+            }
+        }
+    }
+
+    /// Compact with nothing to list, full size with entries. The top edge stays put, so the search field does not
+    /// move. No animation: like Spotlight, the panel snaps to its new height.
+    private func fitPanelToContent() {
+        guard let panel, panel.isVisible else {
+            // `show()` sizes the panel before it appears.
+            return
+        }
+        let size = Self.size(of: panel, showsEntries: model.showsEntries)
+        guard panel.frame.size != size else {
+            return
+        }
+        let frame = HistoryPanelPlacement.frame(resizing: panel.frame, to: size, in: panel.screen?.visibleFrame)
+        panel.setFrame(frame, display: true, animate: false)
+    }
+
     private func makePanel() -> HistoryPanel {
-        let panel = HistoryPanel(contentRect: NSRect(origin: .zero, size: HistoryPanelPlacement.size))
+        let size = HistoryPanelPlacement.fullSize
+        let panel = HistoryPanel(contentRect: NSRect(origin: .zero, size: size))
         // A titled window adds the title bar height to the content rect. Keep the frame at the content size.
-        panel.setFrame(NSRect(origin: .zero, size: HistoryPanelPlacement.size), display: false)
+        panel.setFrame(NSRect(origin: .zero, size: size), display: false)
         panel.delegate = self
         panel.onCancel = { [weak self] in
             self?.hide()
         }
 
-        let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: HistoryPanelPlacement.size))
+        // The background and the hosting view follow the panel's size as it switches between compact and full.
+        let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
         background.material = .popover
         background.blendingMode = .behindWindow
         // The app is never active while the panel is shown, so keep the material from looking inactive.
@@ -121,7 +156,15 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         content.autoresizingMask = [.width, .height]
         background.addSubview(content)
         panel.contentView = background
+        observeShowsEntries()
         return panel
+    }
+
+    /// The frame size for the list's state. When the transparent title bar keeps the content out of the top of the
+    /// panel, the compact panel is taller by that much, so its message row is not cut off.
+    static func size(of panel: HistoryPanel, showsEntries: Bool) -> CGSize {
+        let topInset = panel.frame.height - panel.contentLayoutRect.height
+        return HistoryPanelPlacement.size(showsEntries: showsEntries, topInset: topInset)
     }
 
     /// The screen with the mouse pointer is the one the user is looking at.

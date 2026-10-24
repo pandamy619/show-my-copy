@@ -83,6 +83,12 @@ final class HistoryWindowModel {
         return matchingIndices.map { entries[$0] }
     }
 
+    /// Whether the window lists any entries. False for an empty history and for a search with no matches: then
+    /// the window shrinks to the search bar and a one-line message. Observable, like `items`.
+    var showsEntries: Bool {
+        !items.isEmpty
+    }
+
     /// The entry whose text is on the clipboard now. Nil after a copy that was not recorded, such as a password
     /// or an image: then the newest entry is no longer on the clipboard and the window shows no current entry.
     var currentEntryID: ClipboardEntry.ID? {

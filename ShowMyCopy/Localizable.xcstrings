@@ -595,16 +595,6 @@
         }
       }
     },
-    "Text you copy will appear here." : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Скопированный текст появится здесь."
-          }
-        }
-      }
-    },
     "The saved history could not be loaded." : {
       "localizations" : {
         "ru" : {

@@ -8,6 +8,7 @@ First version, 0.1.0. Not released yet.
 - History survives quitting the app: it is saved on your Mac only, in the app's sandbox container, never synced and left out of Time Machine backups. Saved passwords are encrypted with a key kept in your Keychain; without Keychain access they are kept in memory only. Settings → Storage says it is saved on this Mac only and warns when the history or a password cannot be saved.
 - History window on a global shortcut (⌥⌘V by default, changeable in Settings), on top of any app.
 - Search, arrow keys to select, Enter to copy an entry back, Esc to close.
+- With nothing to list (empty history or no matches) the history window shrinks to the search field and a one-line message, like Spotlight, and grows downward when items appear; the search field stays in place.
 - Settings: history limit from 10 to 1000 entries with confirmation before removing old ones, clear history (also deletes it from disk).
 - Settings → Storage: how much the history takes, split into text and passwords, its size on disk, and how much memory the app uses. An optional size limit (100 MB, 500 MB, 1 GB; no limit by default) asks before removing old items and says how much space that frees. Clear History says how many items and how much space it removes.
 - Pauses while the Mac sleeps or the screen is locked.
