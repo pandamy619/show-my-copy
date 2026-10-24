@@ -1,0 +1,179 @@
+import Foundation
+import Synchronization
+import Testing
+
+@testable import ShowMyCopy
+
+/// Makes file thumbnails from the file name alone: "*.jpg" and "*.png" are photos, "*.mov" videos. A name with
+/// "slow" never finishes until it is cancelled, one with "broken" gives no thumbnail. Counts what it was asked.
+final class FakeFileThumbnailMaker: FileThumbnailMaking {
+    private let asked = Mutex<[String]>([])
+    private let made = Mutex<[String]>([])
+    private let pixelSize: Int
+
+    init(pixelSize: Int = 256) {
+        self.pixelSize = pixelSize
+    }
+
+    /// The names whose kind was asked for, in order.
+    var askedNames: [String] {
+        asked.withLock { $0 }
+    }
+
+    /// The names whose thumbnail was asked for, in order.
+    var thumbnailNames: [String] {
+        made.withLock { $0 }
+    }
+
+    func mediaKind(of url: URL) -> FileThumbnail.Kind? {
+        asked.withLock { $0.append(url.lastPathComponent) }
+        switch url.pathExtension {
+        case "jpg", "png":
+            return .image
+        case "mov":
+            return .movie
+        default:
+            return nil
+        }
+    }
+
+    func thumbnail(of url: URL, maximumPixelSize: Int) async -> ImageInspection.Thumbnail? {
+        let name = url.lastPathComponent
+        made.withLock { $0.append(name) }
+        if name.contains("slow") {
+            // Until the timeout cancels it.
+            try? await Task.sleep(for: .seconds(60))
+            return nil
+        }
+        if name.contains("broken") {
+            return nil
+        }
+        return ImageInspection.Thumbnail(
+            pngData: Data("png of \(name)".utf8), pixelWidth: pixelSize, pixelHeight: pixelSize / 2)
+    }
+}
+
+struct FileThumbnailIngestorTests {
+    private let blobs = CountingBlobStore()
+    private let maker = FakeFileThumbnailMaker()
+
+    private func ingestor(
+        maker: (any FileThumbnailMaking)? = nil,
+        blobs: (any BlobStore)? = nil,
+        maximumFiles: Int = 4,
+        timeoutPerFile: Duration = .seconds(10),
+        totalBudget: Duration = .seconds(10)
+    ) -> FileThumbnailIngestor {
+        FileThumbnailIngestor(
+            blobs: blobs ?? self.blobs, maker: maker ?? self.maker,
+            limits: FileThumbnailIngestor.Limits(
+                maximumFiles: maximumFiles, timeoutPerFile: timeoutPerFile, totalBudget: totalBudget))
+    }
+
+    private func files(_ names: String...) -> [FileReference] {
+        names.map { ContentFixtures.file("/Users/me/\($0)") }
+    }
+
+    @Test func photosAndVideosGetThumbnailsInTheBlobStore() async throws {
+        let copied = files("a.jpg", "b.txt", "c.mov")
+        let result = await ingestor().ingest(copied)
+
+        #expect(result.map(\.path) == copied.map(\.path))
+        #expect(result.map(\.byteSize) == copied.map(\.byteSize))
+        let photo = try #require(result[0].thumbnail)
+        #expect(photo.kind == .image)
+        #expect(try blobs.read(photo.blobID) == Data("png of a.jpg".utf8))
+        #expect(photo.reference.pixelWidth == 256)
+        #expect(photo.reference.pixelHeight == 128)
+        #expect(photo.reference.byteSize == Data("png of a.jpg".utf8).count)
+        #expect(result[1].thumbnail == nil)
+        #expect(result[2].thumbnail?.kind == .movie)
+        #expect(blobs.allIDs().count == 2)
+        #expect(maker.thumbnailNames == ["a.jpg", "c.mov"])
+    }
+
+    @Test func onlyTheFirstFilesAreLookedAt() async {
+        let copied = files("1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.jpg", "6.jpg")
+        let result = await ingestor(maximumFiles: 4).ingest(copied)
+        #expect(result.map { $0.thumbnail != nil } == [true, true, true, true, false, false])
+        #expect(maker.askedNames == ["1.jpg", "2.jpg", "3.jpg", "4.jpg"])
+        #expect(blobs.writeCount == 4)
+    }
+
+    @Test func filesAreDoneOneAfterAnotherInTheirOrder() async {
+        let result = await ingestor().ingest(files("c.mov", "a.jpg", "b.png"))
+        #expect(maker.thumbnailNames == ["c.mov", "a.jpg", "b.png"])
+        #expect(result.map(\.name) == ["c.mov", "a.jpg", "b.png"])
+    }
+
+    @Test func urlsThatAreNotFileURLsAreNeverLookedAt() async throws {
+        let remote = FileReference(url: try #require(URL(string: "https://example.com/a.jpg")))
+        let result = await ingestor().ingest([remote])
+        #expect(result == [remote])
+        #expect(maker.askedNames.isEmpty)
+        #expect(blobs.writeCount == 0)
+    }
+
+    @Test func fileThatTakesTooLongKeepsItsIcon() async {
+        let result = await ingestor(timeoutPerFile: .milliseconds(200)).ingest(files("slow.mov", "fast.jpg"))
+        #expect(result[0].thumbnail == nil)
+        #expect(result[1].thumbnail != nil)
+        #expect(blobs.writeCount == 1)
+    }
+
+    @Test func filesLeftWhenTheTimeIsUpKeepTheirIcons() async {
+        let result = await ingestor(totalBudget: .milliseconds(200)).ingest(files("a.jpg", "slow.mov", "c.jpg"))
+        #expect(result.map { $0.thumbnail != nil } == [true, false, false])
+        // The third file is not even asked for.
+        #expect(maker.thumbnailNames == ["a.jpg", "slow.mov"])
+        #expect(blobs.writeCount == 1)
+    }
+
+    @Test func fileWithoutAThumbnailKeepsItsIcon() async {
+        let result = await ingestor().ingest(files("broken.jpg", "b.jpg"))
+        #expect(result[0].thumbnail == nil)
+        #expect(result[1].thumbnail != nil)
+    }
+
+    @Test func thumbnailsLargerThanAThumbnailAreNotKept() async {
+        let large = FakeFileThumbnailMaker(pixelSize: ThumbnailReference.maximumPixelSize * 2)
+        let result = await ingestor(maker: large).ingest(files("a.jpg"))
+        #expect(result[0].thumbnail == nil)
+        #expect(blobs.writeCount == 0)
+    }
+
+    @Test func thumbnailsAreChecked() {
+        let png = Data([1])
+        #expect(FileThumbnailIngestor.isValid(ImageInspection.Thumbnail(pngData: png, pixelWidth: 256, pixelHeight: 1)))
+        #expect(
+            !FileThumbnailIngestor.isValid(ImageInspection.Thumbnail(pngData: Data(), pixelWidth: 9, pixelHeight: 9)))
+        #expect(!FileThumbnailIngestor.isValid(ImageInspection.Thumbnail(pngData: png, pixelWidth: 0, pixelHeight: 9)))
+        #expect(
+            !FileThumbnailIngestor.isValid(ImageInspection.Thumbnail(pngData: png, pixelWidth: 9, pixelHeight: 257)))
+    }
+
+    @Test func thumbnailThatCannotBeWrittenIsLeftOut() async {
+        let failing = CountingBlobStore(failingWrite: 1)
+        let result = await ingestor(blobs: failing).ingest(files("a.jpg", "b.jpg"))
+        #expect(result.allSatisfy { $0.thumbnail == nil })
+        #expect(failing.allIDs().isEmpty)
+    }
+
+    @Test func discardDeletesTheThumbnails() async {
+        let ingestor = ingestor()
+        let result = await ingestor.ingest(files("a.jpg", "b.txt", "c.mov"))
+        #expect(blobs.allIDs().count == 2)
+        ingestor.discard(result)
+        #expect(blobs.allIDs().isEmpty)
+    }
+
+    @Test func runGivesTheResultOrNilAfterTheTimeout() async {
+        let sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        #expect(await FileThumbnailIngestor.run(within: .seconds(10), sleep: sleep) { 7 } == 7)
+        let late = await FileThumbnailIngestor.run(within: .milliseconds(50), sleep: sleep) { () -> Int in
+            try? await Task.sleep(for: .seconds(60))
+            return 7
+        }
+        #expect(late == nil)
+    }
+}

@@ -13,7 +13,8 @@ struct AppContainerImageTests {
     private func makeContainer(
         store: any HistoryStore,
         blobs: (any BlobStore)?,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        fileThumbnails: (any FileThumbnailMaking)? = nil
     ) -> AppContainer {
         AppContainer(
             store: store,
@@ -27,6 +28,7 @@ struct AppContainerImageTests {
             isSessionActive: { true },
             blobs: blobs,
             thumbnails: FakeThumbnailMaker(),
+            fileThumbnails: fileThumbnails,
             previewImages: decoder,
             makeSettingsWindow: { _, _, _ in SettingsWindowSpy() }
         )
@@ -37,6 +39,32 @@ struct AppContainerImageTests {
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         try await body(defaults)
+    }
+
+    @Test func copiedPhotoFilesGetThumbnailsInTheBlobStore() async throws {
+        try await withDefaults { defaults in
+            let store = InMemoryHistoryStore(blobs: blobs)
+            let container = makeContainer(
+                store: store, blobs: blobs, defaults: defaults, fileThumbnails: FakeFileThumbnailMaker())
+            pasteboard.copyFiles([URL(filePath: "/Users/me/a.jpg")])
+            container.monitor.poll()
+            await container.monitor.finishStoringImages()
+            let entry = try #require(store.entries.first)
+            #expect(entry.content.blobIDs.count == 1)
+            #expect(blobs.allIDs() == Set(entry.content.blobIDs))
+        }
+    }
+
+    @Test func withoutABlobStoreFilesGetNoThumbnails() async throws {
+        try await withDefaults { defaults in
+            let store = InMemoryHistoryStore()
+            let maker = FakeFileThumbnailMaker()
+            let container = makeContainer(store: store, blobs: nil, defaults: defaults, fileThumbnails: maker)
+            pasteboard.copyFiles([URL(filePath: "/Users/me/a.jpg")])
+            container.monitor.poll()
+            #expect(store.entries.first?.content.blobIDs == [])
+            #expect(maker.askedNames.isEmpty)
+        }
     }
 
     @Test func imagesAreStoredInTheBlobStoreAndCopiedBack() async throws {
