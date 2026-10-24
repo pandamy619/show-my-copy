@@ -49,15 +49,13 @@ struct FileBlobStore: BlobStore {
             .appending(path: folderName, directoryHint: .isDirectory)
     }
 
-    func write(_ data: Data) throws(BlobStoreError) -> BlobID {
-        let id = BlobID()
+    func write(_ data: Data, as id: BlobID) throws(BlobStoreError) {
         do {
             try data.write(to: url(for: id), options: .atomic)
         } catch {
             AppLogger.history.error("Could not save an image: \(String(describing: error), privacy: .private)")
             throw .writeFailed
         }
-        return id
     }
 
     func read(_ id: BlobID) throws(BlobStoreError) -> Data {

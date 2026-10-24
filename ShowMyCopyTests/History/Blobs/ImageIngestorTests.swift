@@ -38,7 +38,7 @@ final class CountingBlobStore: BlobStore {
         writes.withLock { $0 }
     }
 
-    func write(_ data: Data) throws(BlobStoreError) -> BlobID {
+    func write(_ data: Data, as id: BlobID) throws(BlobStoreError) {
         let count = writes.withLock { count in
             count += 1
             return count
@@ -46,7 +46,7 @@ final class CountingBlobStore: BlobStore {
         if let failingWrite, count >= failingWrite {
             throw .writeFailed
         }
-        return inner.write(data)
+        inner.write(data, as: id)
     }
 
     func read(_ id: BlobID) throws(BlobStoreError) -> Data { try inner.read(id) }
@@ -64,13 +64,27 @@ struct ImageIngestorTests {
         CapturedImage(data: data ?? self.data, typeIdentifier: type)
     }
 
-    @Test func storesTheImageAndItsThumbnail() async throws {
-        let blobs = InMemoryBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker())
-        let ingested = try await ingestor.ingest(captured(), known: [:])
+    /// Stores `image` through a new reservation of `blobs`, as the app does.
+    private func store(
+        _ image: CapturedImage,
+        with ingestor: ImageIngestor,
+        in blobs: InFlightBlobStore,
+        known: [ContentHash: ImageReference] = [:]
+    ) throws(ImageIngestError) -> IngestedImage {
+        let reservation = blobs.reservation()
+        return try ingestor.store(image, as: reservation.newID(), known: known, reservation: reservation)
+    }
+
+    @Test func storesTheImageAndItsThumbnailUnderTheReservedID() async throws {
+        let blobs = InFlightBlobStore(base: InMemoryBlobStore())
+        let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker())
+        let reservation = blobs.reservation()
+        let blobID = reservation.newID()
+        let ingested = try await ingestor.ingest(captured(), as: blobID, known: [:], reservation: reservation)
         let reference = ingested.reference
 
         #expect(ingested.isNew)
+        #expect(reference.blobID == blobID)
         #expect(reference.typeIdentifier == "public.png")
         #expect(reference.pixelWidth == 640)
         #expect(reference.pixelHeight == 480)
@@ -82,73 +96,73 @@ struct ImageIngestorTests {
         #expect(thumbnail.pixelHeight == 192)
         #expect(thumbnail.byteSize == 100)
         #expect(try blobs.read(thumbnail.blobID).count == 100)
-        #expect(blobs.allIDs().count == 2)
+        // Both are held until the reservation is released, which gives them back.
+        #expect(try blobs.allIDs().isEmpty)
+        #expect(Set(reservation.release()) == Set(reference.blobIDs))
     }
 
     @Test func knownImageIsUsedAgainWithoutWriting() throws {
-        let blobs = CountingBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker())
+        let base = CountingBlobStore()
+        let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker())
         let existing = ContentFixtures.imageReference()
-        let ingested = try ingestor.store(captured(), known: [hasher.digest(of: data): existing])
+        let ingested = try store(
+            captured(), with: ingestor, in: InFlightBlobStore(base: base),
+            known: [hasher.digest(of: data): existing])
         #expect(ingested == IngestedImage(reference: existing, isNew: false))
-        #expect(blobs.writeCount == 0)
+        #expect(base.writeCount == 0)
     }
 
     @Test func dataThatIsNotAnImageStoresNothing() {
-        let blobs = InMemoryBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker())
+        let base = InMemoryBlobStore()
+        let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker())
         #expect(throws: ImageIngestError.notAnImage) {
-            try ingestor.store(captured(Data([0, 1, 2])), known: [:])
+            try store(captured(Data([0, 1, 2])), with: ingestor, in: InFlightBlobStore(base: base))
         }
-        #expect(blobs.allIDs().isEmpty)
+        #expect(base.allIDs().isEmpty)
     }
 
     @Test func theMakerIsToldTheTypeTheImageWasCopiedAs() throws {
-        let blobs = InMemoryBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker(acceptedType: "public.tiff"))
+        let base = InMemoryBlobStore()
+        let blobs = InFlightBlobStore(base: base)
+        let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker(acceptedType: "public.tiff"))
         #expect(throws: ImageIngestError.notAnImage) {
-            try ingestor.store(captured(as: "public.png"), known: [:])
+            try store(captured(as: "public.png"), with: ingestor, in: blobs)
         }
-        #expect(blobs.allIDs().isEmpty)
-        let ingested = try ingestor.store(captured(as: "public.tiff"), known: [:])
+        #expect(base.allIDs().isEmpty)
+        let ingested = try store(captured(as: "public.tiff"), with: ingestor, in: blobs)
         #expect(ingested.reference.typeIdentifier == "public.tiff")
     }
 
     @Test func imageWithoutThumbnailIsStillStored() throws {
-        let blobs = InMemoryBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker(makesThumbnail: false))
-        let ingested = try ingestor.store(captured(), known: [:])
+        let base = InMemoryBlobStore()
+        let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker(makesThumbnail: false))
+        let ingested = try store(captured(), with: ingestor, in: InFlightBlobStore(base: base))
         #expect(ingested.reference.thumbnail == nil)
-        #expect(blobs.allIDs() == [ingested.reference.blobID])
+        #expect(base.allIDs() == [ingested.reference.blobID])
     }
 
     @Test func failedImageWriteLeavesNothing() {
-        let blobs = CountingBlobStore(failingWrite: 1)
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker())
+        let base = CountingBlobStore(failingWrite: 1)
+        let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker())
         #expect(throws: ImageIngestError.storageFailed) {
-            try ingestor.store(captured(), known: [:])
+            try store(captured(), with: ingestor, in: InFlightBlobStore(base: base))
         }
-        #expect(blobs.allIDs().isEmpty)
+        #expect(base.allIDs().isEmpty)
     }
 
-    @Test func failedThumbnailWriteDeletesTheImage() {
-        let blobs = CountingBlobStore(failingWrite: 2)
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker())
+    @Test func failedThumbnailWriteGivesTheImageBackToBeDeleted() throws {
+        let base = CountingBlobStore(failingWrite: 2)
+        let blobs = InFlightBlobStore(base: base)
+        let ingestor = ImageIngestor(thumbnails: FakeThumbnailMaker())
+        let reservation = blobs.reservation()
+        let blobID = reservation.newID()
         #expect(throws: ImageIngestError.storageFailed) {
-            try ingestor.store(captured(), known: [:])
+            try ingestor.store(captured(), as: blobID, known: [:], reservation: reservation)
         }
-        #expect(blobs.allIDs().isEmpty)
-    }
-
-    @Test func discardDeletesOnlyWhatWasWritten() throws {
-        let blobs = InMemoryBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker())
-        let new = try ingestor.store(captured(), known: [:])
-        let reused = try ingestor.store(captured(), known: [new.reference.contentHash: new.reference])
-
-        ingestor.discard(reused)
-        #expect(blobs.allIDs().count == 2)
-        ingestor.discard(new)
-        #expect(blobs.allIDs().isEmpty)
+        #expect(base.allIDs() == [blobID])
+        let released = reservation.release()
+        #expect(released.contains(blobID))
+        try blobs.delete(released)
+        #expect(base.allIDs().isEmpty)
     }
 }

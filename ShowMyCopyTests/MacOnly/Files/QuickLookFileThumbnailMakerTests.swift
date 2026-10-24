@@ -181,8 +181,10 @@ struct QuickLookFileThumbnailMakerTests {
         let photo = try writePNG(named: "a.png", width: 300, height: 300)
         let movie = try await writeMovie(named: "b.mov", width: 320, height: 240)
         let blobs = InMemoryBlobStore()
-        let ingestor = FileThumbnailIngestor(blobs: blobs, maker: maker)
-        let result = await ingestor.ingest([FileReference(url: photo), FileReference(url: movie)])
+        let ingestor = FileThumbnailIngestor(maker: maker)
+        let result = await ingestor.ingest(
+            [FileReference(url: photo), FileReference(url: movie)],
+            reservation: InFlightBlobStore(base: blobs).reservation())
         #expect(result.map(\.thumbnail?.kind) == [.image, .movie])
         #expect(blobs.allIDs().count == 2)
         // Only thumbnails are kept, never the files' data.

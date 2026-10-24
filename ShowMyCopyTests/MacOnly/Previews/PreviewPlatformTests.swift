@@ -64,9 +64,12 @@ struct ImageIOPreviewDecoderTests {
 
     @Test @MainActor func thumbnailProviderDecodesARealThumbnailOffTheMainActor() async throws {
         let blobs = InMemoryBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: ImageIOThumbnailMaker())
+        let ingestor = ImageIngestor(thumbnails: ImageIOThumbnailMaker())
         let captured = CapturedImage(data: try png(width: 800, height: 600), typeIdentifier: "public.png")
-        let reference = try await ingestor.ingest(captured, known: [:]).reference
+        let reservation = InFlightBlobStore(base: blobs).reservation()
+        let reference = try await ingestor.ingest(
+            captured, as: reservation.newID(), known: [:], reservation: reservation
+        ).reference
         let provider = ThumbnailProvider(blobs: blobs, decoder: decoder)
         let thumbnail = try #require(await provider.thumbnail(for: reference))
         #expect(thumbnail.pixelWidth == 256)

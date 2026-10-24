@@ -34,9 +34,11 @@ enum BlobStoreError: Error, Equatable, Sendable {
 ///
 /// `Sendable` and synchronous: writing a new image happens off the main actor (see `ImageIngestor`), deleting and
 /// sizing on it. Whoever removes the entry that references a blob deletes the blob; the history stores do that.
+/// Work that writes blobs in the background goes through `InFlightBlobStore`, so they are not deleted before the
+/// work hands them to the history.
 protocol BlobStore: Sendable {
-    /// Stores `data` under a new ID.
-    func write(_ data: Data) throws(BlobStoreError) -> BlobID
+    /// Stores `data` under `id`, a new ID no blob has.
+    func write(_ data: Data, as id: BlobID) throws(BlobStoreError)
 
     func read(_ id: BlobID) throws(BlobStoreError) -> Data
 
@@ -54,6 +56,13 @@ protocol BlobStore: Sendable {
 }
 
 extension BlobStore {
+    /// Stores `data` under a new ID.
+    func write(_ data: Data) throws(BlobStoreError) -> BlobID {
+        let id = BlobID()
+        try write(data, as: id)
+        return id
+    }
+
     /// Whether the blob is stored.
     func contains(_ id: BlobID) -> Bool {
         size(of: id) != nil
@@ -66,10 +75,8 @@ final class InMemoryBlobStore: BlobStore {
 
     init() {}
 
-    func write(_ data: Data) -> BlobID {
-        let id = BlobID()
+    func write(_ data: Data, as id: BlobID) {
         blobs.withLock { $0[id] = data }
-        return id
     }
 
     func read(_ id: BlobID) throws(BlobStoreError) -> Data {

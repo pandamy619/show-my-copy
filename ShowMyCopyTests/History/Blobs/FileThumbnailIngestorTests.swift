@@ -85,18 +85,29 @@ struct FileThumbnailIngestorTests {
     /// The time limits end only when a test fires them.
     private let timers = ManualTimers()
 
+    /// An ingestor that writes through a new reservation of `blobs` on every call, as the app does.
+    private struct Ingesting: Sendable {
+        let ingestor: FileThumbnailIngestor
+        let blobs: InFlightBlobStore
+
+        func ingest(_ files: [FileReference]) async -> [FileReference] {
+            await ingestor.ingest(files, reservation: blobs.reservation())
+        }
+    }
+
     private func ingestor(
         maker: (any FileThumbnailMaking)? = nil,
         blobs: (any BlobStore)? = nil,
         maximumFiles: Int = 4,
         timeoutPerFile: Duration = .seconds(10),
         totalBudget: Duration = .seconds(10)
-    ) -> FileThumbnailIngestor {
-        FileThumbnailIngestor(
-            blobs: blobs ?? self.blobs, maker: maker ?? self.maker,
+    ) -> Ingesting {
+        let ingestor = FileThumbnailIngestor(
+            maker: maker ?? self.maker,
             limits: FileThumbnailIngestor.Limits(
                 maximumFiles: maximumFiles, timeoutPerFile: timeoutPerFile, totalBudget: totalBudget),
             sleep: timers.sleep)
+        return Ingesting(ingestor: ingestor, blobs: InFlightBlobStore(base: blobs ?? self.blobs))
     }
 
     private func files(_ names: String...) -> [FileReference] {
@@ -220,12 +231,15 @@ struct FileThumbnailIngestorTests {
         #expect(failing.allIDs().isEmpty)
     }
 
-    @Test func discardDeletesTheThumbnails() async {
-        let ingestor = ingestor()
-        let result = await ingestor.ingest(files("a.jpg", "b.txt", "c.mov"))
-        #expect(blobs.allIDs().count == 2)
-        ingestor.discard(result)
-        #expect(blobs.allIDs().isEmpty)
+    @Test func theThumbnailsAreHeldUntilTheReservationIsReleased() async throws {
+        let inFlight = InFlightBlobStore(base: blobs)
+        let reservation = inFlight.reservation()
+        let result = await ingestor().ingestor.ingest(files("a.jpg", "b.txt", "c.mov"), reservation: reservation)
+        let made = Set(result.compactMap(\.thumbnail?.blobID))
+        #expect(made.count == 2)
+        #expect(try inFlight.allIDs().isEmpty)
+        #expect(Set(reservation.release()) == made)
+        #expect(try inFlight.allIDs() == made)
     }
 
     @Test func runGivesTheResultOrNilAfterTheTimeout() async {

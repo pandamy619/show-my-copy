@@ -28,8 +28,9 @@ final class AppContainer {
     let passwordSettings: PasswordSettings
     let pasteboard: any PasteboardReading & PasteboardWriting
     /// Where image data and thumbnails are kept, or nil when images are not recorded. History rows read thumbnails
-    /// from it; the full image is read only when it is opened or copied.
-    let blobs: (any BlobStore)?
+    /// from it; the full image is read only when it is opened or copied. The history store must delete blobs in
+    /// this same store, so it never deletes those that background work is about to hand to it.
+    let blobs: InFlightBlobStore?
     let monitor: ClipboardMonitor
     let activityObserver: SystemActivityObserver
     let copier: EntryCopier
@@ -51,7 +52,7 @@ final class AppContainer {
         distributedNotifications: any NotificationObserving = DistributedNotificationObserver(),
         isScreenLocked: @escaping @MainActor () -> Bool = { ConsoleSession.isScreenLocked() },
         isSessionActive: @escaping @MainActor () -> Bool = { ConsoleSession.isActive() },
-        blobs: (any BlobStore)? = nil,
+        blobs: InFlightBlobStore? = nil,
         thumbnails: (any ThumbnailMaking)? = nil,
         fileThumbnails: (any FileThumbnailMaking)? = nil,
         previewImages: (any PreviewImageDecoding)? = nil,
@@ -62,7 +63,7 @@ final class AppContainer {
         let passwordSettings = PasswordSettings(history: store, defaults: defaults, now: now)
         let settingsWindow = makeSettingsWindow(store, historySettings, passwordSettings)
 
-        let ingestors = Self.makeIngestors(blobs: blobs, thumbnails: thumbnails, fileThumbnails: fileThumbnails)
+        let ingestors = Self.makeIngestors(thumbnails: thumbnails, fileThumbnails: fileThumbnails)
         // The monitor reads the password setting on every change, so a new choice applies to the next copy.
         let monitor = ClipboardMonitor(
             pasteboard: pasteboard,
@@ -73,6 +74,7 @@ final class AppContainer {
             frontmostApp: frontmostApp,
             now: now,
             passwordPolicy: { [passwordSettings] in passwordSettings.policy },
+            blobs: blobs,
             imageIngestor: ingestors.images,
             fileThumbnailIngestor: ingestors.files
         )
@@ -114,20 +116,13 @@ final class AppContainer {
         self.settingsWindow = settingsWindow
     }
 
-    /// Images are recorded only with somewhere to keep them and a way to make thumbnails, and copied photo and video
-    /// files get thumbnails only with somewhere to keep them. The store must delete blobs in the same `blobs`.
+    /// Images are recorded only with a way to make thumbnails, and copied photo and video files get thumbnails only
+    /// with a way to make them; both also need somewhere to keep them, `blobs`.
     private static func makeIngestors(
-        blobs: (any BlobStore)?,
         thumbnails: (any ThumbnailMaking)?,
         fileThumbnails: (any FileThumbnailMaking)?
     ) -> (images: ImageIngestor?, files: FileThumbnailIngestor?) {
-        guard let blobs else {
-            return (nil, nil)
-        }
-        return (
-            thumbnails.map { ImageIngestor(blobs: blobs, thumbnails: $0) },
-            fileThumbnails.map { FileThumbnailIngestor(blobs: blobs, maker: $0) }
-        )
+        (thumbnails.map { ImageIngestor(thumbnails: $0) }, fileThumbnails.map { FileThumbnailIngestor(maker: $0) })
     }
 
     /// Starts watching the clipboard and the system.

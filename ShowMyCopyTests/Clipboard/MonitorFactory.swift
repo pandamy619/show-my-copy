@@ -20,6 +20,7 @@ enum MonitorFactory {
         interval: Duration = PollingSchedule.defaultInterval,
         sleep: @escaping @Sendable (Duration) async throws -> Void = MonitorFactory.sleepUntilCancelled,
         activity: any PollingActivity = CountingActivity(),
+        blobs: InFlightBlobStore? = nil,
         imageIngestor: ImageIngestor? = nil,
         fileThumbnailIngestor: FileThumbnailIngestor? = nil
     ) -> ClipboardMonitor {
@@ -32,6 +33,7 @@ enum MonitorFactory {
             frontmostApp: frontmostApp,
             now: now,
             passwordPolicy: passwordPolicy,
+            blobs: blobs,
             imageIngestor: imageIngestor,
             fileThumbnailIngestor: fileThumbnailIngestor
         )

@@ -265,7 +265,7 @@ struct FileThumbnailPersistenceTests {
         let photo = try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)
         store.record(.files([photo]), sourceApp: nil, at: start)
         // Made for a copy that was never recorded, for example because the app quit meanwhile.
-        let orphan = blobs.write(Data([1, 2, 3]))
+        let orphan = try blobs.write(Data([1, 2, 3]))
 
         _ = makeStore(now: start + 1)
         #expect(blobs.allIDs() == photo.thumbnailBlobIDs)

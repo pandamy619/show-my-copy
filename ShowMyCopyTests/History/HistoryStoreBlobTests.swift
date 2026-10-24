@@ -7,7 +7,7 @@ import Testing
 private final class UndeletableBlobStore: BlobStore {
     let inner = InMemoryBlobStore()
 
-    func write(_ data: Data) -> BlobID { inner.write(data) }
+    func write(_ data: Data, as id: BlobID) { inner.write(data, as: id) }
     func read(_ id: BlobID) throws(BlobStoreError) -> Data { try inner.read(id) }
     func delete(_ ids: [BlobID]) throws(BlobStoreError) { throw .deleteFailed }
     func size(of id: BlobID) -> Int? { inner.size(of: id) }
@@ -215,7 +215,7 @@ struct PersistentHistoryStoreBlobTests {
         let image = try ContentFixtures.storedImage(in: blobs)
         store.record(.image(image), sourceApp: nil, at: start)
         // Written for an entry that was never saved, for example because the app quit right after.
-        let orphan = blobs.write(Data([1, 2, 3]))
+        let orphan = try blobs.write(Data([1, 2, 3]))
 
         _ = makeStore(now: start + 1)
         #expect(blobs.allIDs() == Set(image.blobIDs))

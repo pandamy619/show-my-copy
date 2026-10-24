@@ -26,8 +26,8 @@ struct ClipboardMonitorBlobsInFlightTests {
         history: any HistoryStore, hasher: any ContentHasher = SHA256ContentHasher()
     ) -> ClipboardMonitor {
         MonitorFactory.make(
-            pasteboard: pasteboard, history: history,
-            imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker(), hasher: hasher))
+            pasteboard: pasteboard, history: history, blobs: blobs,
+            imageIngestor: ImageIngestor(thumbnails: FakeThumbnailMaker(), hasher: hasher))
     }
 
     /// Every blob an entry names is stored, and every stored blob belongs to an entry.

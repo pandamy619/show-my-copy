@@ -54,8 +54,8 @@ final class ReadCountingBlobStore: BlobStore {
         reads.withLock { $0.count }
     }
 
-    func write(_ data: Data) throws(BlobStoreError) -> BlobID {
-        base.write(data)
+    func write(_ data: Data, as id: BlobID) throws(BlobStoreError) {
+        base.write(data, as: id)
     }
 
     func read(_ id: BlobID) throws(BlobStoreError) -> Data {

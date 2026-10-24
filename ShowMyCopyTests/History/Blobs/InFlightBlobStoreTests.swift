@@ -15,7 +15,7 @@ struct InFlightBlobStoreTests {
         let id = try blobs.write(Data([1, 2]))
         #expect(try blobs.read(id) == Data([1, 2]))
         #expect(blobs.size(of: id) == 2)
-        #expect(blobs.allIDs() == [id])
+        #expect(try blobs.allIDs() == [id])
         try blobs.delete([id])
         #expect(base.allIDs().isEmpty)
     }
@@ -38,9 +38,9 @@ struct InFlightBlobStoreTests {
         let reservation = blobs.reservation()
         let inFlight = reservation.newID()
         try blobs.write(Data([2]), as: inFlight)
-        #expect(blobs.allIDs() == [settled])
+        #expect(try blobs.allIDs() == [settled])
         _ = reservation.release()
-        #expect(blobs.allIDs() == [settled, inFlight])
+        #expect(try blobs.allIDs() == [settled, inFlight])
     }
 
     @Test func existingBlobHeldByWorkIsGivenBackOnlyWhenItsDeletionWasPutOff() throws {

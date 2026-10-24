@@ -60,7 +60,7 @@ struct InMemoryBlobStoreTests {
 
     @Test func emptyDataIsABlobToo() throws {
         let store = InMemoryBlobStore()
-        let id = store.write(Data())
+        let id = try store.write(Data())
         #expect(store.size(of: id) == 0)
         #expect(try store.read(id).isEmpty)
     }

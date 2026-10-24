@@ -87,7 +87,7 @@ struct EntryCopierKindTests {
         history.record(text: "newer", sourceApp: nil, at: start + 1)
         let monitor = MonitorFactory.make(
             pasteboard: pasteboard, history: history,
-            imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker()))
+            blobs: InFlightBlobStore(base: blobs), imageIngestor: ImageIngestor(thumbnails: FakeThumbnailMaker()))
         monitor.poll()
         let entry = try #require(history.entries.last)
         let copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor, blobs: blobs)

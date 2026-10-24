@@ -9,7 +9,7 @@ import os
 /// The work is bounded: only the first `Limits.maximumFiles` files of a copy are looked at (those without a
 /// thumbnail), each gets at most `Limits.timeoutPerFile`, and all of them together `Limits.totalBudget`. A file that
 /// is not a photo or video, cannot be read, is not on this Mac or takes too long keeps its icon. Runs off the main
-/// actor.
+/// actor, and writes only through the reservation it is given (see `InFlightBlobStore`).
 struct FileThumbnailIngestor: Sendable {
     struct Limits: Equatable, Sendable {
         /// How many files of one copy are looked at, from the first. Rows show the first file; the preview lists
@@ -25,18 +25,15 @@ struct FileThumbnailIngestor: Sendable {
             maximumFiles: 4, timeoutPerFile: .milliseconds(1500), totalBudget: .seconds(2))
     }
 
-    let blobs: any BlobStore
     let maker: any FileThumbnailMaking
     let limits: Limits
     private let sleep: @Sendable (Duration) async throws -> Void
 
     init(
-        blobs: any BlobStore,
         maker: any FileThumbnailMaking,
         limits: Limits = .standard,
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
-        self.blobs = blobs
         self.maker = maker
         self.limits = limits
         self.sleep = sleep
@@ -44,16 +41,16 @@ struct FileThumbnailIngestor: Sendable {
 
     /// `files` in the same order, each with the thumbnail made now or none: thumbnails for the photos and videos
     /// among the first `limits.maximumFiles` that have none yet. A thumbnail a file already had is not returned, so
-    /// handing the result on or discarding it never touches it. The new thumbnails are written to the blob store;
-    /// whoever does not hand them to a history store calls `discard`.
+    /// handing the result on or deleting what is left never touches it. The new thumbnails are written through
+    /// `reservation`, which the caller releases after handing them to a history store.
     @concurrent
-    func ingest(_ files: [FileReference]) async -> [FileReference] {
+    func ingest(_ files: [FileReference], reservation: BlobReservation) async -> [FileReference] {
         let made = await makeThumbnails(for: files)
         var result = files.map { $0.withThumbnail(nil) }
         for (index, thumbnail) in made.sorted(by: { $0.key < $1.key }) {
             let id: BlobID
             do {
-                id = try blobs.write(thumbnail.image.pngData)
+                id = try reservation.write(thumbnail.image.pngData)
             } catch {
                 // Logged by the blob store; the file keeps its icon.
                 continue
@@ -64,19 +61,6 @@ struct FileThumbnailIngestor: Sendable {
             result[index] = result[index].withThumbnail(FileThumbnail(kind: thumbnail.kind, reference: reference))
         }
         return result
-    }
-
-    /// Deletes the thumbnails `ingest` wrote for files that are not recorded after all.
-    func discard(_ files: [FileReference]) {
-        let ids = files.compactMap(\.thumbnail?.blobID)
-        guard !ids.isEmpty else {
-            return
-        }
-        do {
-            try blobs.delete(ids)
-        } catch {
-            AppLogger.history.error("Could not delete thumbnails that are not used; they go at the next launch")
-        }
     }
 
     private struct Made: Sendable {

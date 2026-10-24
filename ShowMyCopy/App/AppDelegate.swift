@@ -18,7 +18,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let applicationSupport = HistoryFolder.applicationSupport() {
             LegacyHistoryFiles(appFolder: HistoryFolder.appFolder(inApplicationSupport: applicationSupport)).delete()
         }
-        let blobs = Self.openBlobStore()
+        // One store for the history and the work that saves images in the background, so neither deletes what the
+        // other is about to use.
+        let blobs = Self.openBlobStore().map { InFlightBlobStore(base: $0) }
         let container = AppContainer(
             store: Self.makeHistoryStore(blobs: blobs),
             blobs: blobs,

@@ -7,13 +7,15 @@ import Testing
 struct ClipboardMonitorImageTests {
     private let pasteboard = FakePasteboard()
     private let blobs = CountingBlobStore()
+    private let inFlight: InFlightBlobStore
     private let history: InMemoryHistoryStore
     private let date = Date(timeIntervalSince1970: 1_790_000_000)
     private let preview = SourceApp(bundleIdentifier: "com.apple.Preview", name: "Preview")
     private let png = Data([0x89, 0x50, 0x4E, 0x47, 9, 9])
 
     init() {
-        history = InMemoryHistoryStore(blobs: blobs)
+        inFlight = InFlightBlobStore(base: blobs)
+        history = InMemoryHistoryStore(blobs: inFlight)
     }
 
     private func makeMonitor() -> ClipboardMonitor {
@@ -22,7 +24,7 @@ struct ClipboardMonitorImageTests {
             history: history,
             frontmostApp: { [preview] in preview },
             now: { [date] in date },
-            imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker())
+            blobs: inFlight, imageIngestor: ImageIngestor(thumbnails: FakeThumbnailMaker())
         )
     }
 
@@ -103,7 +105,7 @@ struct ClipboardMonitorImageTests {
         let failing = CountingBlobStore(failingWrite: 1)
         let monitor = MonitorFactory.make(
             pasteboard: pasteboard, history: history,
-            imageIngestor: ImageIngestor(blobs: failing, thumbnails: FakeThumbnailMaker()))
+            blobs: InFlightBlobStore(base: failing), imageIngestor: ImageIngestor(thumbnails: FakeThumbnailMaker()))
         monitor.poll()
         pasteboard.copy([.png: png])
         monitor.poll()
@@ -122,7 +124,7 @@ struct ClipboardMonitorImageTests {
         // The next launch finds the same image on the pasteboard.
         let relaunched = MonitorFactory.make(
             pasteboard: pasteboard, history: history, now: { [date] in date + 100 },
-            imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker()))
+            blobs: inFlight, imageIngestor: ImageIngestor(thumbnails: FakeThumbnailMaker()))
         relaunched.poll()
         await relaunched.finishStoringImages()
         #expect(history.entries == [entry])
@@ -148,7 +150,7 @@ struct ClipboardMonitorImageTests {
         let monitor = MonitorFactory.make(
             pasteboard: pasteboard, history: history,
             passwordPolicy: { PasswordPolicy(savesPasswords: true, lifetime: 600) },
-            imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker()))
+            blobs: inFlight, imageIngestor: ImageIngestor(thumbnails: FakeThumbnailMaker()))
         monitor.poll()
         pasteboard.copy([.png: png], markers: [PasteboardMarker.concealed])
         monitor.poll()

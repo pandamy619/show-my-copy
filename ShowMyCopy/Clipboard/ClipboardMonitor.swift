@@ -22,6 +22,8 @@ final class ClipboardMonitor: PasteboardChangeTracking {
     private let frontmostApp: @MainActor () -> SourceApp?
     private let now: @MainActor () -> Date
     private let passwordPolicy: @MainActor () -> PasswordPolicy
+    /// Where images and thumbnails are written, through a reservation per copy. Without it neither is made.
+    private let blobs: InFlightBlobStore?
     /// Stores copied images. Without it images are not read.
     private let imageIngestor: ImageIngestor?
     /// Makes thumbnails of copied photo and video files. Without it files are recorded at once, with their icons.
@@ -44,15 +46,17 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         frontmostApp: @escaping @MainActor () -> SourceApp?,
         now: @escaping @MainActor () -> Date,
         passwordPolicy: @escaping @MainActor () -> PasswordPolicy,
+        blobs: InFlightBlobStore? = nil,
         imageIngestor: ImageIngestor? = nil,
         fileThumbnailIngestor: FileThumbnailIngestor? = nil
     ) {
         self.pasteboard = pasteboard
+        self.blobs = blobs
+        self.imageIngestor = blobs == nil ? nil : imageIngestor
+        self.fileThumbnailIngestor = blobs == nil ? nil : fileThumbnailIngestor
         self.reader = PasteboardSnapshotReader(
             pasteboard: pasteboard,
-            contentReaders: PasteboardSnapshotReader.standardReaders(readsImages: imageIngestor != nil))
-        self.imageIngestor = imageIngestor
-        self.fileThumbnailIngestor = fileThumbnailIngestor
+            contentReaders: PasteboardSnapshotReader.standardReaders(readsImages: self.imageIngestor != nil))
         self.history = history
         self.schedule = schedule
         self.expiry = expiry
@@ -208,32 +212,36 @@ final class ClipboardMonitor: PasteboardChangeTracking {
     /// holds the entry that was current, and the image is not an entry yet.
     private func storeImage(_ image: CapturedImage, copy: Copy) {
         history.markCurrentSkipped()
-        guard let imageIngestor else {
+        guard let imageIngestor, let blobs else {
             return
         }
-        // Images already in the history, so copying one again writes nothing.
+        // Images already in the history, so copying one again writes nothing. Their blobs are held while the image
+        // is stored, so the one it repeats keeps its data even if its entry is removed meanwhile.
         let known = Dictionary(
             history.entries.compactMap { entry in entry.content.image.map { ($0.contentHash, $0) } },
             uniquingKeysWith: { first, _ in first })
+        let reservation = blobs.reservation()
+        reservation.hold(known.values.flatMap(\.blobIDs))
+        let blobID = reservation.newID()
         pendingIngestion = Task { [weak self] in
             let result: Result<IngestedImage, ImageIngestError>
             do throws(ImageIngestError) {
-                result = .success(try await imageIngestor.ingest(image, known: known))
+                result = .success(
+                    try await imageIngestor.ingest(image, as: blobID, known: known, reservation: reservation))
             } catch {
                 result = .failure(error)
             }
             guard let self else {
-                if case .success(let ingested) = result {
-                    imageIngestor.discard(ingested)
-                }
+                Self.delete(reservation.release(), from: blobs)
                 return
             }
             self.pendingIngestion = nil
-            self.recordImage(result, ingestor: imageIngestor, copy: copy)
+            self.recordImage(result, copy: copy)
+            self.finish(reservation)
         }
     }
 
-    private func recordImage(_ result: Result<IngestedImage, ImageIngestError>, ingestor: ImageIngestor, copy: Copy) {
+    private func recordImage(_ result: Result<IngestedImage, ImageIngestError>, copy: Copy) {
         let ingested: IngestedImage
         switch result {
         case .success(let value):
@@ -249,18 +257,35 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         // and the entry the user picked must stay on top.
         guard lastChangeCount == copy.changeCount else {
             AppLogger.clipboard.debug("The pasteboard changed while an image was saved; it is not recorded")
-            ingestor.discard(ingested)
             return
         }
-        // A known image whose entry was removed meanwhile lost its data with it.
-        guard ingested.isNew || history.entries.contains(where: { $0.content.image == ingested.reference }) else {
-            return
-        }
+        // A known image keeps its data while it is held, even when its entry was removed meanwhile.
         let content = ClipboardContent.image(ingested.reference)
         if copy.isFirstRead, history.markNewestCurrent(ifItHolds: content) != nil {
             return
         }
         history.record(content, sourceApp: copy.sourceApp, at: copy.date)
+    }
+
+    /// Releases what a copy's work wrote or held, once its result is handed to the history, and deletes the blobs
+    /// no entry took.
+    private func finish(_ reservation: BlobReservation) {
+        guard let blobs else {
+            return
+        }
+        let used = Set(history.entries.flatMap(\.content.blobIDs))
+        Self.delete(reservation.release().filter { !used.contains($0) }, from: blobs)
+    }
+
+    private nonisolated static func delete(_ ids: [BlobID], from blobs: InFlightBlobStore) {
+        guard !ids.isEmpty else {
+            return
+        }
+        do {
+            try blobs.delete(ids)
+        } catch {
+            AppLogger.history.error("Could not delete image data no entry uses; it goes at the next launch")
+        }
     }
 }
 
@@ -276,22 +301,24 @@ extension ClipboardMonitor {
         }
         let id = history.record(.files(files), sourceApp: copy.sourceApp, at: copy.date)
         // The entry's own files: copied again, they may have thumbnails already, which are not made again.
-        guard let fileThumbnailIngestor,
+        guard let fileThumbnailIngestor, let blobs,
             case .files(let recorded)? = history.entries.first(where: { $0.id == id })?.content
         else {
             return
         }
         let previous = pendingFileThumbnails
+        let reservation = blobs.reservation()
         pendingFileThumbnails = Task { [weak self] in
             // One copy after another, so QuickLook is never asked for many files at once.
             await previous?.value
-            let made = await fileThumbnailIngestor.ingest(recorded)
+            let made = await fileThumbnailIngestor.ingest(recorded, reservation: reservation)
             guard let self else {
-                fileThumbnailIngestor.discard(made)
+                Self.delete(reservation.release(), from: blobs)
                 return
             }
-            // The store takes what the entry lacks and deletes the rest, also when the entry is gone.
+            // The store takes what the entry lacks, also when the entry is gone; the rest is deleted.
             self.history.addThumbnails(made, toEntry: id)
+            self.finish(reservation)
         }
     }
 }

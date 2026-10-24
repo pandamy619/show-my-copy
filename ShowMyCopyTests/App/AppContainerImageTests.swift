@@ -7,12 +7,17 @@ import Testing
 @MainActor
 struct AppContainerImageTests {
     private let pasteboard = FakePasteboard()
-    private let blobs = InMemoryBlobStore()
+    private let base = InMemoryBlobStore()
+    private let blobs: InFlightBlobStore
     private let decoder = FakeImageDecoder()
+
+    init() {
+        blobs = InFlightBlobStore(base: base)
+    }
 
     private func makeContainer(
         store: any HistoryStore,
-        blobs: (any BlobStore)?,
+        blobs: InFlightBlobStore?,
         defaults: UserDefaults,
         fileThumbnails: (any FileThumbnailMaking)? = nil
     ) -> AppContainer {
@@ -51,7 +56,7 @@ struct AppContainerImageTests {
             await container.monitor.finishStoringImages()
             let entry = try #require(store.entries.first)
             #expect(entry.content.blobIDs.count == 1)
-            #expect(blobs.allIDs() == Set(entry.content.blobIDs))
+            #expect(base.allIDs() == Set(entry.content.blobIDs))
         }
     }
 

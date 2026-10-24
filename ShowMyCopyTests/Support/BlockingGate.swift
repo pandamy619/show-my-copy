@@ -2,6 +2,8 @@ import Dispatch
 import Foundation
 import Synchronization
 
+@testable import ShowMyCopy
+
 /// Stops synchronous background work at one point until the test lets it go on, so a test can change the history
 /// while the work is in flight. The work's thread waits on a semaphore; the test waits for it to arrive without
 /// blocking the main actor and without real time passing.
@@ -59,8 +61,8 @@ final class GatedBlobStore: BlobStore {
         gate.arm()
     }
 
-    func write(_ data: Data, as id: BlobID) throws(BlobStoreError) {
-        try base.write(data, as: id)
+    func write(_ data: Data, as id: BlobID) {
+        base.write(data, as: id)
         let count = writes.withLock { count in
             count += 1
             return count

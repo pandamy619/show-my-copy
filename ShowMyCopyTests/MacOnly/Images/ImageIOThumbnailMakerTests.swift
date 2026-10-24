@@ -80,9 +80,12 @@ struct ImageIOThumbnailMakerTests {
 
     @Test func ingestorStoresAnImageOverThePixelLimitWithoutAThumbnail() async throws {
         let blobs = InMemoryBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: maker)
+        let ingestor = ImageIngestor(thumbnails: maker)
+        let reservation = InFlightBlobStore(base: blobs).reservation()
         let data = try CraftedPNG.blank(width: 11000, height: 11000)
-        let ingested = try await ingestor.ingest(CapturedImage(data: data, typeIdentifier: "public.png"), known: [:])
+        let ingested = try await ingestor.ingest(
+            CapturedImage(data: data, typeIdentifier: "public.png"), as: reservation.newID(), known: [:],
+            reservation: reservation)
         #expect(ingested.reference.pixelWidth == 11000)
         #expect(ingested.reference.thumbnail == nil)
         #expect(blobs.allIDs() == [ingested.reference.blobID])
@@ -114,9 +117,12 @@ struct ImageIOThumbnailMakerTests {
 
     @Test func ingestorStoresARealImageWithItsThumbnail() async throws {
         let blobs = InMemoryBlobStore()
-        let ingestor = ImageIngestor(blobs: blobs, thumbnails: maker)
+        let ingestor = ImageIngestor(thumbnails: maker)
+        let reservation = InFlightBlobStore(base: blobs).reservation()
         let data = try png(width: 800, height: 600)
-        let ingested = try await ingestor.ingest(CapturedImage(data: data, typeIdentifier: "public.png"), known: [:])
+        let ingested = try await ingestor.ingest(
+            CapturedImage(data: data, typeIdentifier: "public.png"), as: reservation.newID(), known: [:],
+            reservation: reservation)
         #expect(ingested.reference.pixelWidth == 800)
         #expect(ingested.reference.pixelHeight == 600)
         #expect(try blobs.read(ingested.reference.blobID) == data)
