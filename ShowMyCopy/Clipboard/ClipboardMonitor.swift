@@ -6,7 +6,7 @@ import AppKit
 ///   item only when the count changed; `PasteboardSnapshotReader` says what the item is.
 /// - The monitor decides who copied (the app in front, or nobody known after a pause) and what the password settings
 ///   allow, and records text and rich text itself.
-/// - `capture` records images and files at once and fills in their data and thumbnails in the background. The
+/// - `capture` records images and files at once and fills in their data, sizes and thumbnails in the background. The
 ///   monitor goes on reading meanwhile, so no copy is missed while an image is saved.
 /// - `expiry` removes expired passwords on every look, and `clearedClipboard` may take the entry copied just before
 ///   an emptied clipboard for a password.
@@ -162,7 +162,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
             }
         case .cleared:
             clearedClipboard.clipboardWasEmptied(changeCount: changeCount, at: copy.date)
-        case .content(.files(let files), isSecret: false) where capture?.makesFileThumbnails == true:
+        case .content(.files(let files), isSecret: false) where capture != nil:
             capture?.record(files, as: copy)
         case .content(let content, let isSecret):
             record(content, isSecret: isSecret, copy: copy, policy: policy)

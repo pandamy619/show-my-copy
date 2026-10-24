@@ -72,7 +72,7 @@ final class InMemoryHistoryStore: HistoryStore {
             entry = entries.remove(at: index)
             // Files copied again may bring the thumbnails the first copy could not make, such as for an entry from
             // before thumbnails or after a timeout. Those it has stay.
-            let filled = entry.content.addingMissingThumbnails(from: content)
+            let filled = entry.content.addingMissingFileDetails(from: content)
             if filled != entry.content {
                 entry = entry.replacingContent(filled)
             }
@@ -97,13 +97,13 @@ final class InMemoryHistoryStore: HistoryStore {
         return entry.id
     }
 
-    func addThumbnails(_ files: [FileReference], toEntry id: ClipboardEntry.ID) {
+    func addFileDetails(_ files: [FileReference], toEntry id: ClipboardEntry.ID) {
         let offered = ClipboardContent.files(files)
         guard let index = entries.firstIndex(where: { $0.id == id }) else {
             deleteBlobs(offered.blobIDs)
             return
         }
-        let filled = entries[index].content.addingMissingThumbnails(from: offered)
+        let filled = entries[index].content.addingMissingFileDetails(from: offered)
         let taken = Set(filled.blobIDs)
         deleteBlobs(offered.blobIDs.filter { !taken.contains($0) })
         guard filled != entries[index].content else {

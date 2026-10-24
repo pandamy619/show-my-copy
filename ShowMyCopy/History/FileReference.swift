@@ -14,7 +14,8 @@ struct FileReference: Equatable, Sendable {
     let url: URL
     /// The name shown for the file: its last path component when it was copied.
     let name: String
-    /// The size in bytes when it was copied, or nil for a folder or when the sandbox did not let the app read it.
+    /// The size in bytes, read just after it was copied, or nil for a folder, a file the sandbox did not let the app
+    /// read, one on a network volume, or before it is read.
     let byteSize: Int?
     /// A small picture of a photo or video, kept in the blob store, or nil for other files and when none could be
     /// made. Not part of the file's identity: the path is.
@@ -29,6 +30,11 @@ struct FileReference: Equatable, Sendable {
 
     /// The same file with another thumbnail, or none.
     func withThumbnail(_ thumbnail: FileThumbnail?) -> FileReference {
+        FileReference(url: url, name: name, byteSize: byteSize, thumbnail: thumbnail)
+    }
+
+    /// The same file with its size, read after it was recorded.
+    func withByteSize(_ byteSize: Int?) -> FileReference {
         FileReference(url: url, name: name, byteSize: byteSize, thumbnail: thumbnail)
     }
 
@@ -65,6 +71,9 @@ enum FileAvailability: Equatable, Sendable {
     /// sandboxed app cannot tell a missing file from one it is not allowed to look at. Show it as "may be
     /// unavailable", never as deleted.
     case mayBeUnavailable
+    /// Not looked at: on a network volume or an automounted path (`CopiedPaths`), where even looking could contact
+    /// a server or wait for one, or the check took too long. Shown without a mark.
+    case notChecked
 }
 
 /// Checks whether copied files can still be found, for marking entries whose file may be gone.
@@ -74,9 +83,19 @@ protocol FileAvailabilityChecking: Sendable {
 
 /// Asks the file system. In the sandbox `FileManager.fileExists` answers false for files outside the container
 /// that the app has no access to, so `mayBeUnavailable` is all a false answer means. Touches the disk, so check
-/// when an entry is shown, not for the whole history at once.
+/// off the main actor (`FileAvailabilityProbe`) when an entry is shown, not for the whole history at once. Paths on
+/// network volumes and automounted paths are not looked at (`notChecked`).
 struct FileSystemAvailabilityChecker: FileAvailabilityChecking {
+    let paths: CopiedPaths
+
+    init(paths: CopiedPaths = CopiedPaths()) {
+        self.paths = paths
+    }
+
     func availability(of file: FileReference) -> FileAvailability {
-        FileManager.default.fileExists(atPath: file.path) ? .available : .mayBeUnavailable
+        guard paths.access(for: file.url) != .remote else {
+            return .notChecked
+        }
+        return FileManager.default.fileExists(atPath: file.path) ? .available : .mayBeUnavailable
     }
 }

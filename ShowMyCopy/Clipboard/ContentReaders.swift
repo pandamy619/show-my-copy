@@ -27,20 +27,16 @@ extension PasteboardSnapshotReader {
     }
 }
 
-/// Reads copied files: their URLs, names and sizes, never their contents.
+/// Reads copied files: their URLs and names, never their contents. Nothing here touches the files: their sizes are
+/// read later, off the main actor (`FileSizeReader`), since even that can wait for a slow disk or a server.
 struct FileURLContentReader: PasteboardContentReader {
     nonisolated static let defaultMaximumCount = 100
 
     /// The most files kept from one copy. More are skipped without reading any URL.
     let maximumCount: Int
-    private let fileSize: (URL) -> Int?
 
-    init(
-        maximumCount: Int = FileURLContentReader.defaultMaximumCount,
-        fileSize: @escaping (URL) -> Int? = { FileURLContentReader.sizeOfFile(at: $0) }
-    ) {
+    init(maximumCount: Int = FileURLContentReader.defaultMaximumCount) {
         self.maximumCount = maximumCount
-        self.fileSize = fileSize
     }
 
     func read(from pasteboard: any PasteboardReading) -> ContentReading {
@@ -58,22 +54,7 @@ struct FileURLContentReader: PasteboardContentReader {
         guard urls.count <= maximumCount else {
             return .tooLarge(limit: maximumCount)
         }
-        return .content(.files(urls.map { FileReference(url: $0, byteSize: fileSize($0)) }))
-    }
-
-    /// The size of a regular file, or nil for a folder, a missing file or one the sandbox does not let the app see.
-    /// Not knowing the size is normal in the sandbox, so it is not logged.
-    nonisolated static func sizeOfFile(at url: URL) -> Int? {
-        let attributes: [FileAttributeKey: Any]
-        do {
-            attributes = try FileManager.default.attributesOfItem(atPath: url.path(percentEncoded: false))
-        } catch {
-            return nil
-        }
-        guard (attributes[.type] as? FileAttributeType) == .typeRegular else {
-            return nil
-        }
-        return (attributes[.size] as? NSNumber)?.intValue
+        return .content(.files(urls.map { FileReference(url: $0) }))
     }
 }
 

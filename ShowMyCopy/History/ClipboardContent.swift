@@ -109,17 +109,20 @@ enum ClipboardContent: Equatable, Sendable {
         }
     }
 
-    /// For the same files copied again: this content with the thumbnails it lacks taken from `newer`, file by
-    /// file. Thumbnails it has stay, so a thumbnail that already belongs to the entry is never replaced. Other
-    /// kinds, and files whose paths differ, are returned unchanged.
-    func addingMissingThumbnails(from newer: ClipboardContent) -> ClipboardContent {
+    /// For the same files copied again, or their thumbnails and sizes read later: this content with the thumbnails and
+    /// sizes it lacks taken from `newer`, file by file. Those it has stay, so a thumbnail that already belongs to the
+    /// entry is never replaced. Other kinds, and files whose paths differ, are returned unchanged.
+    func addingMissingFileDetails(from newer: ClipboardContent) -> ClipboardContent {
         guard case .files(let files) = self, case .files(let newFiles) = newer, files.count == newFiles.count,
             zip(files, newFiles).allSatisfy({ $0.path == $1.path })
         else {
             return self
         }
         return .files(
-            zip(files, newFiles).map { old, new in old.thumbnail == nil ? old.withThumbnail(new.thumbnail) : old })
+            zip(files, newFiles).map { old, new in
+                let filled = old.thumbnail == nil ? old.withThumbnail(new.thumbnail) : old
+                return filled.byteSize == nil ? filled.withByteSize(new.byteSize) : filled
+            })
     }
 
     /// The image, for content that is one.

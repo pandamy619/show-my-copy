@@ -9,7 +9,7 @@ struct CopyEvent: Sendable {
 }
 
 /// Records copied images and files at once and fills in what takes long afterwards, off the main actor: an image's
-/// data, size and thumbnail, and the thumbnails of copied photos and videos.
+/// data, size and thumbnail, and the sizes of copied files and the thumbnails of copied photos and videos.
 ///
 /// Both go the same way: the copy is recorded now, the slow work runs in the background, and its result is handed to
 /// the entry, which keeps its place and current state. `ClipboardMonitor` goes on reading the pasteboard meanwhile, so
@@ -24,6 +24,7 @@ final class CaptureEnrichment {
     private let history: any HistoryStore
     private let blobs: InFlightBlobStore
     private let images: ImageIngestor?
+    private let fileSizes: FileSizeReader
     private let fileThumbnails: FileThumbnailIngestor?
     /// The work for the copy recorded last, which runs after that of the copies before it, or nil when none runs.
     private var last: Task<Void, Never>?
@@ -34,20 +35,18 @@ final class CaptureEnrichment {
         history: any HistoryStore,
         blobs: InFlightBlobStore,
         images: ImageIngestor?,
+        fileSizes: FileSizeReader = FileSizeReader(),
         fileThumbnails: FileThumbnailIngestor?
     ) {
         self.history = history
         self.blobs = blobs
         self.images = images
+        self.fileSizes = fileSizes
         self.fileThumbnails = fileThumbnails
     }
 
     var readsImages: Bool {
         images != nil
-    }
-
-    var makesFileThumbnails: Bool {
-        fileThumbnails != nil
     }
 
     /// Whether work for a recorded copy has not been handed to the history yet.
@@ -98,27 +97,32 @@ final class CaptureEnrichment {
         }
     }
 
-    /// Records copied files at once, then makes thumbnails of the photos and videos among them in the background and
-    /// adds them to the entry. Files still on the pasteboard at launch that are the newest entry already are not read
-    /// again: the entry keeps what it has.
+    /// Records copied files at once, then reads their sizes and makes thumbnails of the photos and videos among them
+    /// in the background, and adds them to the entry. Files still on the pasteboard at launch that are the newest entry
+    /// already are not read again: the entry keeps what it has.
     func record(_ files: [FileReference], as copy: CopyEvent) {
         if copy.isFirstRead, history.markNewestCurrent(ifItHolds: .files(files)) != nil {
             return
         }
         let id = history.record(.files(files), sourceApp: copy.sourceApp, at: copy.date)
-        // The entry's own files: copied again, they may have thumbnails already, which are not made again.
-        guard let fileThumbnails,
-            case .files(let recorded)? = history.entries.first(where: { $0.id == id })?.content
-        else {
+        // The entry's own files: copied again, they may have thumbnails and sizes already, which are not read again.
+        guard case .files(let recorded)? = history.entries.first(where: { $0.id == id })?.content else {
             return
         }
         let reservation = blobs.reservation()
         let history = history
+        let fileSizes = fileSizes
+        let fileThumbnails = fileThumbnails
         enqueue(reservation) {
-            await fileThumbnails.ingest(recorded, reservation: reservation)
+            let sized = await fileSizes.sizes(of: recorded)
+            guard let fileThumbnails else {
+                return sized
+            }
+            let made = await fileThumbnails.ingest(recorded, reservation: reservation)
+            return zip(made, sized).map { made, sized in made.withByteSize(sized.byteSize) }
         } handOn: { made in
             // The store takes what the entry lacks, also when the entry is gone; the rest is deleted.
-            history.addThumbnails(made, toEntry: id)
+            history.addFileDetails(made, toEntry: id)
         }
     }
 

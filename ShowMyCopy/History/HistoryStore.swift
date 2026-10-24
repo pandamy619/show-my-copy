@@ -49,11 +49,11 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
         expiresAt: Date?
     ) -> ClipboardEntry.ID
 
-    /// Gives the files of entry `id` the thumbnails in `files` they lack, made after the entry was recorded, so the
-    /// monitor does not wait for them. The entry keeps its place, date and current state; the limits apply to its
-    /// new size. The store owns the thumbnails from this call on: those it does not take (the entry is gone, holds
-    /// other content or has them already) are deleted at once.
-    func addThumbnails(_ files: [FileReference], toEntry id: ClipboardEntry.ID)
+    /// Gives the files of entry `id` the thumbnails and sizes in `files` they lack, read and made after the entry was
+    /// recorded, so the monitor does not wait for them. The entry keeps its place, date and current state; the limits
+    /// apply to its new size. The store owns the thumbnails from this call on: those it does not take (the entry is
+    /// gone, holds other content or has them already) are deleted at once.
+    func addFileDetails(_ files: [FileReference], toEntry id: ClipboardEntry.ID)
 
     /// Completes an image recorded before its data was saved (`ImageReference.isSaved` is false), so the monitor
     /// does not wait for it: the entry that holds `unsaved` gets `image`, the image as saved, with its hash, size and

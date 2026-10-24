@@ -40,7 +40,8 @@ enum CapturedItem: Equatable, Sendable {
 /// writes to it (copying an entry back), so the reads stay here, and the sizes of text, styled text and images are
 /// checked right after reading, before anything is decoded or kept. A copy of hundreds of megabytes can therefore
 /// pause the app and take that much memory for a moment before it is skipped. What can be done is done: the count
-/// of copied files is checked before any URL is read; the types are looked at before any data; one image type is
+/// of copied files is checked before any URL is read, and no file is touched here (`FileSizeReader` reads their sizes
+/// later, off the main actor); the types are looked at before any data; one image type is
 /// read, not every one offered; and styled text reads its plain text first and skips the item without reading the
 /// larger RTF when the plain text is already over its limit.
 ///

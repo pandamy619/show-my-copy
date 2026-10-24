@@ -7,9 +7,12 @@ import os
 /// After a relaunch the sandbox no longer lets the app read a copied file, so its thumbnail is made right when it is
 /// copied and kept in the blob store, like an image's thumbnail. Only the thumbnail is kept, never the file's data.
 /// The work is bounded: only the first `Limits.maximumFiles` files of a copy are looked at (those without a
-/// thumbnail), each gets at most `Limits.timeoutPerFile`, and all of them together `Limits.totalBudget`. A file that
-/// is not a photo or video, cannot be read, is not on this Mac or takes too long keeps its icon. Runs off the main
-/// actor, and writes only through the reservation it is given (see `InFlightBlobStore`).
+/// thumbnail), each gets at most `Limits.timeoutPerFile`, and all of them together `Limits.totalBudget`. The limits
+/// also cover the synchronous checks of the file (`FileThumbnailMaking.mediaKind`), which cannot be cancelled: when the
+/// time is up the copy goes on without waiting for them (`TimeLimit`). A file on a network volume or an automounted
+/// path (`CopiedPaths`) is not touched at all. A file that is not a photo or video, cannot be read, is not on this Mac
+/// or takes too long keeps its icon. Runs off the main actor, and writes only through the reservation it is given
+/// (see `InFlightBlobStore`).
 struct FileThumbnailIngestor: Sendable {
     struct Limits: Equatable, Sendable {
         /// How many files of one copy are looked at, from the first. Rows show the first file; the preview lists
@@ -27,15 +30,19 @@ struct FileThumbnailIngestor: Sendable {
 
     let maker: any FileThumbnailMaking
     let limits: Limits
+    /// Which files may be looked at.
+    let paths: CopiedPaths
     private let sleep: @Sendable (Duration) async throws -> Void
 
     init(
         maker: any FileThumbnailMaking,
         limits: Limits = .standard,
+        paths: CopiedPaths = CopiedPaths(),
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.maker = maker
         self.limits = limits
+        self.paths = paths
         self.sleep = sleep
     }
 
@@ -71,9 +78,11 @@ struct FileThumbnailIngestor: Sendable {
     /// The thumbnails made in time, by the file's position. One file at a time, so a copy of many videos does not
     /// start many QuickLook requests at once.
     private func makeThumbnails(for files: [FileReference]) async -> [Int: Made] {
-        // Only file URLs: QuickLook is never asked for anything that could be fetched over the network.
+        // Only local files: QuickLook is never asked for anything that could be fetched over the network, and
+        // nothing on a network volume is even looked up.
+        let paths = paths
         let candidates = files.prefix(max(limits.maximumFiles, 0)).enumerated().filter {
-            $0.element.url.isFileURL && $0.element.thumbnail == nil
+            $0.element.thumbnail == nil && paths.access(for: $0.element.url) != .remote
         }
         guard !candidates.isEmpty else {
             return [:]
@@ -82,7 +91,7 @@ struct FileThumbnailIngestor: Sendable {
         let maker = maker
         let limits = limits
         let sleep = sleep
-        let finished: Void? = await Self.run(within: limits.totalBudget, sleep: sleep) {
+        let finished: Void? = await TimeLimit.run(within: limits.totalBudget, sleep: sleep) {
             for (index, file) in candidates {
                 if Task.isCancelled {
                     return
@@ -90,7 +99,7 @@ struct FileThumbnailIngestor: Sendable {
                 guard let kind = maker.mediaKind(of: file.url) else {
                     continue
                 }
-                let image = await Self.run(within: limits.timeoutPerFile, sleep: sleep) {
+                let image = await TimeLimit.run(within: limits.timeoutPerFile, sleep: sleep) {
                     await maker.thumbnail(of: file.url, maximumPixelSize: ThumbnailReference.maximumPixelSize)
                 }
                 guard let finished = image, let image = finished else {
@@ -114,38 +123,5 @@ struct FileThumbnailIngestor: Sendable {
     static func isValid(_ image: ImageInspection.Thumbnail) -> Bool {
         let sides = 1...ThumbnailReference.maximumPixelSize
         return !image.pngData.isEmpty && sides.contains(image.pixelWidth) && sides.contains(image.pixelHeight)
-    }
-
-    private enum Outcome<Value: Sendable>: Sendable {
-        case finished(Value)
-        case timedOut
-    }
-
-    /// Runs `work` until it finishes or `timeout` passes, whichever is first, and cancels the other. Nil when the
-    /// time ran out or the calling task was cancelled. `work` must stop soon after it is cancelled.
-    static func run<Value: Sendable>(
-        within timeout: Duration,
-        sleep: @escaping @Sendable (Duration) async throws -> Void,
-        _ work: @escaping @Sendable () async -> Value
-    ) async -> Value? {
-        await withTaskGroup(of: Outcome<Value>.self) { group in
-            group.addTask {
-                .finished(await work())
-            }
-            group.addTask {
-                do {
-                    try await sleep(timeout)
-                } catch {
-                    // Cancelled: the work finished first, or the caller was cancelled.
-                }
-                return .timedOut
-            }
-            let first = await group.next()
-            group.cancelAll()
-            guard case .finished(let value) = first else {
-                return nil
-            }
-            return value
-        }
     }
 }

@@ -143,8 +143,8 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         change { $0.record(content, sourceApp: sourceApp, at: date, concealed: concealed, expiresAt: expiresAt) }
     }
 
-    func addThumbnails(_ files: [FileReference], toEntry id: ClipboardEntry.ID) {
-        change { $0.addThumbnails(files, toEntry: id) }
+    func addFileDetails(_ files: [FileReference], toEntry id: ClipboardEntry.ID) {
+        change { $0.addFileDetails(files, toEntry: id) }
     }
 
     func completeImage(_ unsaved: ImageReference, with image: ImageReference, keepsEarlierCopy: Bool) {
