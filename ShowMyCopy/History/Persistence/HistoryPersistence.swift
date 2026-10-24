@@ -31,8 +31,8 @@ enum HistoryPersistenceError: Error, Equatable, Sendable {
 /// and learns at once whether it failed, so the history in memory and on disk cannot drift apart unnoticed. The
 /// writes are small (one text entry per copy, a few at most per change) and the SwiftData context they go through
 /// is itself bound to one actor; an actor here would add hops, ordering and `Sendable` snapshots for no gain.
-/// Content kinds with large data (images, files) should write that data off the main actor before recording the
-/// entry, and keep only a reference in `payload`.
+/// Image data is written to a `BlobStore` off the main actor (`ImageIngestor`) before the entry is recorded, and
+/// a record keeps only the blob IDs, in `payload` and in plain in `blobIDs`.
 @MainActor
 protocol HistoryPersistence: AnyObject {
     /// Every saved record, in any order.

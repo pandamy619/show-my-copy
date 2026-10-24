@@ -6,8 +6,8 @@ struct RetentionPolicy: Equatable, Sendable {
 
     /// The most entries kept. Always within `entryLimitRange`.
     let entryLimit: Int
-    /// The most bytes of content kept (the sum of `ClipboardEntry.byteSize`), or nil for no size limit.
-    /// Nothing sets it yet; it is there for a disk limit once the history is saved.
+    /// The most bytes of content kept (the sum of `ClipboardEntry.byteSize`, which for an image is its data and
+    /// thumbnail in the blob store), or nil for no size limit.
     let byteLimit: Int?
 
     init(entryLimit: Int = RetentionPolicy.defaultEntryLimit, byteLimit: Int? = nil) {

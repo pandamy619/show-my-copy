@@ -12,7 +12,8 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     var entries: [ClipboardEntry] { get }
 
     /// The entry whose content is on the pasteboard now, or nil when the latest pasteboard change was not recorded
-    /// (a skipped password, a transient, empty, too large or non-text item). The newest entry is not always current.
+    /// (a skipped password, a transient, empty, too large or unsupported item, or an image still being saved). The
+    /// newest entry is not always current.
     var currentEntryID: ClipboardEntry.ID? { get }
 
     /// The limits in effect.
@@ -30,6 +31,13 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// A `concealed` copy hides the entry, also one that was plain before, and sets `expiresAt` when one is given.
     /// A plain copy of concealed content keeps the entry concealed with its expiry, for example after the user
     /// pasted a password into a note and copied it from there: it is still a password.
+    ///
+    /// The store owns the blobs of the content it keeps (image data): they are deleted with the entry. Blobs of a
+    /// copy of content the history already holds are deleted at once. Content that cannot be concealed (images,
+    /// files) is not recorded as a concealed copy: it and any entry holding it are removed, and the returned ID
+    /// belongs to no entry.
+    ///
+    /// Any `stats()` and `ClearResult` count the blobs: an image's `byteSize` is its data and thumbnail.
     @discardableResult
     func record(
         _ content: ClipboardContent,
@@ -50,7 +58,8 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// The latest pasteboard change was not recorded, so no entry matches the pasteboard any more.
     func markCurrentSkipped()
 
-    /// Hides an entry and sets when it is removed. An expiry that is already earlier stays.
+    /// Hides an entry and sets when it is removed. An expiry that is already earlier stays. An entry that cannot be
+    /// concealed (an image or files) is removed instead.
     func conceal(id: ClipboardEntry.ID, expiresAt: Date)
 
     /// Moves every concealed entry's expiry to `date` at the latest, after the user picked a shorter lifetime.
