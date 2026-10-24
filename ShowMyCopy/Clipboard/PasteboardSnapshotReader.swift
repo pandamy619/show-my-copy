@@ -4,6 +4,8 @@ import AppKit
 enum CapturedItem: Equatable, Sendable {
     /// Content to record. `isSecret`: a password, by its marker or because a password manager copied it.
     case content(ClipboardContent, isSecret: Bool)
+    /// An image to store before it is recorded. Never a secret: a secret is kept as text or not at all.
+    case image(CapturedImage)
     /// Not recorded.
     case skipped(SkipReason)
     /// Nothing on the pasteboard: an app, usually a password manager, emptied it.
@@ -12,7 +14,8 @@ enum CapturedItem: Equatable, Sendable {
     enum SkipReason: Equatable, Sendable {
         /// Marked as transient or auto-generated: never kept.
         case marked
-        /// A password while passwords are not saved. Its contents were not read.
+        /// A password while passwords are not saved (its contents were not read), or a password without text,
+        /// such as an image marked as concealed: a secret is never kept as an image or files.
         case secret
         /// No content reader found anything it records, for example in an image.
         case unsupported
@@ -28,19 +31,24 @@ enum CapturedItem: Equatable, Sendable {
 /// with its own size limit, which it checks before it builds anything from the data.
 ///
 /// Reading happens on the main actor: `NSPasteboard` is not `Sendable`, and its contents can change between calls,
-/// which the monitor detects with `changeCount`. So readers only check sizes and copy the bytes out. Later work on
-/// the content belongs in an ingestor that will sit between this reader and the history: it gets the `Sendable`
-/// `CapturedItem` and, off the main actor, hashes the content, writes image and file data to disk and makes
-/// thumbnails, then hands the finished entry to the history store on the main actor. Keep that work out of the
-/// readers, or large copies will block the UI.
+/// which the monitor detects with `changeCount`. So readers only check sizes and copy the bytes out. An image is
+/// returned as `CapturedItem.image` with its raw bytes; `ImageIngestor` hashes it, makes the thumbnail and writes it
+/// to disk off the main actor before the monitor records it. Keep that work out of the readers, or large copies
+/// will block the UI.
+///
+/// A secret (by marker or password manager) is read by the readers that keep secrets only, which is plain text: a
+/// password is never kept as rich text, an image or files.
 @MainActor
 struct PasteboardSnapshotReader {
     private let pasteboard: any PasteboardReading
     /// Tried in order; the first that finds content wins. Readers for images, files or rich text go before the
-    /// text reader, because such items usually carry a plain-text form too.
+    /// text reader, because such items usually carry a plain-text form too. See `standardReaders(readsImages:)`.
     private let contentReaders: [any PasteboardContentReader]
 
-    init(pasteboard: any PasteboardReading, contentReaders: [any PasteboardContentReader] = [TextContentReader()]) {
+    init(
+        pasteboard: any PasteboardReading,
+        contentReaders: [any PasteboardContentReader] = PasteboardSnapshotReader.standardReaders(readsImages: false)
+    ) {
         self.pasteboard = pasteboard
         self.contentReaders = contentReaders
     }
@@ -56,27 +64,37 @@ struct PasteboardSnapshotReader {
         if let reason = skipReason(markers, isSecret: isSecret, savesPasswords: savesPasswords) {
             return .skipped(reason)
         }
-        let found = readContent()
+        let readSecretsOnly = isSecret
+        var found = readContent(secretsOnly: readSecretsOnly)
         // An app can add a marker after the data without a new change count, so look at the markers again.
         let markersAfterRead = currentMarkers()
         isSecret = isSecret || markersAfterRead.isSecret
         if let reason = skipReason(markersAfterRead, isSecret: isSecret, savesPasswords: savesPasswords) {
             return .skipped(reason)
         }
+        if isSecret, !readSecretsOnly {
+            // It turned out to be a secret: read it again as a secret, so it is kept as text or not at all.
+            found = readContent(secretsOnly: true)
+        }
         switch found {
         case .content(let content):
             return .content(content, isSecret: isSecret)
+        case .image(let image):
+            return .image(image)
         case .tooLarge(let limit):
-            AppLogger.clipboard.info("Skipped an item larger than \(limit, privacy: .public) bytes")
+            AppLogger.clipboard.info("Skipped an item over the limit of its reader (\(limit, privacy: .public))")
             return .skipped(.tooLarge)
         case .nothing:
             // Empty text, or a text type without text, is what an app leaves when it empties the clipboard.
-            return markersAfterRead.contentTypes.isSubset(of: Self.textTypes) ? .cleared : .skipped(.unsupported)
+            if markersAfterRead.contentTypes.isSubset(of: Self.textTypes) {
+                return .cleared
+            }
+            return isSecret ? .skipped(.secret) : .skipped(.unsupported)
         }
     }
 
-    private func readContent() -> ContentReading {
-        for reader in contentReaders {
+    private func readContent(secretsOnly: Bool) -> ContentReading {
+        for reader in contentReaders where reader.readsSecrets || !secretsOnly {
             let found = reader.read(from: pasteboard)
             if found != .nothing {
                 return found
@@ -98,7 +116,7 @@ struct PasteboardSnapshotReader {
     }
 
     /// Types that hold plain text. An item with only these types and no text is an emptied clipboard.
-    private static let textTypes: Set<NSPasteboard.PasteboardType> = [
+    static let textTypes: Set<NSPasteboard.PasteboardType> = [
         .string, NSPasteboard.PasteboardType("NSStringPboardType"),
     ]
 
@@ -124,16 +142,27 @@ struct PasteboardSnapshotReader {
 /// What a content reader found on the current item.
 enum ContentReading: Equatable, Sendable {
     case content(ClipboardContent)
+    /// Image data, to be stored before it can be recorded.
+    case image(CapturedImage)
     /// Nothing of the reader's kind, or only an empty value.
     case nothing
-    /// Content larger than `limit` bytes. It was not decoded.
+    /// Content over the reader's limit (`limit` bytes, or files for the file reader). It was not decoded.
     case tooLarge(limit: Int)
 }
 
 /// Reads one kind of content, such as plain text, from the current pasteboard item, within its own size limit.
 @MainActor
 protocol PasteboardContentReader {
+    /// Whether the reader may read an item that is a secret. Only plain text may be kept as a password.
+    var readsSecrets: Bool { get }
+
     func read(from pasteboard: any PasteboardReading) -> ContentReading
+}
+
+extension PasteboardContentReader {
+    var readsSecrets: Bool {
+        false
+    }
 }
 
 /// Reads plain text.
@@ -145,6 +174,10 @@ struct TextContentReader: PasteboardContentReader {
 
     init(maximumBytes: Int = TextContentReader.defaultMaximumBytes) {
         self.maximumBytes = maximumBytes
+    }
+
+    var readsSecrets: Bool {
+        true
     }
 
     /// Reads the UTF-8 data first and checks its size, so text over the limit is never decoded into a `String`.

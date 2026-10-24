@@ -8,6 +8,10 @@ protocol PasteboardReading {
     /// The current item's data for `dataType`, without converting it. For `.string` it is UTF-8 text, so its size
     /// can be checked before a `String` is made from it.
     func data(forType dataType: NSPasteboard.PasteboardType) -> Data?
+    /// How many items the pasteboard holds. Copied files are one item each, so this counts them without reading.
+    var itemCount: Int { get }
+    /// The file URLs of all items, in order. Other URLs are left out.
+    func fileURLs() -> [URL]
 }
 
 /// The parts of `NSPasteboard` the app uses. Tests replace it to check what is written.
@@ -17,6 +21,8 @@ protocol PasteboardBackend: AnyObject {
     var types: [NSPasteboard.PasteboardType]? { get }
     func string(forType dataType: NSPasteboard.PasteboardType) -> String?
     func data(forType dataType: NSPasteboard.PasteboardType) -> Data?
+    var pasteboardItems: [NSPasteboardItem]? { get }
+    func readObjects(forClasses classArray: [AnyClass], options: [NSPasteboard.ReadingOptionKey: Any]?) -> [Any]?
     func prepareForNewContents(with options: NSPasteboard.ContentsOptions) -> Int
     func setString(_ string: String, forType dataType: NSPasteboard.PasteboardType) -> Bool
 }
@@ -50,6 +56,15 @@ final class SystemPasteboard: PasteboardReading {
 
     func data(forType dataType: NSPasteboard.PasteboardType) -> Data? {
         pasteboard.data(forType: dataType)
+    }
+
+    var itemCount: Int {
+        pasteboard.pasteboardItems?.count ?? 0
+    }
+
+    func fileURLs() -> [URL] {
+        let objects = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+        return (objects ?? []).compactMap { $0 as? URL }
     }
 }
 

@@ -156,7 +156,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         sourceOfNextChangeIsUnknown = false
         lastChangeCount = changeCount
         switch item {
-        case .skipped:
+        case .skipped, .image:
             history.markCurrentSkipped()
         case .cleared:
             clipboardWasCleared(at: date, policy: policy)
