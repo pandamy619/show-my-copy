@@ -132,6 +132,9 @@ struct FileBlobStoreTests {
         let base = URL(filePath: "/tmp/Application Support", directoryHint: .isDirectory)
         #expect(
             FileBlobStore.directory(inApplicationSupport: base).path(percentEncoded: false)
-                == "/tmp/Application Support/ShowMyCopy/Blobs/")
+                == "/tmp/Application Support/ShowMyCopy/History/Blobs/")
+        let expected = HistoryFolder.directory(inApplicationSupport: base)
+            .appending(path: "Blobs", directoryHint: .isDirectory)
+        #expect(FileBlobStore.directory(inApplicationSupport: base) == expected)
     }
 }
