@@ -79,3 +79,25 @@ final class ReadCountingBlobStore: BlobStore {
         base.allIDs()
     }
 }
+
+struct FakeRenderedRichText: RenderedRichText, Equatable {
+    let rtf: Data
+}
+
+/// Renders any RTF except `FakeRichTextRenderer.unreadable`.
+struct FakeRichTextRenderer: RichTextRendering {
+    static let unreadable = Data("{\\rtf1 broken".utf8)
+
+    func render(rtf: Data) -> (any RenderedRichText)? {
+        rtf == Self.unreadable ? nil : FakeRenderedRichText(rtf: rtf)
+    }
+}
+
+/// Says that the files under `missing` may be unavailable, and every other file is available.
+struct FakeAvailabilityChecker: FileAvailabilityChecking {
+    var missing: Set<String> = []
+
+    func availability(of file: FileReference) -> FileAvailability {
+        missing.contains(file.path) ? .mayBeUnavailable : .available
+    }
+}
