@@ -153,11 +153,35 @@ struct SystemActivityObserverTests {
         #expect(back.count == 1)
     }
 
+    @Test func switchingAppsKeepsAppNapAwayForAWhile() async {
+        let activity = CountingActivity()
+        let clock = ManualInstant()
+        let sleeper = ManualSleeper()
+        let monitor = MonitorFactory.make(
+            pasteboard: FakePasteboard(), history: ClipboardHistory(),
+            sleep: { [sleeper] in await sleeper.sleep(for: $0) }, activity: activity, activityClock: clock.read)
+        let observer = SystemActivityObserver(
+            monitor: monitor, workspace: workspace, distributed: distributed, isScreenLocked: { false },
+            isSessionActive: { true })
+        observer.start()
+        monitor.start()
+        await sleeper.waitUntilSleeping()
+        clock.advance(by: PollingActivityPolicy.holdAfterActivity)
+        sleeper.wakeAll()
+        await sleeper.waitUntilSleeping()
+        #expect(!activity.isActive)
+
+        workspace.post(NSWorkspace.didActivateApplicationNotification)
+        #expect(activity.isActive)
+        monitor.stop()
+        sleeper.wakeAll()
+    }
+
     @Test func startTwiceObservesOnce() {
         let observer = makeObserver()
         observer.start()
         observer.start()
-        #expect(workspace.observedNames.count == 6)
+        #expect(workspace.observedNames.count == 7)
         #expect(distributed.observedNames.count == 2)
     }
 

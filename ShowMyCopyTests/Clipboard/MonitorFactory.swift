@@ -20,6 +20,7 @@ enum MonitorFactory {
         interval: Duration = PollingSchedule.defaultInterval,
         sleep: @escaping @Sendable (Duration) async throws -> Void = MonitorFactory.sleepUntilCancelled,
         activity: any PollingActivity = CountingActivity(),
+        activityClock: @escaping @MainActor () -> ContinuousClock.Instant = { .now },
         blobs: InFlightBlobStore? = nil,
         imageIngestor: ImageIngestor? = nil,
         fileSizes: FileSizeReader = MonitorFactory.noFileSizes,
@@ -28,7 +29,7 @@ enum MonitorFactory {
         ClipboardMonitor(
             pasteboard: pasteboard,
             history: history,
-            schedule: PollingSchedule(interval: interval, sleep: sleep, activity: activity),
+            schedule: PollingSchedule(interval: interval, sleep: sleep, activity: activity, now: activityClock),
             expiry: PasswordExpiry(history: history, now: now),
             clearedClipboard: ClearedClipboardCheck(history: history),
             capture: blobs.map { blobs in

@@ -127,11 +127,14 @@ struct HistoryWindowControllerTests {
         controller.shortcutPressed()
 
         // A pause left by a missed notification is cleared first, so the catch-up poll is not the last one.
-        #expect(tracker.calls == [.userIsActive, .poll])
+        #expect(tracker.calls == [.userIsActive, .poll, .historyWindowOpened(true)])
         #expect(controller.isVisible)
 
         controller.shortcutPressed()
-        #expect(tracker.calls == [.userIsActive, .poll, .userIsActive])
+        #expect(
+            tracker.calls == [
+                .userIsActive, .poll, .historyWindowOpened(true), .userIsActive, .historyWindowOpened(false),
+            ])
         #expect(!controller.isVisible)
     }
 

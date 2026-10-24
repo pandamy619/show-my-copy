@@ -7,6 +7,7 @@ final class ChangeTrackerSpy: PasteboardChangeTracking {
         case poll
         case acknowledge(changeCount: Int)
         case userIsActive
+        case historyWindowOpened(Bool)
     }
 
     private(set) var calls: [Call] = []
@@ -21,5 +22,9 @@ final class ChangeTrackerSpy: PasteboardChangeTracking {
 
     func userIsActive() {
         calls.append(.userIsActive)
+    }
+
+    func historyWindowOpened(_ isOpen: Bool) {
+        calls.append(.historyWindowOpened(isOpen))
     }
 }
