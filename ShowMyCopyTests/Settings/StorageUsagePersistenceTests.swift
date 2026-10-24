@@ -61,7 +61,7 @@ struct StorageUsagePersistenceTests {
     @Test func failedSaveShowsAWarningUntilSavingWorksAgain() {
         let store = disk.makeStore(now: start)
         let usage = makeUsage(store)
-        disk.failing = [.insert]
+        disk.failing = [.apply]
         store.record(text: "a", sourceApp: nil, at: start)
         #expect(usage.storageWarning == .changesNotSaved)
 
@@ -86,7 +86,7 @@ struct StorageUsagePersistenceTests {
         } onChange: {
             changed.set()
         }
-        disk.failing = [.insert]
+        disk.failing = [.apply]
         store.record(text: "a", sourceApp: nil, at: start)
         #expect(changed.value)
     }

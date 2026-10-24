@@ -3,21 +3,33 @@ import Foundation
 @testable import ShowMyCopy
 
 /// Keeps records in a dictionary, like a store on disk that outlives the history store, and can be told to fail.
+/// Each `apply` is all or nothing, like a transaction.
 @MainActor
 final class FakeHistoryPersistence: HistoryPersistence {
     enum Operation: Hashable {
-        case loadAll, insert, update, delete, deleteAll
+        case loadAll, apply
     }
 
     var records: [UUID: StoredEntryRecord] = [:]
     /// Operations that throw instead of changing anything.
     var failing: Set<Operation> = []
+    /// Calls that throw instead of changing anything, by their number in `calls` counting from 1, also the calls
+    /// before `resetCalls()`: the n-th operation fails.
+    var failingCalls: Set<Int> = []
     /// Every call, in order, also the failed ones.
     private(set) var calls: [Operation] = []
+    /// Every change passed to `apply`, also the failed ones.
+    private(set) var changes: [StoredChange] = []
     /// What `storedBytes()` returns, like the size of the files on disk.
     var bytesOnDisk: Int64?
     /// How often `storedBytes()` was called.
     private(set) var storedBytesReadCount = 0
+    private var callCount = 0
+
+    /// The number the next call gets, for `failingCalls`.
+    var nextCall: Int {
+        callCount + 1
+    }
 
     func record(_ id: UUID) -> StoredEntryRecord? {
         records[id]
@@ -29,26 +41,18 @@ final class FakeHistoryPersistence: HistoryPersistence {
         return records.values.sorted { $0.date < $1.date }
     }
 
-    func insert(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError) {
-        try perform(.insert)
-        save(records)
-    }
-
-    func update(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError) {
-        try perform(.update)
-        save(records)
-    }
-
-    func delete(ids: [UUID]) throws(HistoryPersistenceError) {
-        try perform(.delete)
-        for id in ids {
+    func apply(_ change: StoredChange) throws(HistoryPersistenceError) {
+        changes.append(change)
+        try perform(.apply)
+        if change.deletesAll {
+            records.removeAll()
+        }
+        for id in change.deleted {
             records[id] = nil
         }
-    }
-
-    func deleteAll() throws(HistoryPersistenceError) {
-        try perform(.deleteAll)
-        records.removeAll()
+        for record in change.saved {
+            records[record.id] = record
+        }
     }
 
     func storedBytes() -> Int64? {
@@ -58,6 +62,7 @@ final class FakeHistoryPersistence: HistoryPersistence {
 
     func resetCalls() {
         calls.removeAll()
+        changes.removeAll()
     }
 
     private func perform(
@@ -65,14 +70,9 @@ final class FakeHistoryPersistence: HistoryPersistence {
         error: HistoryPersistenceError = .saveFailed
     ) throws(HistoryPersistenceError) {
         calls.append(operation)
-        if failing.contains(operation) {
+        callCount += 1
+        if failing.contains(operation) || failingCalls.contains(callCount) {
             throw error
-        }
-    }
-
-    private func save(_ newRecords: [StoredEntryRecord]) {
-        for record in newRecords {
-            records[record.id] = record
         }
     }
 }
@@ -84,11 +84,12 @@ extension FakeHistoryPersistence {
         savesPasswords: Bool = true,
         retention: RetentionPolicy = .default,
         now: Date,
-        openError: HistoryPersistenceError? = nil
+        openError: HistoryPersistenceError? = nil,
+        blobs: (any BlobStore)? = nil
     ) -> PersistentHistoryStore {
         PersistentHistoryStore(
             persistence: self, sealer: sealer, savesPasswords: savesPasswords, retention: retention, now: now,
-            openError: openError)
+            openError: openError, blobs: blobs)
     }
 
     /// The texts of the saved records that `sealer` can read.
@@ -101,5 +102,24 @@ extension FakeHistoryPersistence {
                 }
                 return entry.text
             })
+    }
+}
+
+/// The single-purpose writes the tests use to set up a saved history, as changes of one kind each.
+extension HistoryPersistence {
+    func insert(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError) {
+        try apply(StoredChange(saved: records))
+    }
+
+    func update(_ records: [StoredEntryRecord]) throws(HistoryPersistenceError) {
+        try apply(StoredChange(saved: records))
+    }
+
+    func delete(ids: [UUID]) throws(HistoryPersistenceError) {
+        try apply(StoredChange(deleted: ids))
+    }
+
+    func deleteAll() throws(HistoryPersistenceError) {
+        try apply(StoredChange(deletesAll: true))
     }
 }

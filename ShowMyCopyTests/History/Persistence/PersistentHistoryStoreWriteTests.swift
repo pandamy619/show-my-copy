@@ -99,7 +99,7 @@ struct PersistentHistoryStoreWriteTests {
 
     @Test func aFailedWriteKeepsTheEntryAndIsReported() {
         let store = makeStore()
-        disk.failing = [.insert]
+        disk.failing = [.apply]
         let id = store.record(text: "a", sourceApp: nil, at: start)
 
         #expect(store.entries.map(\.id) == [id])
@@ -110,7 +110,7 @@ struct PersistentHistoryStoreWriteTests {
 
     @Test func theNextChangeAfterAFailedWriteSavesEverything() {
         let store = makeStore()
-        disk.failing = [.insert]
+        disk.failing = [.apply]
         store.record(text: "a", sourceApp: nil, at: start)
         disk.failing = []
 
@@ -123,7 +123,7 @@ struct PersistentHistoryStoreWriteTests {
         let store = makeStore()
         store.record(text: "plain", sourceApp: nil, at: start)
         store.record(text: "hunter2", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 600)
-        disk.failing = [.delete]
+        disk.failing = [.apply]
         store.removeConcealed()
         #expect(store.storageError == .saveFailed)
         disk.failing = []
@@ -136,7 +136,7 @@ struct PersistentHistoryStoreWriteTests {
     @Test func aFailedClearIsReported() {
         let store = makeStore()
         store.record(text: "a", sourceApp: nil, at: start)
-        disk.failing = [.deleteAll]
+        disk.failing = [.apply]
 
         #expect(store.clear() == ClearResult(removedCount: 1, freedBytes: 1))
         #expect(store.entries.isEmpty)
@@ -178,7 +178,7 @@ struct PersistentHistoryStoreWriteTests {
             errorChanged.set()
         }
 
-        disk.failing = [.insert]
+        disk.failing = [.apply]
         store.record(text: "a", sourceApp: nil, at: start)
         #expect(entriesChanged.value)
         #expect(errorChanged.value)

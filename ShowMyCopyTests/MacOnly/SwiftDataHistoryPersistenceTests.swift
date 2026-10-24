@@ -105,6 +105,40 @@ struct SwiftDataHistoryPersistenceTests {
         #expect(try persistence.loadAll().isEmpty)
     }
 
+    @Test func oneChangeDeletesAndSaves() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        let kept = makeRecord(text: "kept", date: date + 2)
+        let removed = makeRecord(text: "removed", date: date + 1)
+        var changed = makeRecord(text: "old")
+        try persistence.insert([kept, removed, changed])
+
+        changed.date = date + 3
+        let added = makeRecord(text: "added", date: date + 4)
+        try persistence.apply(StoredChange(deleted: [removed.id], saved: [changed, added]))
+        #expect(sorted(try persistence.loadAll()) == [added, changed, kept])
+    }
+
+    @Test func aRecordBothDeletedAndSavedIsSaved() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        var record = makeRecord()
+        try persistence.insert([record])
+
+        record.date = date + 1
+        try persistence.apply(StoredChange(deleted: [record.id], saved: [record]))
+        #expect(try persistence.loadAll() == [record])
+    }
+
+    @Test func deletingAllKeepsOnlyTheSavedRecords() throws {
+        let persistence = try SwiftDataHistoryPersistence.inMemory()
+        var changed = makeRecord(text: "changed")
+        try persistence.insert([changed, makeRecord(text: "gone", date: date + 1)])
+
+        changed.date = date + 5
+        let added = makeRecord(text: "added", date: date + 2)
+        try persistence.apply(StoredChange(deletesAll: true, saved: [changed, added]))
+        #expect(sorted(try persistence.loadAll()) == [changed, added])
+    }
+
     @Test func emptyChangesDoNothing() throws {
         let persistence = try SwiftDataHistoryPersistence.inMemory()
         let record = makeRecord()
@@ -113,6 +147,7 @@ struct SwiftDataHistoryPersistenceTests {
         try persistence.insert([])
         try persistence.update([])
         try persistence.delete(ids: [])
+        try persistence.apply(StoredChange())
         #expect(try persistence.loadAll() == [record])
     }
 
