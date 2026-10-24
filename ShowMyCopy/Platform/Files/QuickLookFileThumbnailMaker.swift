@@ -10,18 +10,29 @@ import UniformTypeIdentifiers
 /// as PNG.
 ///
 /// The app is sandboxed: it can read a copied file only because reading its URL from the pasteboard gave it access
-/// for as long as the app runs. QuickLook reads the file with that access in its own process and gives back a small
-/// image; nothing of the file is kept here. Files whose data is not on this Mac are skipped before QuickLook is
-/// asked, so making a thumbnail never downloads anything: iCloud and other cloud files that are not downloaded
-/// (including "dataless" placeholders of file providers) and files on network volumes.
+/// for as long as the app runs. QuickLook reads the file with that access in a system process (or a third-party
+/// Quick Look extension), outside the app's sandbox, and gives back a small image; nothing of the file is kept here.
+/// So QuickLook is asked only about files the app has checked first:
+///
+/// - Files whose data is on this Mac: not iCloud and other cloud files that are not downloaded (including "dataless"
+///   placeholders of file providers), and not files on network volumes. The app never asks for a file that is not
+///   local.
+/// - Types in `FileThumbnailPolicy`, matched exactly: the allowed image formats and QuickTime and MPEG-4 movies. No
+///   SVG, PDF or other format that can load external resources.
+/// - An image file must start with the signature of its type, ImageIO must read it as that type, and its header
+///   must be within `ImageDecodingPolicy.maximumPixelCount`. Only the header is read, in this process.
+/// - A movie file must hold its own media (`MovieContainer`): no reference movies. Only box headers are read.
 struct QuickLookFileThumbnailMaker: FileThumbnailMaking {
     private static let resourceKeys: Set<URLResourceKey> = [
         .contentTypeKey, .isRegularFileKey, .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey,
-        .volumeIsLocalKey,
+        .volumeIsLocalKey, .fileSizeKey,
     ]
 
     /// `SF_DATALESS` from <sys/stat.h>: the file's data lives with a file provider and reading it downloads it.
     private static let datalessFlag: UInt32 = 0x4000_0000
+
+    /// How many bytes of an image file are read to check its signature.
+    private static let signatureLength = 32
 
     func mediaKind(of url: URL) -> FileThumbnail.Kind? {
         guard url.isFileURL else {
@@ -36,17 +47,17 @@ struct QuickLookFileThumbnailMaker: FileThumbnailMaking {
             return nil
         }
         guard values.isRegularFile == true, values.volumeIsLocal != false, Self.isDownloaded(values),
-            !Self.isDataless(url), let type = values.contentType
+            !Self.isDataless(url), let type = values.contentType,
+            let candidate = FileThumbnailPolicy.candidate(forContentType: type.identifier)
         else {
             return nil
         }
-        if type.conforms(to: .movie) {
-            return .movie
+        switch candidate {
+        case .image(let format):
+            return Self.isAllowedImage(at: url, format: format) ? .image : nil
+        case .movie:
+            return Self.holdsItsOwnMedia(url, fileSize: values.fileSize) ? .movie : nil
         }
-        if type.conforms(to: .image) {
-            return .image
-        }
-        return nil
     }
 
     func thumbnail(of url: URL, maximumPixelSize: Int) async -> ImageInspection.Thumbnail? {
@@ -80,6 +91,77 @@ struct QuickLookFileThumbnailMaker: FileThumbnailMaking {
             return true
         }
         return info.st_flags & datalessFlag != 0
+    }
+
+    /// Whether the image file starts with the signature of `format`, ImageIO reads it as that format, and its header
+    /// is within the pixel limit. QuickLook would otherwise decode a decompression bomb, or hand a file to a decoder
+    /// for another format than its name says.
+    private static func isAllowedImage(at url: URL, format: ImageFormat) -> Bool {
+        guard let start = read(url, offset: 0, count: signatureLength), ImageFormat(sniffing: start) == format,
+            let image = CheckedImageSource.open(fileAt: url, format: format)
+        else {
+            AppLogger.clipboard.info("Skipped the thumbnail of an image file that is not the format its type says")
+            return false
+        }
+        guard image.isWithinPixelLimit else {
+            AppLogger.clipboard.info("Skipped the thumbnail of an image file over the pixel limit")
+            return false
+        }
+        return true
+    }
+
+    /// Whether the movie file holds its own media, from its box headers. Not a reference movie, whose media
+    /// QuickLook would have to load from elsewhere.
+    private static func holdsItsOwnMedia(_ url: URL, fileSize: Int?) -> Bool {
+        guard let fileSize, fileSize > 0 else {
+            return false
+        }
+        let handle: FileHandle
+        do {
+            handle = try FileHandle(forReadingFrom: url)
+        } catch {
+            return false
+        }
+        defer {
+            do {
+                try handle.close()
+            } catch {
+                AppLogger.clipboard.debug("Could not close a copied movie file")
+            }
+        }
+        let holds = MovieContainer.holdsItsOwnMedia(fileSize: UInt64(fileSize)) { offset, count in
+            Self.read(handle, offset: offset, count: count)
+        }
+        if !holds {
+            AppLogger.clipboard.info("Skipped the thumbnail of a movie file that does not hold its own media")
+        }
+        return holds
+    }
+
+    /// Up to `count` bytes of the file at `url` from `offset`, or nil when it cannot be read.
+    private static func read(_ url: URL, offset: UInt64, count: Int) -> Data? {
+        let handle: FileHandle
+        do {
+            handle = try FileHandle(forReadingFrom: url)
+        } catch {
+            return nil
+        }
+        let data = read(handle, offset: offset, count: count)
+        do {
+            try handle.close()
+        } catch {
+            AppLogger.clipboard.debug("Could not close a copied image file")
+        }
+        return data
+    }
+
+    private static func read(_ handle: FileHandle, offset: UInt64, count: Int) -> Data? {
+        do {
+            try handle.seek(toOffset: offset)
+            return try handle.read(upToCount: count)
+        } catch {
+            return nil
+        }
     }
 
     /// `image` as PNG data, scaled down first if QuickLook gave a larger one.
