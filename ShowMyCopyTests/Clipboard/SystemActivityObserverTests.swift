@@ -56,11 +56,11 @@ struct SystemActivityObserverTests {
         let back: Notification.Name
     }
 
-    nonisolated static let reasons: [ClipboardMonitor.PauseReason] = [
+    nonisolated static let reasons: [PollingSchedule.PauseReason] = [
         .systemSleep, .displaySleep, .sessionInactive, .screenLocked,
     ]
 
-    static func pair(for reason: ClipboardMonitor.PauseReason) -> Pair {
+    static func pair(for reason: PollingSchedule.PauseReason) -> Pair {
         switch reason {
         case .systemSleep:
             Pair(center: .workspace, away: NSWorkspace.willSleepNotification, back: NSWorkspace.didWakeNotification)
@@ -110,7 +110,7 @@ struct SystemActivityObserverTests {
     }
 
     @Test(arguments: reasons)
-    func pausesAndResumesThePairedReason(reason: ClipboardMonitor.PauseReason) {
+    func pausesAndResumesThePairedReason(reason: PollingSchedule.PauseReason) {
         let pair = Self.pair(for: reason)
         let observer = makeObserver()
         observer.start()
@@ -127,7 +127,7 @@ struct SystemActivityObserverTests {
     }
 
     @Test(arguments: reasons)
-    func tellsWhenTheUserLeaves(reason: ClipboardMonitor.PauseReason) {
+    func tellsWhenTheUserLeaves(reason: PollingSchedule.PauseReason) {
         let pair = Self.pair(for: reason)
         let observer = makeObserver()
         let away = CallCounter()

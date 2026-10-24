@@ -1,10 +1,10 @@
 import AppKit
 
-/// Polls the pasteboard and records new copies in the history.
+/// Records new copies in the history.
 ///
-/// macOS has no notification for pasteboard changes, so the monitor compares `changeCount`
-/// on a timer and reads the contents only when the count changes. It decides when to read, who copied and what
-/// the password settings allow; `PasteboardSnapshotReader` decides what the item is.
+/// `schedule` says when to look at the pasteboard; on each look the monitor compares `changeCount` and reads the
+/// contents only when the count changed. It decides who copied and what the password settings allow;
+/// `PasteboardSnapshotReader` decides what the item is. Expired passwords go on every look (`expiry`).
 ///
 /// A copied image is stored by `imageIngestor` off the main actor before it is recorded. Until then the monitor reads
 /// no further change, so copies are recorded in the order they were made. Copied files are recorded at once; the
@@ -12,16 +12,6 @@ import AppKit
 /// and added to their entries, so no copy is missed while they are made.
 @MainActor
 final class ClipboardMonitor: PasteboardChangeTracking {
-    enum PauseReason: Hashable, Sendable {
-        case systemSleep
-        case displaySleep
-        case screenLocked
-        case sessionInactive
-    }
-
-    nonisolated static let defaultInterval: Duration = .milliseconds(500)
-    /// The largest text recorded, in UTF-8 bytes. `TextContentReader` checks it.
-    nonisolated static let maximumTextBytes = TextContentReader.defaultMaximumBytes
     /// How soon after a copy an emptied clipboard counts as a password manager clearing the password it copied.
     /// 1Password and Bitwarden clear after about 90 seconds by default.
     nonisolated static let clearedClipboardWindow: TimeInterval = 180
@@ -29,11 +19,10 @@ final class ClipboardMonitor: PasteboardChangeTracking {
     private let pasteboard: any PasteboardReading
     private let reader: PasteboardSnapshotReader
     private let history: any HistoryStore
-    private let interval: Duration
+    private let schedule: PollingSchedule
+    private let expiry: PasswordExpiry
     private let frontmostApp: @MainActor () -> SourceApp?
     private let now: @MainActor () -> Date
-    private let sleep: @Sendable (Duration) async throws -> Void
-    private let activity: any PollingActivity
     private let passwordPolicy: @MainActor () -> PasswordPolicy
     /// Stores copied images. Without it images are not read.
     private let imageIngestor: ImageIngestor?
@@ -47,19 +36,15 @@ final class ClipboardMonitor: PasteboardChangeTracking {
     /// True until the monitor has looked at the pasteboard while running. A change found then was made before
     /// launch or while the monitor was stopped or paused, so the app in front now did not necessarily make it.
     private var sourceOfNextChangeIsUnknown = true
-    private var pollTask: Task<Void, Never>?
-    private var isStarted = false
-    private(set) var pauseReasons: Set<PauseReason> = []
 
     init(
         pasteboard: any PasteboardReading,
         history: any HistoryStore,
-        interval: Duration = ClipboardMonitor.defaultInterval,
-        frontmostApp: @escaping @MainActor () -> SourceApp? = { SourceApp.frontmost() },
-        now: @escaping @MainActor () -> Date = { Date() },
-        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
-        activity: any PollingActivity = ProcessPollingActivity(),
-        passwordPolicy: @escaping @MainActor () -> PasswordPolicy = { .default },
+        schedule: PollingSchedule,
+        expiry: PasswordExpiry,
+        frontmostApp: @escaping @MainActor () -> SourceApp?,
+        now: @escaping @MainActor () -> Date,
+        passwordPolicy: @escaping @MainActor () -> PasswordPolicy,
         imageIngestor: ImageIngestor? = nil,
         fileThumbnailIngestor: FileThumbnailIngestor? = nil
     ) {
@@ -70,71 +55,48 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         self.imageIngestor = imageIngestor
         self.fileThumbnailIngestor = fileThumbnailIngestor
         self.history = history
-        self.interval = interval
+        self.schedule = schedule
+        self.expiry = expiry
         self.frontmostApp = frontmostApp
         self.now = now
-        self.sleep = sleep
-        self.activity = activity
         self.passwordPolicy = passwordPolicy
+        schedule.tick = { [weak self] in
+            self?.poll()
+        }
     }
 
     var isPolling: Bool {
-        pollTask != nil
+        schedule.isPolling
+    }
+
+    var pauseReasons: Set<PollingSchedule.PauseReason> {
+        schedule.pauseReasons
     }
 
     func start() {
-        isStarted = true
-        updatePolling()
+        schedule.start()
     }
 
     func stop() {
-        isStarted = false
         sourceOfNextChangeIsUnknown = true
-        updatePolling()
+        schedule.stop()
     }
 
     /// Stops polling while the Mac sleeps or the screen is locked. Polling resumes when every reason is cleared.
-    func pause(for reason: PauseReason) {
-        pauseReasons.insert(reason)
+    func pause(for reason: PollingSchedule.PauseReason) {
         sourceOfNextChangeIsUnknown = true
-        updatePolling()
+        schedule.pause(for: reason)
     }
 
-    func resume(for reason: PauseReason) {
-        pauseReasons.remove(reason)
-        updatePolling()
+    func resume(for reason: PollingSchedule.PauseReason) {
+        schedule.resume(for: reason)
     }
 
     /// Clears every pause reason. Call it when the user does something only a person at the unlocked Mac can do,
     /// such as pressing the history shortcut: then the Mac is awake, the screen is unlocked and the session is
     /// active, even if a notification saying so was missed.
     func userIsActive() {
-        guard !pauseReasons.isEmpty else {
-            return
-        }
-        pauseReasons.removeAll()
-        updatePolling()
-    }
-
-    private func updatePolling() {
-        let shouldPoll = isStarted && pauseReasons.isEmpty
-        if shouldPoll, pollTask == nil {
-            activity.begin()
-            poll()
-            pollTask = Task { [weak self, interval, sleep] in
-                while !Task.isCancelled {
-                    try? await sleep(interval)
-                    guard let self, !Task.isCancelled else {
-                        return
-                    }
-                    self.poll()
-                }
-            }
-        } else if !shouldPoll, let pollTask {
-            pollTask.cancel()
-            self.pollTask = nil
-            activity.end()
-        }
+        schedule.resumeAll()
     }
 
     /// Marks a pasteboard change made by this app as seen, so it is not recorded again as a copy
@@ -145,16 +107,15 @@ final class ClipboardMonitor: PasteboardChangeTracking {
 
     /// Checks the pasteboard once. The first call records whatever is on the pasteboard at launch.
     func poll() {
+        expiry.removeExpired()
         let date = now()
-        // Checked on every poll, not only on a change, so a password leaves the history on time.
-        history.removeExpired(at: date)
         guard pendingIngestion == nil else {
             // The next change is read once the image is recorded, so it ends up above the image.
             return
         }
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else {
-            if isStarted, pauseReasons.isEmpty {
+            if schedule.isWatching {
                 // Nothing changed while the monitor was away, so the next change happens while it is watching.
                 sourceOfNextChangeIsUnknown = false
             }

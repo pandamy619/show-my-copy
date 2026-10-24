@@ -87,18 +87,18 @@ struct SystemPasteboardRealTests {
 
     @Test func textOverTheLimitIsSkippedByItsDataSize() {
         withIsolatedPasteboard { backend in
-            let tooLarge = String(repeating: "a", count: ClipboardMonitor.maximumTextBytes + 1)
+            let tooLarge = String(repeating: "a", count: TextContentReader.defaultMaximumBytes + 1)
             #expect(backend.setString(tooLarge, forType: .string))
 
             let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: nil)
-            #expect(pasteboard.data(forType: .string)?.count == ClipboardMonitor.maximumTextBytes + 1)
+            #expect(pasteboard.data(forType: .string)?.count == TextContentReader.defaultMaximumBytes + 1)
             #expect(read(backend) == .skipped(.tooLarge))
         }
     }
 
     @Test func textOfExactlyTheLimitIsRead() {
         withIsolatedPasteboard { backend in
-            let text = String(repeating: "a", count: ClipboardMonitor.maximumTextBytes)
+            let text = String(repeating: "a", count: TextContentReader.defaultMaximumBytes)
             #expect(backend.setString(text, forType: .string))
             #expect(read(backend) == .content(.text(text), isSecret: false))
         }

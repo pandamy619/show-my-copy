@@ -104,11 +104,11 @@ struct ClipboardMonitorTests {
 
     @Test func skipsTextOverSizeLimit() {
         let monitor = makeMonitor()
-        pasteboard.copy(String(repeating: "a", count: ClipboardMonitor.maximumTextBytes + 1))
+        pasteboard.copy(String(repeating: "a", count: TextContentReader.defaultMaximumBytes + 1))
         monitor.poll()
         #expect(history.entries.isEmpty)
 
-        pasteboard.copy(String(repeating: "a", count: ClipboardMonitor.maximumTextBytes))
+        pasteboard.copy(String(repeating: "a", count: TextContentReader.defaultMaximumBytes))
         monitor.poll()
         #expect(history.entries.count == 1)
     }
@@ -167,7 +167,7 @@ struct ClipboardMonitorCurrentEntryTests {
 
     @Test func skippedLargeTextIsNotCurrent() {
         let monitor = makeMonitorWithRecordedEntry()
-        pasteboard.copy(String(repeating: "a", count: ClipboardMonitor.maximumTextBytes + 1))
+        pasteboard.copy(String(repeating: "a", count: TextContentReader.defaultMaximumBytes + 1))
         monitor.poll()
         #expect(history.currentEntryID == nil)
     }

@@ -22,13 +22,13 @@ struct PasteboardSnapshotReaderTests {
     }
 
     @Test func tooLargeTextIsSkippedWithoutMakingAString() {
-        pasteboard.copy(String(repeating: "a", count: ClipboardMonitor.maximumTextBytes + 1))
+        pasteboard.copy(String(repeating: "a", count: TextContentReader.defaultMaximumBytes + 1))
         #expect(read() == .skipped(.tooLarge))
         #expect(pasteboard.stringCallCount == 0)
     }
 
     @Test func textOfExactlyTheLimitIsRead() {
-        let text = String(repeating: "a", count: ClipboardMonitor.maximumTextBytes)
+        let text = String(repeating: "a", count: TextContentReader.defaultMaximumBytes)
         pasteboard.copy(text)
         #expect(read() == .content(.text(text), isSecret: false))
     }

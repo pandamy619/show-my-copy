@@ -67,10 +67,10 @@ final class AppContainer {
         let monitor = ClipboardMonitor(
             pasteboard: pasteboard,
             history: store,
+            schedule: PollingSchedule(sleep: sleep, activity: pollingActivity),
+            expiry: PasswordExpiry(history: store, now: now),
             frontmostApp: frontmostApp,
             now: now,
-            sleep: sleep,
-            activity: pollingActivity,
             passwordPolicy: { [passwordSettings] in passwordSettings.policy },
             imageIngestor: ingestors.images,
             fileThumbnailIngestor: ingestors.files

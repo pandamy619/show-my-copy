@@ -17,7 +17,7 @@ enum MonitorFactory {
         frontmostApp: @escaping @MainActor () -> SourceApp? = { nil },
         now: @escaping @MainActor () -> Date = { MonitorFactory.date },
         passwordPolicy: @escaping @MainActor () -> PasswordPolicy = { .default },
-        interval: Duration = ClipboardMonitor.defaultInterval,
+        interval: Duration = PollingSchedule.defaultInterval,
         sleep: @escaping @Sendable (Duration) async throws -> Void = MonitorFactory.sleepUntilCancelled,
         activity: any PollingActivity = CountingActivity(),
         imageIngestor: ImageIngestor? = nil,
@@ -26,11 +26,10 @@ enum MonitorFactory {
         ClipboardMonitor(
             pasteboard: pasteboard,
             history: history,
-            interval: interval,
+            schedule: PollingSchedule(interval: interval, sleep: sleep, activity: activity),
+            expiry: PasswordExpiry(history: history, now: now),
             frontmostApp: frontmostApp,
             now: now,
-            sleep: sleep,
-            activity: activity,
             passwordPolicy: passwordPolicy,
             imageIngestor: imageIngestor,
             fileThumbnailIngestor: fileThumbnailIngestor

@@ -82,5 +82,5 @@ final class SystemActivityObserver {
         }
     }
 
-    private typealias PauseReason = ClipboardMonitor.PauseReason
+    private typealias PauseReason = PollingSchedule.PauseReason
 }
