@@ -145,9 +145,24 @@ struct RichTextContentReaderTests {
         #expect(RichTextContentReader().read(from: pasteboard) == .nothing)
     }
 
-    @Test func rtfOverTheLimitIsLeftForThePlainTextReader() {
+    @Test func rtfOverTheLimitIsKeptAsThePlainTextItReadFirst() {
         pasteboard.copyRichText("bold", rtf: Data(count: 11))
-        #expect(RichTextContentReader(maximumBytes: 10).read(from: pasteboard) == .nothing)
+        #expect(RichTextContentReader(maximumBytes: 10).read(from: pasteboard) == .content(.text("bold")))
+        #expect(pasteboard.dataReadTypes == [.string, .rtf])
+    }
+
+    /// macOS cannot tell the size of copied data before it is read, so the smaller form is read first: styled text
+    /// whose plain text is over the limit is skipped without reading its RTF, which is larger still.
+    @Test func plainTextOverItsLimitSkipsTheItemWithoutReadingTheRTF() {
+        pasteboard.copyRichText(String(repeating: "a", count: 11), rtf: rtf)
+        #expect(RichTextContentReader(textLimit: 10).read(from: pasteboard) == .tooLarge(limit: 10))
+        #expect(pasteboard.dataReadTypes == [.string])
+    }
+
+    @Test func styledTextWithoutPlainTextIsNotRead() {
+        pasteboard.copy([.rtf: rtf])
+        #expect(RichTextContentReader().read(from: pasteboard) == .nothing)
+        #expect(!pasteboard.dataReadTypes.contains(.rtf))
     }
 
     @Test func defaultLimitIsOneMegabyte() {
@@ -219,9 +234,17 @@ struct StandardReadersTests {
         #expect(read() == .skipped(.tooLarge))
     }
 
-    @Test func largeRTFIsKeptAsPlainText() {
+    @Test func largeRTFIsKeptAsPlainTextReadOnce() {
         pasteboard.copyRichText("words", rtf: Data(count: RichTextContentReader.defaultMaximumBytes + 1))
         #expect(read() == .content(.text("words"), isSecret: false))
+        #expect(pasteboard.dataReadTypes.filter { $0 == .string }.count == 1)
+        #expect(pasteboard.dataReadTypes.filter { $0 == .rtf }.count == 1)
+    }
+
+    @Test func styledTextWithTooMuchPlainTextIsSkippedWithoutReadingTheRTF() {
+        pasteboard.copyRichText(String(repeating: "a", count: TextContentReader.defaultMaximumBytes + 1), rtf: png)
+        #expect(read() == .skipped(.tooLarge))
+        #expect(!pasteboard.dataReadTypes.contains(.rtf))
     }
 
     @Test func secretRichTextIsKeptAsPlainText() {

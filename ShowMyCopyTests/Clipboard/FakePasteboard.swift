@@ -29,6 +29,8 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     private(set) var stringCallCount = 0
     /// How often data of any type was read.
     private(set) var dataReadCount = 0
+    /// The type of every data read, in order, to check what is read and how often.
+    private(set) var dataReadTypes: [NSPasteboard.PasteboardType] = []
     /// When true, `write` fails and leaves the pasteboard unchanged.
     var writeFails = false
     /// Runs once inside the next `string()` or `data(forType:)` call, before the contents are returned, to simulate
@@ -66,6 +68,7 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
 
     func data(forType dataType: NSPasteboard.PasteboardType) -> Data? {
         dataReadCount += 1
+        dataReadTypes.append(dataType)
         if dataType == .string {
             stringReadCount += 1
         }
