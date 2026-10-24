@@ -4,14 +4,16 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// Accepts data that starts with the PNG signature byte as an image of `size`, rejects anything else.
+/// Accepts data that starts with the PNG signature byte as an image of `size`, rejects anything else, and anything
+/// declared as another type than `acceptedType` when one is set.
 struct FakeThumbnailMaker: ThumbnailMaking {
     var pixelWidth = 640
     var pixelHeight = 480
     var makesThumbnail = true
+    var acceptedType: String?
 
-    func inspect(_ data: Data, maximumPixelSize: Int) throws(ThumbnailError) -> ImageInspection {
-        guard data.first == 0x89 else {
+    func inspect(_ data: Data, declaredType: String, maximumPixelSize: Int) throws(ThumbnailError) -> ImageInspection {
+        guard data.first == 0x89, acceptedType.map({ $0 == declaredType }) ?? true else {
             throw .notAnImage
         }
         let thumbnail = ImageInspection.Thumbnail(
@@ -58,8 +60,8 @@ struct ImageIngestorTests {
     private let data = Data([0x89, 0x50, 0x4E, 0x47, 1, 2, 3])
     private let hasher = SHA256ContentHasher()
 
-    private func captured(_ data: Data? = nil) -> CapturedImage {
-        CapturedImage(data: data ?? self.data, typeIdentifier: "public.png")
+    private func captured(_ data: Data? = nil, as type: String = "public.png") -> CapturedImage {
+        CapturedImage(data: data ?? self.data, typeIdentifier: type)
     }
 
     @Test func storesTheImageAndItsThumbnail() async throws {
@@ -99,6 +101,17 @@ struct ImageIngestorTests {
             try ingestor.store(captured(Data([0, 1, 2])), known: [:])
         }
         #expect(blobs.allIDs().isEmpty)
+    }
+
+    @Test func theMakerIsToldTheTypeTheImageWasCopiedAs() throws {
+        let blobs = InMemoryBlobStore()
+        let ingestor = ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker(acceptedType: "public.tiff"))
+        #expect(throws: ImageIngestError.notAnImage) {
+            try ingestor.store(captured(as: "public.png"), known: [:])
+        }
+        #expect(blobs.allIDs().isEmpty)
+        let ingested = try ingestor.store(captured(as: "public.tiff"), known: [:])
+        #expect(ingested.reference.typeIdentifier == "public.tiff")
     }
 
     @Test func imageWithoutThumbnailIsStillStored() throws {

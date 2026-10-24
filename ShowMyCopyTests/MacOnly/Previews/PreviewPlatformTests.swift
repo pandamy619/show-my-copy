@@ -44,6 +44,24 @@ struct ImageIOPreviewDecoderTests {
         #expect(decoder.decode(Data(), maximumPixelSize: 256) == nil)
     }
 
+    @Test func imageOverThePixelLimitIsNotDecoded() throws {
+        // Built the same way, but small enough: decoded.
+        let small = try CraftedPNG.blank(width: 3000, height: 3000)
+        let image = try #require(decoder.decode(small, maximumPixelSize: 2048))
+        #expect(image.pixelWidth == 2048)
+        #expect(decoder.decode(try CraftedPNG.blank(width: 11000, height: 11000), maximumPixelSize: 2048) == nil)
+        #expect(decoder.decode(CraftedPNG.headerOnly(width: 60000, height: 60000), maximumPixelSize: 256) == nil)
+    }
+
+    @Test func decodesOnlyAllowedFormats() throws {
+        for type in ["public.jpeg", "com.compuserve.gif", "public.tiff", "com.microsoft.bmp"] {
+            let data = try CraftedPNG.encoded(width: 40, height: 30, as: type)
+            #expect(decoder.decode(data, maximumPixelSize: 256) != nil, "\(type)")
+        }
+        let jpeg2000 = try CraftedPNG.encoded(width: 40, height: 30, as: "public.jpeg-2000")
+        #expect(decoder.decode(jpeg2000, maximumPixelSize: 256) == nil)
+    }
+
     @Test @MainActor func thumbnailProviderDecodesARealThumbnailOffTheMainActor() async throws {
         let blobs = InMemoryBlobStore()
         let ingestor = ImageIngestor(blobs: blobs, thumbnails: ImageIOThumbnailMaker())

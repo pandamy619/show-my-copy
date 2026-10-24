@@ -10,23 +10,15 @@ struct ImageIOThumbnailMakerTests {
 
     /// A PNG of one colour, `width` by `height` pixels.
     private func png(width: Int, height: Int) throws -> Data {
-        let context = try #require(
-            CGContext(
-                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.setFillColor(red: 0.9, green: 0.2, blue: 0.1, alpha: 1)
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        let image = try #require(context.makeImage())
-        let output = NSMutableData()
-        let destination = try #require(
-            CGImageDestinationCreateWithData(output as CFMutableData, "public.png" as CFString, 1, nil))
-        CGImageDestinationAddImage(destination, image, nil)
-        #expect(CGImageDestinationFinalize(destination))
-        return output as Data
+        try CraftedPNG.encoded(width: width, height: height, as: "public.png")
+    }
+
+    private func inspect(_ data: Data, as type: String = "public.png") throws -> ImageInspection {
+        try maker.inspect(data, declaredType: type, maximumPixelSize: 256)
     }
 
     @Test func measuresTheImageAndDrawsASmallPNG() throws {
-        let inspection = try maker.inspect(try png(width: 1000, height: 500), maximumPixelSize: 256)
+        let inspection = try inspect(try png(width: 1000, height: 500))
         #expect(inspection.pixelWidth == 1000)
         #expect(inspection.pixelHeight == 500)
         let thumbnail = try #require(inspection.thumbnail)
@@ -35,20 +27,20 @@ struct ImageIOThumbnailMakerTests {
         #expect(thumbnail.pngData.prefix(4) == Data([0x89, 0x50, 0x4E, 0x47]))
 
         // The thumbnail is itself a readable image of that size.
-        let again = try maker.inspect(thumbnail.pngData, maximumPixelSize: 256)
+        let again = try inspect(thumbnail.pngData)
         #expect(again.pixelWidth == 256)
         #expect(again.pixelHeight == 128)
     }
 
     @Test func smallImageIsNotEnlarged() throws {
-        let inspection = try maker.inspect(try png(width: 40, height: 30), maximumPixelSize: 256)
+        let inspection = try inspect(try png(width: 40, height: 30))
         let thumbnail = try #require(inspection.thumbnail)
         #expect(thumbnail.pixelWidth <= 40)
         #expect(thumbnail.pixelHeight <= 30)
     }
 
     @Test func tallImageIsLimitedByItsHeight() throws {
-        let inspection = try maker.inspect(try png(width: 300, height: 1200), maximumPixelSize: 256)
+        let inspection = try inspect(try png(width: 300, height: 1200))
         let thumbnail = try #require(inspection.thumbnail)
         #expect(thumbnail.pixelHeight == 256)
         #expect(thumbnail.pixelWidth == 64)
@@ -56,10 +48,67 @@ struct ImageIOThumbnailMakerTests {
 
     @Test func dataThatIsNotAnImageIsRejected() {
         #expect(throws: ThumbnailError.notAnImage) {
-            try maker.inspect(Data("not an image".utf8), maximumPixelSize: 256)
+            try inspect(Data("not an image".utf8))
         }
         #expect(throws: ThumbnailError.notAnImage) {
-            try maker.inspect(Data(), maximumPixelSize: 256)
+            try inspect(Data())
+        }
+    }
+
+    @Test func bombHeaderIsMeasuredButNotDecoded() throws {
+        let bomb = CraftedPNG.headerOnly(width: 60000, height: 60000)
+        #expect(bomb.count < 200)
+        let inspection = try inspect(bomb)
+        #expect(inspection.pixelWidth == 60000)
+        #expect(inspection.pixelHeight == 60000)
+        #expect(inspection.thumbnail == nil)
+    }
+
+    /// A valid image built the same way gets a thumbnail at a smaller size, so only the pixel count stops it.
+    @Test func imageOverThePixelLimitIsRecordedWithoutAThumbnail() throws {
+        let small = try CraftedPNG.blank(width: 2000, height: 2000)
+        #expect(try inspect(small).thumbnail != nil)
+        #expect(!ImageDecodingPolicy.allowsDecoding(pixelWidth: 11000, pixelHeight: 11000))
+
+        let over = try CraftedPNG.blank(width: 11000, height: 11000)
+        #expect(over.count < ImageContentReader.defaultMaximumBytes)
+        let inspection = try inspect(over)
+        #expect(inspection.pixelWidth == 11000)
+        #expect(inspection.pixelHeight == 11000)
+        #expect(inspection.thumbnail == nil)
+    }
+
+    @Test func ingestorStoresAnImageOverThePixelLimitWithoutAThumbnail() async throws {
+        let blobs = InMemoryBlobStore()
+        let ingestor = ImageIngestor(blobs: blobs, thumbnails: maker)
+        let data = try CraftedPNG.blank(width: 11000, height: 11000)
+        let ingested = try await ingestor.ingest(CapturedImage(data: data, typeIdentifier: "public.png"), known: [:])
+        #expect(ingested.reference.pixelWidth == 11000)
+        #expect(ingested.reference.thumbnail == nil)
+        #expect(blobs.allIDs() == [ingested.reference.blobID])
+    }
+
+    @Test func dataOfAnotherFormatThanItWasCopiedAsIsRejected() throws {
+        let jpeg = try CraftedPNG.encoded(width: 40, height: 30, as: "public.jpeg")
+        let gif = try CraftedPNG.encoded(width: 40, height: 30, as: "com.compuserve.gif")
+        let tiff = try CraftedPNG.encoded(width: 40, height: 30, as: "public.tiff")
+        for (data, type) in [(jpeg, "public.jpeg"), (gif, "com.compuserve.gif"), (tiff, "public.tiff")] {
+            #expect(try inspect(data, as: type).pixelWidth == 40, "\(type)")
+            #expect(throws: ThumbnailError.notAnImage, "\(type) copied as PNG") {
+                try inspect(data, as: "public.png")
+            }
+        }
+        #expect(throws: ThumbnailError.notAnImage) {
+            try inspect(try png(width: 40, height: 30), as: "public.tiff")
+        }
+    }
+
+    @Test func formatsOutsideTheAllowlistAreRejectedWhateverTheyAreCopiedAs() throws {
+        let jpeg2000 = try CraftedPNG.encoded(width: 40, height: 30, as: "public.jpeg-2000")
+        for type in ["public.jpeg-2000", "public.png", "public.tiff"] {
+            #expect(throws: ThumbnailError.notAnImage, "\(type)") {
+                try inspect(jpeg2000, as: type)
+            }
         }
     }
 
