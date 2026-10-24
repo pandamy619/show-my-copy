@@ -18,6 +18,11 @@ final class FakePasteboardBackend: PasteboardBackend {
     var afterSetString: (@MainActor (FakePasteboardBackend) -> Void)?
     /// Like `NSPasteboard`, only the app that prepared the current contents can add to them.
     private var ownedChangeCount: Int?
+    /// The items another app put on the pasteboard, for counting.
+    var pasteboardItems: [NSPasteboardItem]?
+    /// What `readObjects` returns, and the options it was last called with.
+    var readableObjects: [Any] = []
+    private(set) var lastReadOptions: [NSPasteboard.ReadingOptionKey: Any]?
 
     func prepareForNewContents(with options: NSPasteboard.ContentsOptions) -> Int {
         preparedOptions.append(options)
@@ -53,6 +58,11 @@ final class FakePasteboardBackend: PasteboardBackend {
     /// Text as UTF-8 data, as `NSPasteboard` returns it for `.string`.
     func data(forType dataType: NSPasteboard.PasteboardType) -> Data? {
         strings[dataType].map { Data($0.utf8) }
+    }
+
+    func readObjects(forClasses classArray: [AnyClass], options: [NSPasteboard.ReadingOptionKey: Any]?) -> [Any]? {
+        lastReadOptions = options
+        return readableObjects
     }
 
     /// Another app takes over the pasteboard.
@@ -150,6 +160,19 @@ struct SystemPasteboardTests {
         #expect(pasteboard.changeCount == 1)
         #expect(pasteboard.types.isEmpty)
         #expect(pasteboard.string() == "copied")
+    }
+
+    @Test func countsItemsAndReadsFileURLsOnly() {
+        backend.pasteboardItems = [NSPasteboardItem(), NSPasteboardItem()]
+        let file = URL(filePath: "/Users/me/a.txt")
+        backend.readableObjects = [file, "not a URL"]
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: nil)
+        #expect(pasteboard.itemCount == 2)
+        #expect(pasteboard.fileURLs() == [file])
+        #expect(backend.lastReadOptions?[.urlReadingFileURLsOnly] as? Bool == true)
+
+        backend.pasteboardItems = nil
+        #expect(pasteboard.itemCount == 0)
     }
 
     @Test func readsDataPassThrough() {

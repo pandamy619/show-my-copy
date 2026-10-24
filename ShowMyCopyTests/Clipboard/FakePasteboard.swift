@@ -12,6 +12,10 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     /// What `string()` returns instead of decoding `contents[.string]`, like `NSPasteboard` converting text it
     /// holds in another form. Nil: `string()` decodes the UTF-8 data.
     var convertedString: String?
+    /// The file URLs on the pasteboard, one per item, like `readObjects(forClasses: [NSURL.self])` returns them.
+    var copiedFileURLs: [URL] = []
+    /// How often the file URLs were read, to check that too many files are not read at all.
+    private(set) var fileURLReadCount = 0
     private(set) var writtenTexts: [String] = []
     /// For each write, whether it was marked as concealed.
     private(set) var writtenConcealed: [Bool] = []
@@ -46,6 +50,17 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         return text
     }
 
+    /// One item per file, otherwise one item while there is anything on the pasteboard.
+    var itemCount: Int {
+        max(copiedFileURLs.count, types.isEmpty ? 0 : 1)
+    }
+
+    func fileURLs() -> [URL] {
+        fileURLReadCount += 1
+        runReadHook()
+        return copiedFileURLs
+    }
+
     func data(forType dataType: NSPasteboard.PasteboardType) -> Data? {
         dataReadCount += 1
         if dataType == .string {
@@ -70,6 +85,7 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     func copy(_ text: String, markers: [String] = []) {
         changeCount += 1
         contents = [:]
+        copiedFileURLs = []
         self.text = text
         types = [.string] + markers.map { NSPasteboard.PasteboardType($0) }
     }
@@ -79,6 +95,7 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         changeCount += 1
         self.contents = contents
         convertedString = nil
+        copiedFileURLs = []
         types = contents.keys.sorted { $0.rawValue < $1.rawValue } + markers.map { NSPasteboard.PasteboardType($0) }
     }
 
@@ -87,11 +104,28 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         changeCount += 1
         contents = [:]
         convertedString = nil
+        copiedFileURLs = []
         types = []
     }
 
     func copyImage() {
         copy([.png: Data([0x89, 0x50, 0x4E, 0x47]), .tiff: Data([0x4D, 0x4D])])
+    }
+
+    /// Finder copies files: one file URL per item, the names as text and an icon.
+    func copyFiles(_ urls: [URL], markers: [String] = []) {
+        copy(
+            [
+                .fileURL: Data((urls.first?.absoluteString ?? "").utf8),
+                .string: Data(urls.map(\.lastPathComponent).joined(separator: "\r").utf8),
+                .tiff: Data([0x4D, 0x4D]),
+            ], markers: markers)
+        copiedFileURLs = urls
+    }
+
+    /// TextEdit copies styled text: RTF and its plain text.
+    func copyRichText(_ plain: String, rtf: Data = Data(#"{\rtf1 styled}"#.utf8), markers: [String] = []) {
+        copy([.rtf: rtf, .string: Data(plain.utf8)], markers: markers)
     }
 
     func write(_ text: String, concealed: Bool) -> Int? {
