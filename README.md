@@ -19,7 +19,7 @@
 
 Show My Copy is in early development. There are no releases yet; build it from source. What works now:
 
-- **Background history of text, rich text, images and files.** What you copy is collected quietly, with the app it came from. Styled text keeps its formatting when copied back. Images (up to 20 MB each) are kept as files in the app's sandbox with a small thumbnail; copied files are kept as references (path and name), never as copies. Copied photos and videos get a small thumbnail when you copy them (a frame for a video). The history window shows thumbnails of images, photos and videos and icons of other files, with a mark on files that may have been moved or deleted.
+- **Background history of text, rich text, images and files.** What you copy is collected quietly, with the app it came from. Styled text keeps its formatting when copied back. Images (up to 20 MB each) are kept as files in the app's sandbox with a small thumbnail (images over 120 megapixels without one); copied files are kept as references (path and name), never as copies. Copied photos and videos get a small thumbnail when you copy them (a frame for a video). The history window shows thumbnails of images, photos and videos and icons of other files, with a mark on files that may have been moved or deleted.
 - **History survives a restart.** It is saved only on your Mac, in the app's sandbox, and left out of backups. Saved passwords are encrypted with a key kept in your Keychain, which is used only if you save passwords.
 - **Hotkey window.** ⌥⌘V by default, changeable in Settings, opens your recent copies on top of any app.
 - **Search and keyboard navigation.** Type to filter, arrow keys to move, Enter to copy the entry back to the clipboard, Esc to close.
@@ -32,7 +32,7 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Save passwords, if you want.** Turn it on in Settings to keep passwords hidden in the history: an eye button reveals one, search skips them, and they are removed after 1 minute, 10 minutes or 1 hour.
 - **No menu bar icon, no Dock icon.**
 - **English and Russian** interface.
-- **Private by design.** No analytics, no network, sandboxed.
+- **Private by design.** No analytics. Sandboxed without network access, so the app itself makes no connections; file thumbnails are drawn by macOS QuickLook outside the sandbox, for local files only (see [SECURITY.md](SECURITY.md)).
 
 Deleted entries can stay in the history file's free space until they are overwritten. A password copied without a marker from an app that is not a known password manager, such as a browser extension, can still be kept like normal text — see [SECURITY.md](SECURITY.md) for the details and known limitations.
 
