@@ -196,13 +196,7 @@ struct PersistentHistoryStoreWriteTests {
         disk.resetCalls()
         let pasteboard = FakePasteboard()
         pasteboard.copy("copied yesterday")
-        let monitor = ClipboardMonitor(
-            pasteboard: pasteboard,
-            history: store,
-            frontmostApp: { nil },
-            now: { [start] in start + 100 },
-            passwordPolicy: { .default }
-        )
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: store, now: { [start] in start + 100 })
 
         monitor.poll()
         #expect(store.entries.first == before)

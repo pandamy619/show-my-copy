@@ -15,7 +15,7 @@ struct HistoryWindowControllerTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     init() {
-        monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
     }
 
     private func makeController() -> HistoryWindowController {

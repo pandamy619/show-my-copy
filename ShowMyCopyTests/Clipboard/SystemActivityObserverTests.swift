@@ -88,12 +88,7 @@ struct SystemActivityObserverTests {
     private let workspace = FakeNotifications()
     private let distributed = FakeNotifications()
     private let session = FakeSessionState()
-    private let monitor = ClipboardMonitor(
-        pasteboard: FakePasteboard(),
-        history: ClipboardHistory(),
-        frontmostApp: { nil },
-        activity: CountingActivity()
-    )
+    private let monitor = MonitorFactory.make(pasteboard: FakePasteboard(), history: ClipboardHistory())
 
     private func makeObserver() -> SystemActivityObserver {
         SystemActivityObserver(
@@ -224,12 +219,7 @@ struct SystemActivityObserverTests {
 @MainActor
 struct ClipboardMonitorUserIsActiveTests {
     @Test func userActivityClearsEveryPauseReason() {
-        let monitor = ClipboardMonitor(
-            pasteboard: FakePasteboard(),
-            history: ClipboardHistory(),
-            frontmostApp: { nil },
-            activity: CountingActivity()
-        )
+        let monitor = MonitorFactory.make(pasteboard: FakePasteboard(), history: ClipboardHistory())
         monitor.start()
         defer { monitor.stop() }
         monitor.pause(for: .screenLocked)
@@ -246,12 +236,7 @@ struct ClipboardMonitorUserIsActiveTests {
         let pasteboard = FakePasteboard()
         let history = ClipboardHistory()
         let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
-        let monitor = ClipboardMonitor(
-            pasteboard: pasteboard,
-            history: history,
-            frontmostApp: { notes },
-            activity: CountingActivity()
-        )
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history, frontmostApp: { notes })
         monitor.start()
         defer { monitor.stop() }
         monitor.pause(for: .screenLocked)

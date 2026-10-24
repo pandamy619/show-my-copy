@@ -15,7 +15,7 @@ struct ClipboardMonitorLaunchTests {
     private let safari = SourceApp(bundleIdentifier: "com.apple.Safari", name: "Safari")
 
     private func makeMonitor() -> ClipboardMonitor {
-        ClipboardMonitor(
+        MonitorFactory.make(
             pasteboard: pasteboard,
             history: history,
             frontmostApp: { [safari] in safari },

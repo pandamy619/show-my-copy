@@ -11,7 +11,7 @@ struct ClipboardMonitorKindTests {
     private let finder = SourceApp(bundleIdentifier: "com.apple.finder", name: "Finder")
 
     private func makeMonitor() -> ClipboardMonitor {
-        ClipboardMonitor(
+        MonitorFactory.make(
             pasteboard: pasteboard, history: history, frontmostApp: { [finder] in finder }, now: { [date] in date })
     }
 

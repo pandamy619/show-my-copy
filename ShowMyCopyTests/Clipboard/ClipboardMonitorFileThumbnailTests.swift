@@ -20,7 +20,7 @@ struct ClipboardMonitorFileThumbnailTests {
     }
 
     private func makeMonitor(now: Date? = nil, passwordPolicy: PasswordPolicy = .default) -> ClipboardMonitor {
-        ClipboardMonitor(
+        MonitorFactory.make(
             pasteboard: pasteboard,
             history: history,
             frontmostApp: { [finder] in finder },
@@ -88,8 +88,8 @@ struct ClipboardMonitorFileThumbnailTests {
     }
 
     @Test func filesAndImagesKeepTheirOrder() async {
-        let monitor = ClipboardMonitor(
-            pasteboard: pasteboard, history: history, frontmostApp: { nil },
+        let monitor = MonitorFactory.make(
+            pasteboard: pasteboard, history: history,
             imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker()),
             fileThumbnailIngestor: FileThumbnailIngestor(blobs: blobs, maker: maker))
         monitor.poll()
@@ -190,7 +190,7 @@ struct ClipboardMonitorFileThumbnailTests {
     }
 
     @Test func withoutTheIngestorFilesAreRecordedAtOnce() {
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
         monitor.poll()
         pasteboard.copyFiles([photo])
         monitor.poll()

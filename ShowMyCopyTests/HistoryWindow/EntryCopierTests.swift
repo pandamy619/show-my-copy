@@ -13,7 +13,7 @@ struct EntryCopierTests {
 
     private func makeMonitor() -> ClipboardMonitor {
         // The frontmost app while the history window is open is the app the user will paste into.
-        ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { [safari] in safari })
+        MonitorFactory.make(pasteboard: pasteboard, history: history, frontmostApp: { [safari] in safari })
     }
 
     @Test func copyWritesTextAndMovesEntryToTopKeepingSourceApp() throws {
@@ -129,7 +129,7 @@ struct EntryCopierTests {
         let onePassword = SourceApp(bundleIdentifier: "com.1password.1password", name: "1Password")
         history.record(
             text: "hunter2", sourceApp: onePassword, at: start, concealed: true, expiresAt: start + 600)
-        let monitor = ClipboardMonitor(
+        let monitor = MonitorFactory.make(
             pasteboard: pasteboard, history: history, frontmostApp: { [safari] in safari }, now: { [start] in start })
         pasteboard.copy("newer")
         monitor.poll()
@@ -159,7 +159,7 @@ struct EntryCopierTests {
         for index in 1..<10 {
             history.record(text: "item \(index)", sourceApp: notes, at: start + Double(index))
         }
-        let monitor = ClipboardMonitor(
+        let monitor = MonitorFactory.make(
             pasteboard: pasteboard, history: history, frontmostApp: { [safari] in safari }, now: { [start] in start })
         pasteboard.copy("item 9")
         monitor.poll()
@@ -177,8 +177,8 @@ struct EntryCopierTests {
 
     @Test func expiredPasswordIsNotCopied() throws {
         history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
-        let monitor = ClipboardMonitor(
-            pasteboard: pasteboard, history: history, frontmostApp: { nil }, now: { [start] in start + 60 })
+        let monitor = MonitorFactory.make(
+            pasteboard: pasteboard, history: history, now: { [start] in start + 60 })
         let password = try #require(history.entries.first)
 
         let copier = EntryCopier(
@@ -222,7 +222,8 @@ struct EntryCopierTests {
         for index in 0..<10 {
             history.record(text: "item \(index)", sourceApp: notes, at: start + Double(index))
         }
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { [safari] in safari })
+        let monitor = MonitorFactory.make(
+            pasteboard: pasteboard, history: history, frontmostApp: { [safari] in safari })
         pasteboard.copy("item 9")
         monitor.poll()
         let oldest = try #require(history.entries.last)
@@ -243,7 +244,7 @@ struct ClipboardMonitorAcknowledgeTests {
     @Test func acknowledgedChangeIsNotRecorded() {
         let pasteboard = FakePasteboard()
         let history = ClipboardHistory()
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
         monitor.poll()
 
         pasteboard.copy("written by the app")

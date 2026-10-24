@@ -113,11 +113,8 @@ struct SystemPasteboardRealTests {
     @Test func monitorRecordsACopyFromARealPasteboard() {
         withIsolatedPasteboard { backend in
             let history = ClipboardHistory()
-            let monitor = ClipboardMonitor(
-                pasteboard: SystemPasteboard(pasteboard: backend, bundleIdentifier: nil),
-                history: history,
-                frontmostApp: { nil }
-            )
+            let monitor = MonitorFactory.make(
+                pasteboard: SystemPasteboard(pasteboard: backend, bundleIdentifier: nil), history: history)
             monitor.poll()
             // Another app takes the pasteboard over, which gives it a new change count.
             _ = backend.clearContents()

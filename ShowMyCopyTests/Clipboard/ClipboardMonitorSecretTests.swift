@@ -12,7 +12,7 @@ final class MonitorEnvironment {
     var frontmostApp: SourceApp?
 
     func makeMonitor(pasteboard: FakePasteboard, history: ClipboardHistory) -> ClipboardMonitor {
-        ClipboardMonitor(
+        MonitorFactory.make(
             pasteboard: pasteboard,
             history: history,
             frontmostApp: { [unowned self] in frontmostApp },

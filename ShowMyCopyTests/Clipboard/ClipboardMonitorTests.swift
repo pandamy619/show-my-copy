@@ -11,12 +11,8 @@ struct ClipboardMonitorTests {
     private let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
 
     private func makeMonitor() -> ClipboardMonitor {
-        ClipboardMonitor(
-            pasteboard: pasteboard,
-            history: history,
-            frontmostApp: { [notes] in notes },
-            now: { [date] in date }
-        )
+        MonitorFactory.make(
+            pasteboard: pasteboard, history: history, frontmostApp: { [notes] in notes }, now: { [date] in date })
     }
 
     @Test func recordsWhatIsOnThePasteboardAtLaunch() {
@@ -135,7 +131,7 @@ struct ClipboardMonitorCurrentEntryTests {
     private let history = ClipboardHistory()
 
     private func makeMonitorWithRecordedEntry() -> ClipboardMonitor {
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
         pasteboard.copy("recorded")
         monitor.poll()
         return monitor
@@ -202,7 +198,7 @@ struct ClipboardMonitorPauseTests {
     private let history = ClipboardHistory()
 
     private func makeStartedMonitor() -> ClipboardMonitor {
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
         monitor.start()
         return monitor
     }
@@ -239,7 +235,7 @@ struct ClipboardMonitorPauseTests {
 
     @Test func copyFoundAfterAPauseHasNoSourceApp() throws {
         let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { notes })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history, frontmostApp: { notes })
         monitor.start()
         monitor.pause(for: .screenLocked)
         // Copied on another device or by a background app while the screen was locked.
@@ -254,7 +250,7 @@ struct ClipboardMonitorPauseTests {
 
     @Test func copyAfterTheFirstPollFollowingAPauseHasSourceApp() {
         let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { notes })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history, frontmostApp: { notes })
         monitor.start()
         monitor.pause(for: .systemSleep)
         monitor.resume(for: .systemSleep)
@@ -267,7 +263,7 @@ struct ClipboardMonitorPauseTests {
 
     @Test func copyFoundAfterStopAndStartHasNoSourceApp() {
         let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { notes })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history, frontmostApp: { notes })
         monitor.start()
         monitor.stop()
         pasteboard.copy("copied while stopped")
@@ -278,7 +274,7 @@ struct ClipboardMonitorPauseTests {
     }
 
     @Test func pauseBeforeStartKeepsMonitorIdle() {
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
         monitor.pause(for: .systemSleep)
         monitor.start()
         #expect(!monitor.isPolling)
@@ -289,7 +285,7 @@ struct ClipboardMonitorPauseTests {
     }
 
     @Test func resumeWithoutStartDoesNotPoll() {
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
         monitor.pause(for: .systemSleep)
         monitor.resume(for: .systemSleep)
         #expect(!monitor.isPolling)

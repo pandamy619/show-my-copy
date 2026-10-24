@@ -50,11 +50,10 @@ struct ClipboardMonitorPollingTests {
     private let sleeper = ManualSleeper()
 
     private func makeMonitor() -> ClipboardMonitor {
-        ClipboardMonitor(
+        MonitorFactory.make(
             pasteboard: pasteboard,
             history: history,
             interval: .seconds(3),
-            frontmostApp: { nil },
             sleep: { [sleeper] duration in await sleeper.sleep(for: duration) }
         )
     }
@@ -118,7 +117,7 @@ struct ClipboardMonitorActivityTests {
     private let activity = CountingActivity()
 
     private func makeMonitor() -> ClipboardMonitor {
-        ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil }, activity: activity)
+        MonitorFactory.make(pasteboard: pasteboard, history: history, activity: activity)
     }
 
     @Test func pollingHoldsTheActivityUntilStop() {

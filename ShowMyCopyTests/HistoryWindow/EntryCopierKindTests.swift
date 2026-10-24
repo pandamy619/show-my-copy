@@ -15,7 +15,7 @@ struct EntryCopierKindTests {
     }
 
     private func makeCopier(blobs: (any BlobStore)?) -> EntryCopier {
-        let monitor = ClipboardMonitor(pasteboard: pasteboard, history: history, frontmostApp: { nil })
+        let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
         monitor.poll()
         return EntryCopier(
             history: history, pasteboard: pasteboard, monitor: monitor, blobs: blobs, now: { [start] in start + 10 })
@@ -85,8 +85,8 @@ struct EntryCopierKindTests {
         let image = try ContentFixtures.storedImage(in: blobs, bytes: Data([0x89, 7]))
         history.record(.image(image), sourceApp: nil, at: start)
         history.record(text: "newer", sourceApp: nil, at: start + 1)
-        let monitor = ClipboardMonitor(
-            pasteboard: pasteboard, history: history, frontmostApp: { nil },
+        let monitor = MonitorFactory.make(
+            pasteboard: pasteboard, history: history,
             imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker()))
         monitor.poll()
         let entry = try #require(history.entries.last)

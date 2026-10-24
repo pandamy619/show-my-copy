@@ -17,7 +17,7 @@ struct ClipboardMonitorImageTests {
     }
 
     private func makeMonitor() -> ClipboardMonitor {
-        ClipboardMonitor(
+        MonitorFactory.make(
             pasteboard: pasteboard,
             history: history,
             frontmostApp: { [preview] in preview },
@@ -101,8 +101,8 @@ struct ClipboardMonitorImageTests {
 
     @Test func imageThatCannotBeWrittenIsSkipped() async {
         let failing = CountingBlobStore(failingWrite: 1)
-        let monitor = ClipboardMonitor(
-            pasteboard: pasteboard, history: history, frontmostApp: { nil },
+        let monitor = MonitorFactory.make(
+            pasteboard: pasteboard, history: history,
             imageIngestor: ImageIngestor(blobs: failing, thumbnails: FakeThumbnailMaker()))
         monitor.poll()
         pasteboard.copy([.png: png])
@@ -120,8 +120,8 @@ struct ClipboardMonitorImageTests {
         history.markCurrentSkipped()
 
         // The next launch finds the same image on the pasteboard.
-        let relaunched = ClipboardMonitor(
-            pasteboard: pasteboard, history: history, frontmostApp: { nil }, now: { [date] in date + 100 },
+        let relaunched = MonitorFactory.make(
+            pasteboard: pasteboard, history: history, now: { [date] in date + 100 },
             imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker()))
         relaunched.poll()
         await relaunched.finishStoringImages()
@@ -145,8 +145,8 @@ struct ClipboardMonitorImageTests {
     }
 
     @Test func secretMarkedImageIsNeverStored() async {
-        let monitor = ClipboardMonitor(
-            pasteboard: pasteboard, history: history, frontmostApp: { nil },
+        let monitor = MonitorFactory.make(
+            pasteboard: pasteboard, history: history,
             passwordPolicy: { PasswordPolicy(savesPasswords: true, lifetime: 600) },
             imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker()))
         monitor.poll()
