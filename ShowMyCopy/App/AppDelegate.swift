@@ -78,14 +78,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The history saved on disk, with passwords encrypted by a key kept in the Keychain.
     ///
     /// The key is read or created only when a password is saved or a saved one is loaded: getting it can show a
-    /// Keychain prompt, which users who never save passwords should not see. Saved passwords that have expired, or
-    /// all of them when saving passwords is off, are deleted at load without the key. Without the key, passwords
-    /// are kept in memory only and everything else is still saved. When the store on disk cannot be opened, the
-    /// history is kept in memory only and `storageError` tells why. Image data is in `blobs`; the
-    /// store deletes it with its entries and sweeps what no entry uses at launch.
+    /// Keychain prompt, which users who never save passwords should not see. It is read off the main thread
+    /// (`LazySecretSealer`, `PersistentHistoryStore.loadPasswordKey()`), so the launch never waits for that prompt;
+    /// saved passwords wait on disk until it is read. Saved passwords that have expired, or all of them when saving
+    /// passwords is off, are deleted at load without the key. Without the key, passwords copied now are kept in
+    /// memory only, saved ones stay on disk for the next try, and everything else is still saved. When the store on
+    /// disk cannot be opened, the history is kept in memory only and `storageError` tells why. Image data is in
+    /// `blobs`; the store deletes it with its entries and sweeps what no entry uses at launch.
     private static func makeHistoryStore(blobs: (any BlobStore)?) -> any HistoryStore {
-        let sealer = LazySecretSealer {
-            do {
+        let sealer = LazySecretSealer { () throws(SecretSealingError) -> any SecretSealing in
+            do throws(SecretSealingError) {
                 return try KeychainSecretSealer()
             } catch {
                 AppLogger.history.error(

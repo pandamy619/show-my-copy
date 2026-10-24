@@ -18,6 +18,10 @@ final class SystemActivityObserver {
     /// user switches in. Windows that show the history close here, so it is not on screen for the next person.
     var onUserAway: (@MainActor () -> Void)?
 
+    /// Called when the user may be back: the Mac or its displays wake, the screen unlocks or the session becomes
+    /// active again. What failed because the Mac was locked, such as reading the Keychain, can be tried again here.
+    var onUserBack: (@MainActor () -> Void)?
+
     init(
         monitor: ClipboardMonitor,
         workspace: any NotificationObserving = NotificationCenterObserver(
@@ -79,6 +83,7 @@ final class SystemActivityObserver {
             }
             self.monitor.resume(for: reason)
             self.reconcile()
+            self.onUserBack?()
         }
     }
 

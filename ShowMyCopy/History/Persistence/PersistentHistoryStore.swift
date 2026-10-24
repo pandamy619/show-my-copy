@@ -12,9 +12,11 @@ import os
 /// Concealed entries are written sealed by `sealer`. Without one (no Keychain) they are kept in memory only, like an
 /// image whose data is not saved yet, and saved ones cannot be opened and are deleted at launch.
 ///
-/// Opening a saved password needs the key, and getting the key can show a Keychain prompt. So at launch only
-/// passwords that are still wanted are opened: expired ones, and all of them when saving passwords is off, are
-/// deleted unopened, by what their records say in plain text.
+/// Opening a saved password needs the key, and getting the key can show a Keychain prompt that the asking thread
+/// waits for. So at launch only passwords that are still wanted are opened: expired ones, and all of them when saving
+/// passwords is off, are deleted unopened, by what their records say in plain text. The key is loaded off the main
+/// actor (`loadPasswordKey()`); until it can be used (not loaded yet, Mac locked, access denied), saved passwords
+/// wait on disk unopened (`WaitingPasswords`) and new ones stay in memory. Only data a loaded key cannot open goes.
 ///
 /// Each write is one transaction (`HistoryPersistence.apply`), so a failed one leaves the disk as it was. It never
 /// loses what is in memory either: it is logged, shown through `storageError`, and the next change writes what the
@@ -49,6 +51,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     @ObservationIgnored private var unsaved: Set<ClipboardEntry.ID> = []
     /// Set while a Clear History has not reached the disk: the next write deletes every record first.
     @ObservationIgnored private var clearPending = false
+    /// Saved passwords that wait on disk, unopened, until the key can be used (`loadPasswordKey()`).
+    @ObservationIgnored private var unopened: WaitingPasswords
+    /// The load of the key that a password waiting to be saved asked for, while it runs.
+    @ObservationIgnored private var keyRequest: Task<Void, Never>?
 
     // Reads go to the wrapped store, which is observable itself, so views that read them here are updated too.
     var entries: [ClipboardEntry] { memory.entries }
@@ -103,6 +109,7 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         self.leftovers = leftovers
         self.damagedHistoryBytes = leftovers?.damagedCopyBytes()
         self.storageError = storageError
+        self.unopened = WaitingPasswords(found.unopened)
 
         let kept = Set(memory.entries.map(\.id))
         let removed = found.entries.map(\.id).filter { !kept.contains($0) }
@@ -159,14 +166,21 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
 
     func limitExpiry(to date: Date) {
         change { $0.limitExpiry(to: date) }
+        // Waiting passwords too. When writing that fails they still expire on time: `removeExpired` reads `unopened`.
+        let changed = unopened.limitExpiry(to: date)
+        if !changed.isEmpty {
+            write(StoredChange(saved: changed), covering: [])
+        }
     }
 
     func removeExpired(at date: Date) {
         change { $0.removeExpired(at: date) }
+        deleteUnopened { record in record.expiresAt.map { $0 <= date } == true }
     }
 
     func removeConcealed() {
         change { $0.removeConcealed() }
+        deleteUnopened { _ in true }
     }
 
     func remove(id: ClipboardEntry.ID) {
@@ -179,8 +193,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     @discardableResult
     func clear() -> ClearResult {
         let result = memory.clear()
-        // Every entry is gone, so what earlier writes left unsaved is deleted with the rest.
+        // Every entry is gone, so what earlier writes left unsaved is deleted with the rest, and so are the saved
+        // passwords that wait for the key.
         unsaved = []
+        unopened = WaitingPasswords()
         clearPending = true
         let cleared = write(StoredChange(), covering: [])
         if cleared {
@@ -254,32 +270,33 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     /// these records are touched, so records this session did not load stay as they are.
     private func saveEntries(_ ids: Set<ClipboardEntry.ID>) {
         let pending = ids.union(unsaved)
-        var sealFailed = false
         var change = StoredChange()
         var inMemory: Set<ClipboardEntry.ID> = []
+        // Passwords that could not be sealed, also while the key is not loaded: kept in memory, and saved by a
+        // later write once the key can be used.
+        var unsealed: Set<ClipboardEntry.ID> = []
         for entry in memory.entries where pending.contains(entry.id) && entry.content.image?.isSaved != false {
             inMemory.insert(entry.id)
-            if let record = storedRecord(for: entry, sealFailed: &sealFailed) {
-                change.saved.append(record)
-            } else {
-                // Kept in memory only, such as an entry concealed without a sealer: an old record goes.
+            do {
+                if let record = try coder.record(for: entry) {
+                    change.saved.append(record)
+                } else {
+                    // Kept in memory only, such as an entry concealed without a sealer: an old record goes.
+                    change.deleted.append(entry.id)
+                }
+            } catch {
+                // Logged by the coder. An old record, such as the plain one of an entry just concealed, goes.
+                unsealed.insert(entry.id)
                 change.deleted.append(entry.id)
             }
         }
         change.deleted += pending.subtracting(inMemory).sorted { $0.uuidString < $1.uuidString }
         if write(change, covering: pending) {
-            finishWrite(sealFailed: sealFailed)
+            finishWrite(sealFailed: !unsealed.isEmpty)
         }
-    }
-
-    /// The record to write for `entry`, or nil when it is kept in memory only. A failure to seal was logged by the
-    /// coder and is noted in `sealFailed`.
-    private func storedRecord(for entry: ClipboardEntry, sealFailed: inout Bool) -> StoredEntryRecord? {
-        do {
-            return try coder.record(for: entry)
-        } catch {
-            sealFailed = true
-            return nil
+        unsaved.formUnion(unsealed)
+        if !unsealed.isEmpty {
+            requestPasswordKey()
         }
     }
 
@@ -316,5 +333,67 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
             clearPending = false
         }
         return true
+    }
+}
+
+// MARK: - Passwords waiting for the key
+
+extension PersistentHistoryStore: LoadsPasswordKey {
+    /// Loads the key when a saved password waits to be opened, or a password copied in this session waits to be
+    /// saved. Called at launch, when the user is back at the unlocked Mac, and after a password could not be sealed.
+    /// The sealer decides whether a key that failed before is asked for again (`LazySecretSealer`).
+    func loadPasswordKey() async {
+        guard let sealer = coder.sealer, waitsForPasswordKey else {
+            return
+        }
+        guard await sealer.loadKey() == .ready else {
+            return
+        }
+        openWaitingPasswords()
+        if waitsForPasswordKey {
+            // Passwords copied before the key was loaded.
+            saveEntries([])
+        }
+    }
+
+    private var waitsForPasswordKey: Bool {
+        !unopened.isEmpty || memory.entries.contains { $0.isConcealed && unsaved.contains($0.id) }
+    }
+
+    /// Loads the key in the background, once at a time.
+    private func requestPasswordKey() {
+        guard coder.sealer != nil, keyRequest == nil else {
+            return
+        }
+        keyRequest = Task { [weak self] in
+            await self?.loadPasswordKey()
+            self?.keyRequest = nil
+        }
+    }
+
+    /// Adds the passwords the key opens to the history, by date. Those it cannot open are deleted, and so are those
+    /// the history holds already or the limits leave out.
+    private func openWaitingPasswords() {
+        guard !unopened.isEmpty else {
+            return
+        }
+        let (opened, unreadable) = unopened.open(with: coder)
+        if !unreadable.isEmpty {
+            AppLogger.history.error(
+                "Deleting \(unreadable.count, privacy: .public) saved passwords that could not be decrypted")
+        }
+        let before = Set(memory.entries.map(\.id))
+        memory.restore(opened)
+        let after = Set(memory.entries.map(\.id))
+        let left = opened.map(\.id).filter { !after.contains($0) }
+        saveEntries(before.subtracting(after).union(left).union(unreadable))
+    }
+
+    /// Deletes the waiting passwords `shouldDelete` picks without opening them. A failed delete is done next write.
+    private func deleteUnopened(where shouldDelete: (StoredEntryRecord) -> Bool) {
+        let deleted = unopened.remove(where: shouldDelete)
+        if !deleted.isEmpty {
+            write(StoredChange(deleted: deleted), covering: Set(deleted))
+        }
     }
 }

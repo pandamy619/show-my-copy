@@ -103,11 +103,7 @@ final class AppContainer {
             isScreenLocked: isScreenLocked,
             isSessionActive: isSessionActive
         )
-        // Close the history when the Mac sleeps, locks or switches users, so it is not on screen for whoever
-        // wakes or unlocks it next.
-        activityObserver.onUserAway = { [weak historyWindow] in
-            historyWindow?.hide()
-        }
+        Self.connect(activityObserver, to: historyWindow, store: store)
 
         self.store = store
         self.historySettings = historySettings
@@ -120,6 +116,22 @@ final class AppContainer {
         self.historyWindow = historyWindow
         self.settingsWindow = settingsWindow
         self.sleep = sleep
+    }
+
+    private static func connect(
+        _ activityObserver: SystemActivityObserver,
+        to historyWindow: HistoryWindowController,
+        store: any HistoryStore
+    ) {
+        // Close the history when the Mac sleeps, locks or switches users, so it is not on screen for whoever
+        // wakes or unlocks it next.
+        activityObserver.onUserAway = { [weak historyWindow] in
+            historyWindow?.hide()
+        }
+        // Saved passwords wait while the Keychain is locked: try the key again when the user is back.
+        activityObserver.onUserBack = { [weak store] in
+            loadPasswordKey(of: store)
+        }
     }
 
     /// Images are recorded only with a way to make thumbnails, and copied photo and video files get thumbnails only
@@ -149,6 +161,19 @@ final class AppContainer {
         }
         activityObserver.start()
         monitor.start()
+        // Saved passwords are opened once their key is loaded, off the main actor: reading the Keychain can wait
+        // for the user to answer a prompt, and the launch does not wait for it.
+        Self.loadPasswordKey(of: store)
+    }
+
+    /// Loads the key of saved passwords in the background, when the store keeps passwords that wait for it.
+    private static func loadPasswordKey(of store: (any HistoryStore)?) {
+        guard let store = store as? any LoadsPasswordKey else {
+            return
+        }
+        Task {
+            await store.loadPasswordKey()
+        }
     }
 
     /// Shows the history window, or hides it when it is open. Only a person at the awake, unlocked Mac can ask for

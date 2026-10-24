@@ -7,6 +7,8 @@ struct FoundRecords: Sendable {
     var unreadable: [UUID] = []
     /// Passwords that are expired or no longer saved: deleted unopened.
     var unwanted: [UUID] = []
+    /// Passwords whose key cannot be used now: kept on disk unopened, and opened once it can.
+    var unopened: [StoredEntryRecord] = []
 }
 
 /// How `PersistentHistoryStore` sorts the records it loads at launch and finds the blobs no record uses.
@@ -45,6 +47,8 @@ enum SavedRecords {
                 found.entries.append(content == entry.content ? entry : entry.replacingContent(content))
             case .unreadable:
                 found.unreadable.append(record.id)
+            case .waitsForKey:
+                found.unopened.append(record)
             }
         }
         return found

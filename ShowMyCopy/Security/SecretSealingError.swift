@@ -14,4 +14,17 @@ enum SecretSealingError: Error, Equatable, Sendable {
     case invalidKeyLength(Int)
     /// The key could not be loaded or stored. Secrets should then stay in memory only.
     case keyUnavailable(SymmetricKeyStoreError)
+    /// The key has not been fetched yet (`SecretSealing.loadKey()`); it is fetched off the main thread.
+    case keyNotLoaded
+
+    /// Whether the key could not be used, as opposed to the sealed data being wrong. Data that could not be opened
+    /// for want of a key may open later, so it must not be deleted for this.
+    var isAboutTheKey: Bool {
+        switch self {
+        case .keyUnavailable, .keyNotLoaded, .invalidKeyLength:
+            true
+        case .missingFormatVersion, .unsupportedFormatVersion, .authenticationFailed, .sealingFailed:
+            false
+        }
+    }
 }

@@ -2,8 +2,9 @@ import Foundation
 
 /// Turns history entries into the records written to disk and back. Concealed entries are sealed with `sealer`.
 ///
-/// Without a sealer (the Keychain could not be used) concealed entries are not written at all: they stay in memory
-/// until they expire or the app quits, and saved concealed records cannot be opened.
+/// Without a sealer concealed entries are not written at all: they stay in memory until they expire or the app quits,
+/// and saved concealed records cannot be opened. A sealer whose key cannot be used now (not loaded yet, locked,
+/// denied) is told apart from data that cannot be opened: such a record waits on disk (`Decoded.waitsForKey`).
 struct StoredEntryCoder: Sendable {
     /// What a saved record turned out to be.
     enum Decoded: Equatable, Sendable {
@@ -11,6 +12,9 @@ struct StoredEntryCoder: Sendable {
         /// Damaged, of an unknown kind, or a password that cannot be opened (the key is gone or another one, or the
         /// data was changed). It is of no use to anyone any more and should be deleted.
         case unreadable
+        /// A password that cannot be opened now because the key cannot be used now: not loaded yet, the Mac is
+        /// locked or access was denied. The data may be fine, so it is kept and opened once the key loads.
+        case waitsForKey
     }
 
     /// Sealed data is padded to a multiple of this many bytes, so its size does not tell a password's length.
@@ -20,7 +24,7 @@ struct StoredEntryCoder: Sendable {
     let hasher: any ContentHasher
 
     /// The record to write for `entry`, or nil when the entry is kept in memory only: a concealed entry without
-    /// a sealer. Throws `sealFailed` when sealing a concealed entry fails.
+    /// a sealer. Throws `sealFailed` when sealing a concealed entry fails, also while the sealer's key is not loaded.
     func record(for entry: ClipboardEntry) throws(HistoryPersistenceError) -> StoredEntryRecord? {
         let payload = entry.content.storedPayload
         var record = StoredEntryRecord(
@@ -46,6 +50,9 @@ struct StoredEntryCoder: Sendable {
         }
         do {
             record.payload = try sealer.seal(Self.padded(payload))
+        } catch SecretSealingError.keyNotLoaded {
+            AppLogger.history.info("A password waits for its key before it is saved")
+            throw .sealFailed
         } catch {
             AppLogger.history.error("Could not encrypt a password for the saved history")
             throw .sealFailed
@@ -64,10 +71,14 @@ struct StoredEntryCoder: Sendable {
         }
         var payload = record.payload
         if record.isConcealed {
-            guard let opened = open(payload) else {
+            switch open(payload) {
+            case .opened(let opened):
+                payload = opened
+            case .waitsForKey:
+                return .waitsForKey
+            case .unreadable:
                 return .unreadable
             }
-            payload = opened
         }
         guard let content = ClipboardContent(kind: kind, storedPayload: payload) else {
             return .unreadable
@@ -92,17 +103,25 @@ struct StoredEntryCoder: Sendable {
         )
     }
 
-    private func open(_ sealed: Data) -> Data? {
+    private enum Opened {
+        case opened(Data)
+        case waitsForKey
+        case unreadable
+    }
+
+    private func open(_ sealed: Data) -> Opened {
         guard let sealer else {
-            return nil
+            return .unreadable
         }
         let padded: Data
         do {
             padded = try sealer.open(sealed)
+        } catch let error as SecretSealingError where error.isAboutTheKey {
+            return .waitsForKey
         } catch {
-            return nil
+            return .unreadable
         }
-        return Self.unpadded(padded)
+        return Self.unpadded(padded).map(Opened.opened) ?? .unreadable
     }
 
     /// The length as 4 big-endian bytes, the data, then zeros up to a multiple of `sealedBlockSize`.

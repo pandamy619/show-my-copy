@@ -1,57 +1,114 @@
 import Foundation
 import Synchronization
 
-/// Creates the real sealer on the first `seal` or `open`, not before.
+/// Creates the real sealer when its key is asked for with `loadKey()`, off the caller's actor, and not before.
 ///
-/// Getting the key can show a Keychain prompt, for example after the app's code signature changed. Most users never
-/// save passwords, so the key is asked for only when a password is saved or a saved one is loaded.
+/// Getting the key can show a Keychain prompt, for example after the app's code signature changed, and the thread
+/// that asks waits until the user answers. So the history asks for it with `loadKey()` from a background task, only
+/// when a password is saved or a saved one is to be opened, and `seal` and `open` never create the sealer: until it
+/// exists they throw `SecretSealingError.keyNotLoaded` at once, so the main thread never waits for the Keychain.
 ///
-/// The first result is kept for the session: a sealer that was created is reused, and a failure is thrown again on
-/// every later call without asking the Keychain again. Retrying on each copy could show the same prompt over and
-/// over; quitting and opening the app tries again.
+/// What the first load found is kept for the session, so the same prompt is not shown over and over:
+/// - a sealer that was created is reused;
+/// - a locked Mac, or a Keychain that may not ask the user (`interactionNotAllowed`), is tried again by the next
+///   `loadKey()`, which the app calls when the user is back at the unlocked Mac;
+/// - any other failure, such as the user denying access, is thrown again by every call and tried again only by the
+///   next launch.
 ///
-/// Calls from several threads at once create the sealer once: the others wait for it.
+/// Loads asked for at the same time share one: the sealer is created once.
 final class LazySecretSealer: SecretSealing {
-    typealias Factory = @Sendable () throws -> any SecretSealing
+    typealias Factory = @Sendable () throws(SecretSealingError) -> any SecretSealing
 
     private enum State {
-        case notCreated(Factory)
-        case created(any SecretSealing)
-        case failed(any Error)
+        case notLoaded
+        case loading(Task<SealingKeyState, Never>)
+        case loaded(any SecretSealing)
+        case failed(SecretSealingError, SealingKeyState)
     }
 
-    private let state: Mutex<State>
+    private let makeSealer: Factory
+    private let state = Mutex(State.notLoaded)
 
     init(_ makeSealer: @escaping Factory) {
-        state = Mutex(.notCreated(makeSealer))
+        self.makeSealer = makeSealer
     }
 
     func seal(_ plaintext: Data) throws -> Data {
-        try sealer().seal(plaintext)
+        try loadedSealer().seal(plaintext)
     }
 
     func open(_ sealed: Data) throws -> Data {
-        try sealer().open(sealed)
+        try loadedSealer().open(sealed)
     }
 
-    /// The real sealer, created on the first call. The lock is held while it is created, so a slow Keychain makes
-    /// other callers wait instead of creating a second one.
-    private func sealer() throws -> any SecretSealing {
-        let result: Result<any SecretSealing, any Error> = state.withLock { state in
+    func loadKey() async -> SealingKeyState {
+        let next: LoadStep = state.withLock { state in
             switch state {
-            case .created(let sealer):
-                return .success(sealer)
-            case .failed(let error):
-                return .failure(error)
-            case .notCreated(let makeSealer):
-                do {
-                    let sealer = try makeSealer()
-                    state = .created(sealer)
-                    return .success(sealer)
-                } catch {
-                    state = .failed(error)
-                    return .failure(error)
+            case .loaded:
+                return .known(.ready)
+            case .failed(_, .unavailable):
+                return .known(.unavailable)
+            case .loading(let task):
+                return .wait(task)
+            case .notLoaded, .failed:
+                // Created here, under the lock, so loads asked for at the same time share it. It runs on its own,
+                // off the caller's actor: the Keychain may wait for the user.
+                let task = Task.detached(priority: .userInitiated) { [self] in
+                    self.createSealer()
                 }
+                state = .loading(task)
+                return .wait(task)
+            }
+        }
+        switch next {
+        case .known(let keyState):
+            return keyState
+        case .wait(let task):
+            return await task.value
+        }
+    }
+
+    private enum LoadStep {
+        case known(SealingKeyState)
+        case wait(Task<SealingKeyState, Never>)
+    }
+
+    /// Runs the factory without holding the lock, so `seal` and `open` keep answering while it waits for the user.
+    private func createSealer() -> SealingKeyState {
+        let result: Result<any SecretSealing, SecretSealingError>
+        do throws(SecretSealingError) {
+            result = .success(try makeSealer())
+        } catch {
+            result = .failure(error)
+        }
+        return state.withLock { state in
+            switch result {
+            case .success(let sealer):
+                state = .loaded(sealer)
+                return .ready
+            case .failure(let error):
+                let keyState = Self.keyState(after: error)
+                state = .failed(error, keyState)
+                return keyState
+            }
+        }
+    }
+
+    /// Only a Keychain that is locked or may not ask now is worth asking again in this session.
+    private static func keyState(after error: SecretSealingError) -> SealingKeyState {
+        error == .keyUnavailable(.interactionNotAllowed) ? .lockedOut : .unavailable
+    }
+
+    /// The sealer, or the reason there is none yet, without waiting.
+    private func loadedSealer() throws(SecretSealingError) -> any SecretSealing {
+        let result: Result<any SecretSealing, SecretSealingError> = state.withLock { state in
+            switch state {
+            case .loaded(let sealer):
+                .success(sealer)
+            case .failed(let error, _):
+                .failure(error)
+            case .notLoaded, .loading:
+                .failure(.keyNotLoaded)
             }
         }
         return try result.get()
