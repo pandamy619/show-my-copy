@@ -27,6 +27,9 @@ final class AppContainer {
     let historySettings: HistorySettings
     let passwordSettings: PasswordSettings
     let pasteboard: any PasteboardReading & PasteboardWriting
+    /// Where image data and thumbnails are kept, or nil when images are not recorded. History rows read thumbnails
+    /// from it; the full image is read only when it is opened or copied.
+    let blobs: (any BlobStore)?
     let monitor: ClipboardMonitor
     let activityObserver: SystemActivityObserver
     let copier: EntryCopier
@@ -48,12 +51,22 @@ final class AppContainer {
         distributedNotifications: any NotificationObserving = DistributedNotificationObserver(),
         isScreenLocked: @escaping @MainActor () -> Bool = { ConsoleSession.isScreenLocked() },
         isSessionActive: @escaping @MainActor () -> Bool = { ConsoleSession.isActive() },
+        blobs: (any BlobStore)? = nil,
+        thumbnails: (any ThumbnailMaking)? = nil,
         makeSettingsWindow: SettingsWindowFactory
     ) {
         let historySettings = HistorySettings(history: store, defaults: defaults)
         let passwordSettings = PasswordSettings(history: store, defaults: defaults, now: now)
         let settingsWindow = makeSettingsWindow(store, historySettings, passwordSettings)
 
+        // Images are recorded only with somewhere to keep them and a way to make thumbnails. `store` must delete
+        // blobs in the same `blobs`.
+        let imageIngestor: ImageIngestor? =
+            if let blobs, let thumbnails {
+                ImageIngestor(blobs: blobs, thumbnails: thumbnails)
+            } else {
+                nil
+            }
         // The monitor reads the password setting on every change, so a new choice applies to the next copy.
         let monitor = ClipboardMonitor(
             pasteboard: pasteboard,
@@ -62,9 +75,10 @@ final class AppContainer {
             now: now,
             sleep: sleep,
             activity: pollingActivity,
-            passwordPolicy: { [passwordSettings] in passwordSettings.policy }
+            passwordPolicy: { [passwordSettings] in passwordSettings.policy },
+            imageIngestor: imageIngestor
         )
-        let copier = EntryCopier(history: store, pasteboard: pasteboard, monitor: monitor, now: now)
+        let copier = EntryCopier(history: store, pasteboard: pasteboard, monitor: monitor, blobs: blobs, now: now)
         let historyWindow = HistoryWindowController(
             history: store,
             copier: copier,
@@ -91,6 +105,7 @@ final class AppContainer {
         self.historySettings = historySettings
         self.passwordSettings = passwordSettings
         self.pasteboard = pasteboard
+        self.blobs = blobs
         self.monitor = monitor
         self.activityObserver = activityObserver
         self.copier = copier

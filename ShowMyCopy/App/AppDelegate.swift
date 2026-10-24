@@ -13,7 +13,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !Self.isRunningTests else {
             return
         }
-        let container = AppContainer(store: Self.makeHistoryStore(), makeSettingsWindow: Self.makeSettingsWindow)
+        let blobs = Self.openBlobStore()
+        let container = AppContainer(
+            store: Self.makeHistoryStore(blobs: blobs),
+            blobs: blobs,
+            thumbnails: ImageIOThumbnailMaker(),
+            makeSettingsWindow: Self.makeSettingsWindow
+        )
         KeyboardShortcuts.onKeyDown(for: .toggleHistoryWindow) { [weak container] in
             container?.toggleHistory()
         }
@@ -37,14 +43,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    /// The folder for image data next to the history. Without it images are not recorded; everything else works.
+    private static func openBlobStore() -> FileBlobStore? {
+        do {
+            return try FileBlobStore.openDefault()
+        } catch {
+            AppLogger.history.error("Images are not recorded: their folder could not be opened")
+            return nil
+        }
+    }
+
     /// The history saved on disk, with passwords encrypted by a key kept in the Keychain.
     ///
     /// The key is read or created only when a password is saved or a saved one is loaded: getting it can show a
     /// Keychain prompt, which users who never save passwords should not see. Saved passwords that have expired, or
     /// all of them when saving passwords is off, are deleted at load without the key. Without the key, passwords
     /// are kept in memory only and everything else is still saved. When the store on disk cannot be opened, the
-    /// history is kept in memory only, as before v2, and `storageError` tells why.
-    private static func makeHistoryStore() -> any HistoryStore {
+    /// history is kept in memory only, as before v2, and `storageError` tells why. Image data is in `blobs`; the
+    /// store deletes it with its entries and sweeps what no entry uses at launch.
+    private static func makeHistoryStore(blobs: (any BlobStore)?) -> any HistoryStore {
         let sealer = LazySecretSealer {
             do {
                 return try KeychainSecretSealer()
@@ -63,7 +80,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sealer: sealer,
             savesPasswords: PasswordSettings.storedSavesPasswords(in: .standard),
             retention: HistorySettings.storedRetention(in: .standard),
-            openError: opened.error
+            openError: opened.error,
+            blobs: blobs
         )
     }
 
