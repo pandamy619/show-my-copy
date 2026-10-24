@@ -89,7 +89,7 @@ struct StoredEntryCoderKindTests {
         #expect(coder.decode(record.replacingPayload(with: record.payload.dropLast())) == .unreadable)
         #expect(coder.decode(record.replacingPayload(with: record.payload + Data([0]))) == .unreadable)
         var otherFormat = record.payload
-        otherFormat[otherFormat.startIndex] = 2
+        otherFormat[otherFormat.startIndex] = 9
         #expect(coder.decode(record.replacingPayload(with: otherFormat)) == .unreadable)
         #expect(coder.decode(record.replacingPayload(with: Data())) == .unreadable)
     }
@@ -113,7 +113,7 @@ struct StoredEntryCoderKindTests {
     @Test func versionTwoIsReadAndNewerIsLeftAlone() throws {
         let record = try #require(try coder.record(for: entry(ContentFixtures.image())))
         #expect(coder.supports(record))
-        #expect(!coder.supports(record.replacingSchemaVersion(with: 3)))
+        #expect(!coder.supports(record.replacingSchemaVersion(with: StoredEntryRecord.currentSchemaVersion + 1)))
     }
 }
 
