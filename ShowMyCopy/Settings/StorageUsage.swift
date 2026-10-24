@@ -80,6 +80,7 @@ final class StorageUsage {
     /// The history as a store that reports storage problems and its size on disk; nil for a history in memory.
     @ObservationIgnored private let errorReporter: (any ReportsStorageErrors)?
     @ObservationIgnored private let diskUsage: (any ReportsDiskUsage)?
+    @ObservationIgnored private let damagedHistory: (any KeepsDamagedHistory)?
     @ObservationIgnored private var cachedBreakdown: (revision: Int, breakdown: StorageBreakdown)?
     @ObservationIgnored private var cachedDiskBytes: (revision: Int, bytes: Int64?)?
     /// Changes when the size on disk should be read again, so views update `diskBytes`.
@@ -99,6 +100,18 @@ final class StorageUsage {
         self.memoryReader = memoryReader
         errorReporter = history as? any ReportsStorageErrors
         diskUsage = history as? any ReportsDiskUsage
+        damagedHistory = history as? any KeepsDamagedHistory
+    }
+
+    /// The size of a copy of a history that could not be opened, or nil when there is none. Reading it observes
+    /// the store.
+    var damagedHistoryBytes: Int64? {
+        damagedHistory?.damagedHistoryBytes
+    }
+
+    /// Whether Clear History would remove anything: entries, or a damaged copy of a history.
+    var hasSomethingToClear: Bool {
+        !history.entries.isEmpty || damagedHistoryBytes != nil
     }
 
     /// Why the history is not, or not fully, saved, or nil while saving works. Reading it observes the store.

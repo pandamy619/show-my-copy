@@ -75,6 +75,16 @@ protocol ReportsDiskUsage: AnyObject {
     func storedBytes() -> Int64?
 }
 
+/// A history store that may keep a copy of a history that could not be opened (see `HistoryLeftovers`).
+@MainActor
+protocol KeepsDamagedHistory: AnyObject {
+    /// The copy's size, or nil when there is none. Views that read it are updated when it changes.
+    var damagedHistoryBytes: Int64? { get }
+
+    /// Deletes the copy.
+    func deleteDamagedHistory()
+}
+
 /// Keeps records in memory only. Used when the store on disk cannot be opened: the app keeps working with the same
 /// store type and can tell the user that nothing is saved.
 @MainActor

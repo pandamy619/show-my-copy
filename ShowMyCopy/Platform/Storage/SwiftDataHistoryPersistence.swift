@@ -133,24 +133,24 @@ extension SwiftDataHistoryPersistence {
         guard let applicationSupport = HistoryFolder.applicationSupport() else {
             return Opened(persistence: InMemoryHistoryPersistence(), error: .openFailed, leftovers: nil)
         }
-        return open(in: HistoryFolder.directory(inApplicationSupport: applicationSupport))
+        return open(in: HistoryFolder.directory(inApplicationSupport: applicationSupport), defaults: .standard)
     }
 
     /// Opens or creates `History.store` in `directory`. What happens when it cannot be opened is decided by
     /// `HistoryStoreOpener`: it is tried again, kept where it is while it may open later (`openFailed`, the history
     /// is kept in memory only), and moved aside for a new, empty store only when it is not a database or failed on
-    /// several launches in a row (`storeReset`).
-    static func open(in directory: URL, defaults: UserDefaults = .standard) -> Opened {
+    /// several launches in a row (`storeReset`). `defaults` keeps the count of launches that could not open it.
+    static func open(in directory: URL, defaults: UserDefaults) -> Opened {
         do {
             try prepare(directory)
         } catch {
             AppLogger.history.error("Could not create the history folder; keeping the history in memory only")
             return Opened(persistence: InMemoryHistoryPersistence(), error: .openFailed, leftovers: nil)
         }
-        return HistoryStoreOpener(directory: directory, defaults: defaults) { url throws(HistoryPersistenceError) in
+        let opening: (URL) throws(HistoryPersistenceError) -> any HistoryPersistence = { url in
             try openStore(at: url)
         }
-        .open()
+        return HistoryStoreOpener(directory: directory, defaults: defaults, now: Date(), openStore: opening).open()
     }
 
     private static func openStore(at url: URL) throws(HistoryPersistenceError) -> SwiftDataHistoryPersistence {

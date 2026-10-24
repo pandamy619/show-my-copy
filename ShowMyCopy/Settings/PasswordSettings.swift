@@ -32,7 +32,8 @@ final class PasswordSettings {
     @ObservationIgnored private let history: any HistoryStore
     @ObservationIgnored private let now: @MainActor () -> Date
 
-    /// Off by default. Turning it off removes every saved password from the history at once.
+    /// Off by default. Turning it off removes every saved password from the history at once, and a damaged copy of
+    /// the history, which may hold passwords too.
     var savesPasswords: Bool {
         didSet {
             guard savesPasswords != oldValue else {
@@ -41,6 +42,7 @@ final class PasswordSettings {
             defaults.set(savesPasswords, forKey: SettingsKey.savePasswords)
             if !savesPasswords {
                 history.removeConcealed()
+                (history as? any KeepsDamagedHistory)?.deleteDamagedHistory()
             }
         }
     }

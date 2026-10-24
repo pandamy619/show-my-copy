@@ -41,6 +41,16 @@ struct StorageSection: View {
                         .monospacedDigit()
                 }
             }
+            if let damagedBytes = usage.damagedHistoryBytes.map({ ByteCount.fileSize(Int(clamping: $0)) }) {
+                // Counted in "On disk" above; this says what the part the history does not show is.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("A copy of a history that could not be opened takes \(damagedBytes).")
+                    Text("It is deleted a week after it was set aside, or at once with Clear History.")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
             if !breakdown.parts.isEmpty {
                 StorageBar(breakdown: breakdown)
             }
@@ -190,7 +200,8 @@ struct ClearHistorySection: View {
                 Button("Clear History…") {
                     isConfirmingClear = true
                 }
-                .disabled(usage.history.entries.isEmpty)
+                // Also with no entries, when only a damaged copy of a history is left to delete.
+                .disabled(!usage.hasSomethingToClear)
                 Spacer()
                 if !usage.history.entries.isEmpty {
                     // Two texts, so the plural form depends on the count alone.

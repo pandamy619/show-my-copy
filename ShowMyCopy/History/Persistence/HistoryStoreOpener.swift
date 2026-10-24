@@ -21,13 +21,19 @@ struct OpenedHistory {
 /// - it failed to open on `failedLaunchesBeforeReset` launches in a row; one launch that opens it starts the count
 ///   again. Without this, a database that is damaged inside would keep the history in memory for good.
 ///
-/// Only the latest damaged copy is kept.
+/// Only the latest damaged copy is kept, and for `damagedCopyLifetime` at most: it is there so the history can
+/// still be recovered by hand, or opened by the build that wrote it, but it holds everything that was copied and is
+/// out of reach of the history's own deletes and expiry. Clear History, and turning off Save passwords, delete it
+/// sooner (see `PersistentHistoryStore`).
 @MainActor
 struct HistoryStoreOpener {
     /// How often the store is tried within one launch. The tries follow each other at once: waiting would hold up
     /// the launch, and the next launch is the real second chance.
     static let attemptsPerLaunch = 3
     static let failedLaunchesBeforeReset = 3
+    /// How long a damaged copy is kept, counted from when it was moved aside. It is deleted at the first launch
+    /// after that.
+    static let damagedCopyLifetime: TimeInterval = 7 * 24 * 60 * 60
     /// Where the count of launches in a row that could not open the store is kept. A count, not history data.
     static let failedLaunchesKey = "history.failedOpenLaunches"
     static let storeFileName = "History.store"
@@ -36,8 +42,21 @@ struct HistoryStoreOpener {
 
     let directory: URL
     let defaults: UserDefaults
+    let now: Date
     /// Opens the store at the URL, creating it when there is none.
     let openStore: (URL) throws(HistoryPersistenceError) -> any HistoryPersistence
+
+    init(
+        directory: URL,
+        defaults: UserDefaults,
+        now: Date,
+        openStore: @escaping (URL) throws(HistoryPersistenceError) -> any HistoryPersistence
+    ) {
+        self.directory = directory
+        self.defaults = defaults
+        self.now = now
+        self.openStore = openStore
+    }
 
     var storeURL: URL {
         directory.appending(path: Self.storeFileName, directoryHint: .notDirectory)
@@ -48,6 +67,7 @@ struct HistoryStoreOpener {
     }
 
     func open() -> OpenedHistory {
+        deleteExpiredDamagedCopy()
         if let persistence = tryOpening() {
             defaults.removeObject(forKey: Self.failedLaunchesKey)
             return opened(persistence, error: nil)
@@ -99,7 +119,29 @@ struct HistoryStoreOpener {
         }
     }
 
-    /// Moves the store and its SQLite side files to `damagedStoreFileName`, replacing an older damaged copy.
+    /// Deletes the damaged copy when it was moved aside more than `damagedCopyLifetime` ago.
+    private func deleteExpiredDamagedCopy() {
+        let path = damagedStoreURL.path(percentEncoded: false)
+        guard FileManager.default.fileExists(atPath: path) else {
+            return
+        }
+        let movedAside: Date?
+        do {
+            movedAside = try FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date
+        } catch {
+            AppLogger.history.error("Could not read the date of the damaged copy of the history")
+            return
+        }
+        guard let movedAside, now.timeIntervalSince(movedAside) > Self.damagedCopyLifetime else {
+            return
+        }
+        if LeftoverStoreFiles(damagedStore: damagedStoreURL).deleteDamagedCopy() {
+            AppLogger.history.info("Deleted the damaged copy of the history after its time was up")
+        }
+    }
+
+    /// Moves the store and its SQLite side files to `damagedStoreFileName`, replacing an older damaged copy, and
+    /// dates the copy now, so its lifetime counts from the move and not from its last write.
     private func moveAside() throws {
         let fileManager = FileManager.default
         let moves = zip(StoreFiles.urls(forStoreAt: storeURL), StoreFiles.urls(forStoreAt: damagedStoreURL))
@@ -110,6 +152,10 @@ struct HistoryStoreOpener {
             if fileManager.fileExists(atPath: source.path(percentEncoded: false)) {
                 try fileManager.moveItem(at: source, to: destination)
             }
+        }
+        if fileManager.fileExists(atPath: damagedStoreURL.path(percentEncoded: false)) {
+            try fileManager.setAttributes(
+                [.modificationDate: now], ofItemAtPath: damagedStoreURL.path(percentEncoded: false))
         }
     }
 
@@ -163,11 +209,26 @@ enum StoreFileCheck: Equatable, Sendable {
 
 /// Files of a saved history that this session does not use: the copy of a store that could not be opened
 /// (`History.store.damaged`), and, while it cannot be opened, the store itself. They are told apart from the
-/// history in use so that nothing deletes data they may still need, such as the images they reference.
+/// history in use so that nothing deletes data they may still need, such as the images they reference, and so that
+/// Clear History and turning off Save passwords can delete them. Every call reads or changes the file system.
 @MainActor
 protocol HistoryLeftovers: AnyObject {
-    /// Whether any of the files exists. Reads the file system.
+    /// Whether any of the files exists.
     func hasFiles() -> Bool
+
+    /// The size of the damaged copy with its SQLite side files, or nil when there is none.
+    func damagedCopyBytes() -> Int64?
+
+    /// The size of every file, or nil when there is none.
+    func totalBytes() -> Int64?
+
+    /// Deletes the damaged copy. Returns whether none is left.
+    @discardableResult
+    func deleteDamagedCopy() -> Bool
+
+    /// Deletes the damaged copy and the store that could not be opened. Returns whether none is left.
+    @discardableResult
+    func deleteAll() -> Bool
 }
 
 /// `HistoryLeftovers` on disk.
@@ -182,10 +243,49 @@ final class LeftoverStoreFiles: HistoryLeftovers {
         self.unopenedStore = unopenedStore
     }
 
+    private var stores: [URL] {
+        [damagedStore] + [unopenedStore].compactMap { $0 }
+    }
+
     func hasFiles() -> Bool {
         let fileManager = FileManager.default
-        return ([damagedStore] + [unopenedStore].compactMap { $0 })
-            .flatMap(StoreFiles.urls(forStoreAt:))
+        return stores.flatMap(StoreFiles.urls(forStoreAt:))
             .contains { fileManager.fileExists(atPath: $0.path(percentEncoded: false)) }
+    }
+
+    func damagedCopyBytes() -> Int64? {
+        StoreFiles.totalBytes(ofStoreAt: damagedStore)
+    }
+
+    func totalBytes() -> Int64? {
+        let sizes = stores.compactMap(StoreFiles.totalBytes(ofStoreAt:))
+        return sizes.isEmpty ? nil : sizes.reduce(0, +)
+    }
+
+    func deleteDamagedCopy() -> Bool {
+        Self.delete([damagedStore])
+    }
+
+    func deleteAll() -> Bool {
+        Self.delete(stores)
+    }
+
+    /// Deletes the stores with their side files, each file on its own, so one that cannot be deleted does not
+    /// keep the others.
+    private static func delete(_ stores: [URL]) -> Bool {
+        let fileManager = FileManager.default
+        var failed = 0
+        for url in stores.flatMap(StoreFiles.urls(forStoreAt:))
+        where fileManager.fileExists(atPath: url.path(percentEncoded: false)) {
+            do {
+                try fileManager.removeItem(at: url)
+            } catch {
+                failed += 1
+            }
+        }
+        if failed > 0 {
+            AppLogger.history.error("Could not delete \(failed, privacy: .public) files of an unused history")
+        }
+        return failed == 0
     }
 }

@@ -135,6 +135,16 @@
         }
       }
     },
+    "A copy of a history that could not be opened takes %@." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копия истории, которую не удалось открыть, занимает %@."
+          }
+        }
+      }
+    },
     "App memory" : {
       "localizations" : {
         "ru" : {
@@ -341,6 +351,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "В истории"
+          }
+        }
+      }
+    },
+    "It is deleted a week after it was set aside, or at once with Clear History." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Она удаляется через неделю после того, как была отложена, или сразу кнопкой «Очистить историю»."
           }
         }
       }

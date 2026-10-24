@@ -24,10 +24,13 @@ import os
 /// without a blob store, or the whole saved history when it could not be read. Only Clear History deletes those.
 @MainActor
 @Observable
-final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsDiskUsage {
+final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsDiskUsage, KeepsDamagedHistory {
     /// Why the history is not, or not fully, saved. Nil while saving works. A failed write is cleared by the next
     /// successful one; a failure to open or read the saved history stays for the session.
     private(set) var storageError: HistoryPersistenceError?
+    /// The size of a damaged copy of a history (see `HistoryLeftovers`), or nil when there is none. Read at launch
+    /// and after deleting it, so views never read the file system for it.
+    private(set) var damagedHistoryBytes: Int64?
 
     @ObservationIgnored private let memory: InMemoryHistoryStore
     @ObservationIgnored private let persistence: any HistoryPersistence
@@ -38,6 +41,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     /// no other copy of a history is left. After the store failed to open, its records are unknown, and a damaged
     /// copy may reference any image, so their images may still be wanted.
     @ObservationIgnored private let sweepsBlobs: Bool
+    /// Whether every store that may reference blobs is either `persistence` or in `leftovers`: then, once both are
+    /// deleted, no blob is used. Not after the store failed to open without a folder to find it in.
+    @ObservationIgnored private let knowsEveryStore: Bool
+    @ObservationIgnored private let leftovers: (any HistoryLeftovers)?
     /// The entries whose last write failed: the next write saves them as they are in memory then, or deletes their
     /// records when they are gone.
     @ObservationIgnored private var unsaved: Set<ClipboardEntry.ID> = []
@@ -93,6 +100,9 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         self.coder = coder
         self.blobs = blobs
         self.sweepsBlobs = openError == nil && leftovers?.hasFiles() != true
+        self.knowsEveryStore = openError == nil || leftovers != nil
+        self.leftovers = leftovers
+        self.damagedHistoryBytes = leftovers?.damagedCopyBytes()
         self.storageError = storageError
 
         let kept = Set(memory.entries.map(\.id))
@@ -160,23 +170,38 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         change { $0.remove(id: id) }
     }
 
-    /// Removes every entry from memory and every record from disk, also records that were not loaded,
-    /// and with them every saved image. When that fails, the next write tries again.
+    /// Removes every entry from memory and every record from disk, also records that were not loaded, any copy
+    /// of a history that could not be opened, or the store itself while it cannot be opened (`HistoryLeftovers`),
+    /// and with them every saved image. When deleting the records fails, the next write tries again.
     @discardableResult
     func clear() -> ClearResult {
         let result = memory.clear()
         // Every entry is gone, so what earlier writes left unsaved is deleted with the rest.
         unsaved = []
         clearPending = true
-        if write(StoredChange(), covering: []) {
+        let cleared = write(StoredChange(), covering: [])
+        if cleared {
             // Memory and disk are both empty, so they match again.
             finishWrite(sealFailed: false)
-            if sweepsBlobs, let blobs {
-                // No record is left, so no blob is used: also those of records that were not loaded.
-                Self.deleteOrphans(in: blobs, keeping: [])
-            }
+        }
+        let leftoversDeleted = leftovers?.deleteAll() ?? true
+        damagedHistoryBytes = leftovers?.damagedCopyBytes()
+        if cleared, leftoversDeleted, knowsEveryStore, let blobs {
+            // No record is left anywhere, so no blob is used: also those of records that were not loaded.
+            Self.deleteOrphans(in: blobs, keeping: [])
         }
         return result
+    }
+
+    /// Deletes the copy of a history that could not be opened, for example when saving passwords is turned off:
+    /// it may hold passwords, encrypted with the key in the Keychain, that nothing else would delete. A store
+    /// that could not be opened stays: loading it later deletes its passwords when saving them is off.
+    func deleteDamagedHistory() {
+        guard let leftovers, damagedHistoryBytes != nil else {
+            return
+        }
+        leftovers.deleteDamagedCopy()
+        damagedHistoryBytes = leftovers.damagedCopyBytes()
     }
 
     func setRetention(_ policy: RetentionPolicy) {
@@ -187,10 +212,14 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         memory.stats()
     }
 
-    /// How many bytes the saved history takes on disk, saved images included, or nil when it is kept in memory
-    /// only.
+    /// How many bytes the saved history takes on disk, saved images and `HistoryLeftovers` included, or nil when
+    /// nothing is saved in files.
     func storedBytes() -> Int64? {
-        persistence.storedBytes().map { $0 + (blobs?.totalBytes() ?? 0) }
+        let stores = [persistence.storedBytes(), leftovers?.totalBytes()].compactMap { $0 }
+        guard !stores.isEmpty else {
+            return nil
+        }
+        return stores.reduce(0, +) + (blobs?.totalBytes() ?? 0)
     }
 
     // MARK: - Writing
