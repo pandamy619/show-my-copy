@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             store: Self.makeHistoryStore(blobs: blobs),
             blobs: blobs,
             thumbnails: ImageIOThumbnailMaker(),
+            previewImages: ImageIOPreviewDecoder(),
+            previewRichText: AppKitRichTextRenderer(),
             makeSettingsWindow: Self.makeSettingsWindow
         )
         KeyboardShortcuts.onKeyDown(for: .toggleHistoryWindow) { [weak container] in

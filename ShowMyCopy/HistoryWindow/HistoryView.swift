@@ -10,6 +10,8 @@ struct HistoryView: View {
 
     @FocusState private var isSearchFocused: Bool
 
+    private let icons: any FileIconProviding = WorkspaceFileIconProvider()
+
     var body: some View {
         let items = model.items
         let selectedID = model.selectedIndex(in: items).map { items[$0].id }
@@ -20,7 +22,19 @@ struct HistoryView: View {
                 // The window controller shrinks the panel to exactly these rows.
                 emptyState
             } else {
+                let previewed = model.previewedEntry
+                // The list stays underneath the preview, so it keeps its scroll position.
                 list(items: items, selectedID: selectedID, now: Date())
+                    .opacity(previewed == nil ? 1 : 0)
+                    .allowsHitTesting(previewed == nil)
+                    .accessibilityHidden(previewed != nil)
+                    .overlay {
+                        if let previewed {
+                            EntryPreviewPane(entry: previewed, preview: model.preview, icons: icons) {
+                                model.preview.close()
+                            }
+                        }
+                    }
             }
         }
         // Follow the panel's size: compact with nothing to list, full with entries. Pinned to the top, so the
@@ -32,11 +46,13 @@ struct HistoryView: View {
         .defaultFocus($isSearchFocused, true)
         .onAppear { isSearchFocused = true }
         .onChange(of: model.presentationCount) { isSearchFocused = true }
-        .onKeyPress(keys: Self.handledKeys) { handleKey($0.key) }
+        .onKeyPress(keys: Self.handledKeys) { handleKey($0) }
         .onExitCommand { onClose() }
     }
 
-    private static let handledKeys: Set<KeyEquivalent> = [.upArrow, .downArrow, .return, .escape]
+    private static let handledKeys: Set<KeyEquivalent> = [
+        .upArrow, .downArrow, .leftArrow, .rightArrow, .return, .escape,
+    ]
 
     private var searchBar: some View {
         HStack(spacing: 8) {
@@ -47,7 +63,7 @@ struct HistoryView: View {
                 .textFieldStyle(.plain)
                 .font(.title3)
                 .focused($isSearchFocused)
-                .onKeyPress(keys: Self.handledKeys) { handleKey($0.key) }
+                .onKeyPress(keys: Self.handledKeys) { handleKey($0) }
                 .onSubmit { chooseSelected() }
             Button {
                 onOpenSettings()
@@ -134,9 +150,18 @@ struct HistoryView: View {
             Button {
                 onChoose(entry)
             } label: {
-                HistoryRow(entry: entry, isRevealed: isRevealed, isSelected: isSelected, now: now)
+                HistoryRow(
+                    entry: entry, isRevealed: isRevealed, isSelected: isSelected, now: now, model: model, icons: icons)
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                if EntryPreviewModel.canPreview(entry) {
+                    Button("Show Preview") {
+                        model.showPreview(of: entry)
+                    }
+                }
+            }
+            .modifier(PreviewAccessibility(entry: entry, model: model))
             if entry.isConcealed {
                 RevealButton(isRevealed: isRevealed) {
                     model.toggleReveal(entry.id)
@@ -150,25 +175,60 @@ struct HistoryView: View {
         .id(entry.id)
     }
 
-    private func handleKey(_ key: KeyEquivalent) -> KeyPress.Result {
+    private func handleKey(_ press: KeyPress) -> KeyPress.Result {
         // While an input method composes text (Japanese, Chinese, Korean), these keys move between and confirm
         // its candidates or cancel the composition. Leave them to the search field.
         guard !Self.isComposingText else {
             return .ignored
         }
-        switch key {
-        case .upArrow:
-            model.moveSelection(.up)
-        case .downArrow:
-            model.moveSelection(.down)
-        case .return:
-            chooseSelected()
-        case .escape:
-            onClose()
-        default:
+        guard let key = Self.historyKey(for: press) else {
             return .ignored
         }
-        return .handled
+        switch model.handleKey(key, isCaretAtEnd: Self.isCaretAtEnd) {
+        case .handled:
+            return .handled
+        case .ignored:
+            return .ignored
+        case .choose(let entry):
+            onChoose(entry)
+            return .handled
+        case .close:
+            onClose()
+            return .handled
+        }
+    }
+
+    /// The model's name for a key press, or nil for one the history window leaves to the search field.
+    private static func historyKey(for press: KeyPress) -> HistoryWindowModel.Key? {
+        // Shift, Option, Command or Control with Left or Right Arrow select text or move by word in the search field.
+        let editingModifiers: EventModifiers = [.shift, .option, .command, .control]
+        let isEditing = !press.modifiers.isDisjoint(with: editingModifiers)
+        switch press.key {
+        case .upArrow:
+            return .up
+        case .downArrow:
+            return .down
+        case .leftArrow:
+            return isEditing ? nil : .left
+        case .rightArrow:
+            return isEditing ? nil : .right
+        case .return:
+            return .return
+        case .escape:
+            return .escape
+        default:
+            return nil
+        }
+    }
+
+    /// True when the caret of the search field is after its last character with nothing selected, or the search
+    /// field is not being edited. Only then does Right Arrow open the preview instead of moving the caret.
+    @MainActor private static var isCaretAtEnd: Bool {
+        guard let editor = NSApplication.shared.keyWindow?.firstResponder as? NSTextView else {
+            return true
+        }
+        let selection = editor.selectedRange()
+        return selection.length == 0 && selection.location >= (editor.string as NSString).length
     }
 
     /// True while the search field holds marked text: input that an input method has not committed yet.
@@ -191,12 +251,34 @@ private struct HistoryRow: View {
     let isRevealed: Bool
     let isSelected: Bool
     let now: Date
+    let model: HistoryWindowModel
+    let icons: any FileIconProviding
 
     var body: some View {
+        HStack(spacing: 10) {
+            switch entry.content {
+            case .image(let image):
+                EntryThumbnail(image: image, provider: model.thumbnails)
+            case .files(let files):
+                FileIcon(path: files.first?.path ?? "/", size: 32, icons: icons)
+            case .text, .richText:
+                EmptyView()
+            }
+            details
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var details: some View {
         // A concealed entry shows a mask of fixed length until revealed. Revealed text is sanitized like any other.
         let preview = EntryPreview.rowText(for: entry, isRevealed: isRevealed)
         let appName = entry.sourceApp?.name.map { EntryPreview.text($0) } ?? ""
-        VStack(alignment: .leading, spacing: 3) {
+        return VStack(alignment: .leading, spacing: 3) {
             Group {
                 if entry.isConcealed {
                     // VoiceOver never reads a password, revealed or not.
@@ -208,7 +290,20 @@ private struct HistoryRow: View {
                         .italic()
                         .foregroundStyle(.secondary)
                 } else {
-                    Text(verbatim: preview)
+                    switch entry.content {
+                    case .text:
+                        Text(verbatim: preview)
+                    case .richText:
+                        Text(verbatim: preview)
+                            .accessibilityLabel(Text("Rich text, \(preview)"))
+                    case .image:
+                        // The format and pixel size, under the thumbnail's row.
+                        Text(verbatim: preview)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel(Text("Image, \(preview)"))
+                    case .files(let files):
+                        FileRowTitle(entryID: entry.id, files: files, names: preview, model: model)
+                    }
                 }
             }
             .lineLimit(EntryPreview.maximumLines)
@@ -226,12 +321,6 @@ private struct HistoryRow: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

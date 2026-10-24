@@ -1,6 +1,58 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld files" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld файла"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld файлов"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld файл"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld файла"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld items now" : {
       "localizations" : {
         "en" : {
@@ -123,12 +175,32 @@
         }
       }
     },
+    "Close Preview" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрыть просмотр"
+          }
+        }
+      }
+    },
     "Current clipboard" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сейчас в буфере"
+          }
+        }
+      }
+    },
+    "File, %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файл, %@"
           }
         }
       }
@@ -223,6 +295,36 @@
         }
       }
     },
+    "Image" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изображение"
+          }
+        }
+      }
+    },
+    "Image unavailable" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изображение недоступно"
+          }
+        }
+      }
+    },
+    "Image, %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изображение, %@"
+          }
+        }
+      }
+    },
     "Images" : {
       "localizations" : {
         "ru" : {
@@ -249,6 +351,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сколько записей хранить"
+          }
+        }
+      }
+    },
+    "Left Arrow or Esc closes the preview." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стрелка влево или Esc закрывает просмотр."
+          }
+        }
+      }
+    },
+    "Loading preview" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загрузка просмотра"
+          }
+        }
+      }
+    },
+    "May have been moved or deleted" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Возможно, перемещён или удалён"
           }
         }
       }
@@ -383,6 +515,16 @@
         }
       }
     },
+    "Preview" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Просмотр"
+          }
+        }
+      }
+    },
     "Quit Show My Copy" : {
       "localizations" : {
         "ru" : {
@@ -495,6 +637,26 @@
         }
       }
     },
+    "Rich text, %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Форматированный текст, %@"
+          }
+        }
+      }
+    },
+    "Right Arrow shows a preview." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стрелка вправо открывает просмотр."
+          }
+        }
+      }
+    },
     "Save passwords" : {
       "localizations" : {
         "ru" : {
@@ -575,6 +737,16 @@
         }
       }
     },
+    "Show Preview" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть просмотр"
+          }
+        }
+      }
+    },
     "Show history" : {
       "localizations" : {
         "ru" : {
@@ -595,12 +767,32 @@
         }
       }
     },
+    "Shown without formatting" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показано без форматирования"
+          }
+        }
+      }
+    },
     "Size limit" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ограничение размера"
+          }
+        }
+      }
+    },
+    "Some files may have been moved or deleted" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Возможно, некоторые файлы перемещены или удалены"
           }
         }
       }
