@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// The name the history had before `HistoryStore`. Kept so existing call sites and tests read as before.
 typealias ClipboardHistory = InMemoryHistoryStore
@@ -17,10 +18,18 @@ final class InMemoryHistoryStore: HistoryStore {
     private(set) var currentEntryID: ClipboardEntry.ID?
     private(set) var revision = 0
     private let hasher: any ContentHasher
+    /// Where image data is kept. Every entry removed from the history takes its blobs with it. Nil when the
+    /// history holds no content with blobs.
+    private let blobs: (any BlobStore)?
 
-    init(retention: RetentionPolicy = .default, hasher: any ContentHasher = SHA256ContentHasher()) {
+    init(
+        retention: RetentionPolicy = .default,
+        hasher: any ContentHasher = SHA256ContentHasher(),
+        blobs: (any BlobStore)? = nil
+    ) {
         self.retention = retention
         self.hasher = hasher
+        self.blobs = blobs
     }
 
     /// Starts with `entries`, newest first, such as a history saved before the app quit. Removes the concealed
@@ -31,11 +40,13 @@ final class InMemoryHistoryStore: HistoryStore {
         restoring entries: [ClipboardEntry],
         at date: Date,
         retention: RetentionPolicy = .default,
-        hasher: any ContentHasher = SHA256ContentHasher()
+        hasher: any ContentHasher = SHA256ContentHasher(),
+        blobs: (any BlobStore)? = nil
     ) {
         self.entries = entries
         self.retention = retention
         self.hasher = hasher
+        self.blobs = blobs
         removeExpired(at: date)
         trim()
     }
@@ -53,11 +64,17 @@ final class InMemoryHistoryStore: HistoryStore {
         expiresAt: Date?
     ) -> ClipboardEntry.ID {
         let contentHash = hasher.hash(content)
+        if concealed, !content.canBeConcealed {
+            return dropSecret(content, contentHash: contentHash)
+        }
         var entry: ClipboardEntry
         if let index = entries.firstIndex(where: { $0.contentHash == contentHash }) {
             entry = entries.remove(at: index)
             entry.date = date
             entry.sourceApp = sourceApp
+            // The entry keeps its own content, so blobs written for this copy of the same content are not needed.
+            let kept = Set(entry.content.blobIDs)
+            deleteBlobs(content.blobIDs.filter { !kept.contains($0) })
         } else {
             // Made concealed right away, so no search key is ever made from a password.
             entry = ClipboardEntry(
@@ -74,8 +91,15 @@ final class InMemoryHistoryStore: HistoryStore {
         return entry.id
     }
 
+    /// An entry whose content cannot be concealed (an image or files) is removed instead: a secret is never kept
+    /// as an image file or a file reference.
     func conceal(id: ClipboardEntry.ID, expiresAt: Date) {
         guard let index = entries.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        guard entries[index].content.canBeConcealed else {
+            AppLogger.history.debug("Removed an entry that cannot be kept as a password")
+            remove(id: id)
             return
         }
         entries[index].isConcealed = true
@@ -134,8 +158,10 @@ final class InMemoryHistoryStore: HistoryStore {
     func clear() -> ClearResult {
         let stats = stats()
         if !entries.isEmpty {
+            let removed = entries
             entries.removeAll()
             entriesChanged()
+            deleteBlobs(of: removed)
         }
         currentEntryID = nil
         return ClearResult(removedCount: stats.count, freedBytes: stats.totalBytes)
@@ -150,19 +176,52 @@ final class InMemoryHistoryStore: HistoryStore {
         guard entries.contains(where: shouldRemove) else {
             return
         }
+        let removed = entries.filter(shouldRemove)
         entries.removeAll(where: shouldRemove)
         entriesChanged()
         forgetMissingCurrentEntry()
+        deleteBlobs(of: removed)
     }
 
     private func trim() {
         let kept = retention.kept(entries)
         // Avoid a change notification to observers when nothing is removed, which is the case on almost every copy.
         if kept.count != entries.count {
+            let keptIDs = Set(kept.map(\.id))
+            let removed = entries.filter { !keptIDs.contains($0.id) }
             entries = kept
             entriesChanged()
+            deleteBlobs(of: removed)
         }
         forgetMissingCurrentEntry()
+    }
+
+    /// Content that turned out to be a secret but cannot be concealed is not kept: its new blobs and any entry that
+    /// already holds it go. Returns an ID that no entry has.
+    private func dropSecret(_ content: ClipboardContent, contentHash: ContentHash) -> ClipboardEntry.ID {
+        AppLogger.history.debug("Did not keep a secret that cannot be kept as a password")
+        let existingBlobs = Set(entries.filter { $0.contentHash == contentHash }.flatMap(\.content.blobIDs))
+        removeEntries { $0.contentHash == contentHash }
+        deleteBlobs(content.blobIDs.filter { !existingBlobs.contains($0) })
+        currentEntryID = nil
+        return UUID()
+    }
+
+    private func deleteBlobs(of removed: [ClipboardEntry]) {
+        deleteBlobs(removed.flatMap(\.content.blobIDs))
+    }
+
+    /// Deletes blobs no entry needs any more. A failure is logged by the blob store and leaves the files for the
+    /// sweep at the next launch; the entries are gone either way.
+    private func deleteBlobs(_ ids: [BlobID]) {
+        guard !ids.isEmpty, let blobs else {
+            return
+        }
+        do {
+            try blobs.delete(ids)
+        } catch {
+            AppLogger.history.error("Some image data of removed entries is left for the next launch")
+        }
     }
 
     /// Call after every change to `entries`.

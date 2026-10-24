@@ -29,6 +29,8 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     @ObservationIgnored private let memory: InMemoryHistoryStore
     @ObservationIgnored private let persistence: any HistoryPersistence
     @ObservationIgnored private let coder: StoredEntryCoder
+    /// Where image data is kept, or nil when there is no such store: then records with blobs stay on disk unloaded.
+    @ObservationIgnored private let blobs: (any BlobStore)?
     /// Set after a failed write: the disk no longer matches memory, so the next write replaces everything.
     @ObservationIgnored private var needsFullWrite = false
 
@@ -42,6 +44,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
     /// `savesPasswords`, are deleted without being opened. Then the entries `retention` does not allow are removed,
     /// also from disk, so pass the limits and the password choice the user saved, not the defaults.
     /// `openError` is what went wrong opening the store on disk, if anything, to show in `storageError`.
+    ///
+    /// Image data lives in `blobs`. An entry whose data is gone is deleted, and blobs that no saved record
+    /// references (written for an entry that was never saved, or left by a failed delete) are deleted too. Without
+    /// `blobs`, records that reference blobs are left on disk and not loaded.
     init(
         persistence: any HistoryPersistence,
         sealer: (any SecretSealing)?,
@@ -49,78 +55,53 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         retention: RetentionPolicy = .default,
         hasher: any ContentHasher = SHA256ContentHasher(),
         now: Date = Date(),
-        openError: HistoryPersistenceError? = nil
+        openError: HistoryPersistenceError? = nil,
+        blobs: (any BlobStore)? = nil
     ) {
         let coder = StoredEntryCoder(sealer: sealer, hasher: hasher)
         var storageError = openError
         var records: [StoredEntryRecord] = []
+        var isLoaded = false
         do {
             records = try persistence.loadAll()
+            isLoaded = true
         } catch {
             AppLogger.history.error("Could not read the saved history; starting with an empty one")
             storageError = storageError ?? error
         }
 
-        var loaded: [ClipboardEntry] = []
-        var unreadable: [UUID] = []
-        var unwanted: [UUID] = []
-        for record in records {
-            // Decided before opening: opening asks for the key, which can show a Keychain prompt.
-            if Self.isUnwantedPassword(record, savesPasswords: savesPasswords, at: now, coder: coder) {
-                unwanted.append(record.id)
-                continue
-            }
-            switch coder.decode(record) {
-            case .entry(let entry):
-                loaded.append(entry)
-            case .unreadable:
-                unreadable.append(record.id)
-            case .unsupported:
-                // Saved by a newer app version: leave it for that version.
-                break
-            }
-        }
+        var found = Self.sort(records, coder: coder, savesPasswords: savesPasswords, at: now, blobs: blobs)
         // Each copy moves its entry to the top with the copy's date, so newest first is by date.
-        loaded.sort { $0.date > $1.date }
-        let memory = InMemoryHistoryStore(restoring: loaded, at: now, retention: retention, hasher: hasher)
+        found.entries.sort { $0.date > $1.date }
+        let memory = InMemoryHistoryStore(
+            restoring: found.entries, at: now, retention: retention, hasher: hasher, blobs: blobs)
 
         self.memory = memory
         self.persistence = persistence
         self.coder = coder
+        self.blobs = blobs
         self.storageError = storageError
 
         let kept = Set(memory.entries.map(\.id))
-        let removed = loaded.map(\.id).filter { !kept.contains($0) }
-        if !unreadable.isEmpty {
+        let removed = found.entries.map(\.id).filter { !kept.contains($0) }
+        if !found.unreadable.isEmpty {
             AppLogger.history.error(
-                "Deleting \(unreadable.count, privacy: .public) saved entries that could not be read or decrypted")
+                "Deleting \(found.unreadable.count, privacy: .public) saved entries that could not be read or decrypted"
+            )
         }
-        let deleted = unwanted + unreadable + removed
+        let deleted = found.unwanted + found.unreadable + removed
+        var isDeleted = true
         if !deleted.isEmpty {
-            write { () throws(HistoryPersistenceError) in
+            isDeleted = write { () throws(HistoryPersistenceError) in
                 try persistence.delete(ids: deleted)
             }
         }
-    }
-
-    /// Whether `record` is a saved password that is no longer wanted: expired at `now`, or saving passwords is off.
-    /// Records from a newer app version are left to that version.
-    private static func isUnwantedPassword(
-        _ record: StoredEntryRecord,
-        savesPasswords: Bool,
-        at now: Date,
-        coder: StoredEntryCoder
-    ) -> Bool {
-        guard record.isConcealed, coder.supports(record) else {
-            return false
+        // Only with every record known: a sweep after a failed load would delete the data of every image.
+        if isLoaded, let blobs {
+            let gone = isDeleted ? Set(deleted) : []
+            let referenced = records.filter { !gone.contains($0.id) }.flatMap(\.blobIDs).map { BlobID(uuid: $0) }
+            Self.deleteOrphans(in: blobs, keeping: Set(referenced))
         }
-        guard savesPasswords else {
-            return true
-        }
-        guard let expiresAt = record.expiresAt else {
-            return false
-        }
-        return expiresAt <= now
     }
 
     @discardableResult
@@ -163,7 +144,8 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         change { $0.remove(id: id) }
     }
 
-    /// Removes every entry from memory and every record from disk, also records this version could not load.
+    /// Removes every entry from memory and every record from disk, also records this version could not load,
+    /// and with them every saved image.
     @discardableResult
     func clear() -> ClearResult {
         let result = memory.clear()
@@ -171,6 +153,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
             // Memory and disk are both empty, so they match again.
             needsFullWrite = false
             finishWrite(sealFailed: false)
+            if let blobs {
+                // No record is left, so no blob is used: also those of records this version did not load.
+                Self.deleteOrphans(in: blobs, keeping: [])
+            }
         }
         return result
     }
@@ -183,9 +169,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         memory.stats()
     }
 
-    /// How many bytes the saved history takes on disk, or nil when it is kept in memory only.
+    /// How many bytes the saved history takes on disk, saved images included, or nil when it is kept in memory
+    /// only.
     func storedBytes() -> Int64? {
-        persistence.storedBytes()
+        persistence.storedBytes().map { $0 + (blobs?.totalBytes() ?? 0) }
     }
 
     // MARK: - Writing
@@ -290,5 +277,91 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
             }
             return false
         }
+    }
+}
+
+/// What `PersistentHistoryStore.sort` found in the saved records.
+private struct FoundRecords {
+    var entries: [ClipboardEntry] = []
+    /// Damaged, not to be opened, or an image whose data is gone: deleted.
+    var unreadable: [UUID] = []
+    /// Passwords that are expired or no longer saved: deleted unopened.
+    var unwanted: [UUID] = []
+}
+
+// MARK: - Loading
+
+extension PersistentHistoryStore {
+    /// Sorts the saved records into entries to load and records to delete. Records from a newer app version, and
+    /// records with blobs while there is no blob store, are in neither: they stay on disk.
+    private static func sort(
+        _ records: [StoredEntryRecord],
+        coder: StoredEntryCoder,
+        savesPasswords: Bool,
+        at now: Date,
+        blobs: (any BlobStore)?
+    ) -> FoundRecords {
+        var found = FoundRecords()
+        for record in records {
+            // Decided before opening: opening asks for the key, which can show a Keychain prompt.
+            if isUnwantedPassword(record, savesPasswords: savesPasswords, at: now, coder: coder) {
+                found.unwanted.append(record.id)
+                continue
+            }
+            if !record.blobIDs.isEmpty, coder.supports(record) {
+                guard let blobs else {
+                    // Nowhere to read the data from now; a later launch with the blob store loads it.
+                    continue
+                }
+                if record.blobIDs.contains(where: { !blobs.contains(BlobID(uuid: $0)) }) {
+                    found.unreadable.append(record.id)
+                    continue
+                }
+            }
+            switch coder.decode(record) {
+            case .entry(let entry):
+                found.entries.append(entry)
+            case .unreadable:
+                found.unreadable.append(record.id)
+            case .unsupported:
+                // Saved by a newer app version: leave it for that version.
+                break
+            }
+        }
+        return found
+    }
+
+    /// Deletes the blobs that no record references.
+    private static func deleteOrphans(in blobs: any BlobStore, keeping referenced: Set<BlobID>) {
+        do {
+            let orphans = try blobs.allIDs().subtracting(referenced)
+            guard !orphans.isEmpty else {
+                return
+            }
+            AppLogger.history.info("Deleting \(orphans.count, privacy: .public) saved images no entry uses")
+            try blobs.delete(Array(orphans))
+        } catch {
+            AppLogger.history.error("Could not delete saved images no entry uses; trying again at the next launch")
+        }
+    }
+
+    /// Whether `record` is a saved password that is no longer wanted: expired at `now`, or saving passwords is off.
+    /// Records from a newer app version are left to that version.
+    private static func isUnwantedPassword(
+        _ record: StoredEntryRecord,
+        savesPasswords: Bool,
+        at now: Date,
+        coder: StoredEntryCoder
+    ) -> Bool {
+        guard record.isConcealed, coder.supports(record) else {
+            return false
+        }
+        guard savesPasswords else {
+            return true
+        }
+        guard let expiresAt = record.expiresAt else {
+            return false
+        }
+        return expiresAt <= now
     }
 }
