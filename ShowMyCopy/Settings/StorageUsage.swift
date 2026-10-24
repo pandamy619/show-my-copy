@@ -8,7 +8,7 @@ enum StorageCategory: CaseIterable, Sendable {
     case richText
     /// Counted with their data and thumbnails in the blob store.
     case images
-    /// Only the stored paths and names: the files themselves are not kept.
+    /// The stored paths and names, and the thumbnails of photos and videos: the files themselves are not kept.
     case files
     case passwords
 
