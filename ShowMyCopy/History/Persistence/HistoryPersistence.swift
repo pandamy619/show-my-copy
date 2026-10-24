@@ -46,8 +46,8 @@ struct StoredChange: Equatable, Sendable {
 /// and learns at once whether it failed, so the history in memory and on disk cannot drift apart unnoticed. The
 /// writes are small (one text entry per copy, a few at most per change) and the SwiftData context they go through
 /// is itself bound to one actor; an actor here would add hops, ordering and `Sendable` snapshots for no gain.
-/// Image data is written to a `BlobStore` off the main actor (`ImageIngestor`) before the entry is recorded, and
-/// a record keeps only the blob IDs, in `payload` and in plain in `blobIDs`.
+/// Image data is written to a `BlobStore` off the main actor (`ImageIngestor`); an image entry is saved once its data
+/// is, and a record keeps only the blob IDs, in `payload` and in plain in `blobIDs`.
 @MainActor
 protocol HistoryPersistence: AnyObject {
     /// Every saved record, in any order.

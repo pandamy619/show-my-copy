@@ -9,9 +9,8 @@ import os
 /// changed the entries, writes what changed to `persistence`. The current entry is not saved: after a launch
 /// nothing is current until the monitor reads the pasteboard.
 ///
-/// Concealed entries are written sealed by `sealer`. Without a sealer (the Keychain could not be used) they are
-/// kept in memory only, and saved ones cannot be opened and are deleted at launch. They expire within an hour
-/// anyway.
+/// Concealed entries are written sealed by `sealer`. Without one (no Keychain) they are kept in memory only, like an
+/// image whose data is not saved yet, and saved ones cannot be opened and are deleted at launch.
 ///
 /// Opening a saved password needs the key, and getting the key can show a Keychain prompt. So at launch only
 /// passwords that are still wanted are opened: expired ones, and all of them when saving passwords is off, are
@@ -141,6 +140,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         change { $0.addThumbnails(files, toEntry: id) }
     }
 
+    func completeImage(_ unsaved: ImageReference, with image: ImageReference, keepsEarlierCopy: Bool) {
+        change { $0.completeImage(unsaved, with: image, keepsEarlierCopy: keepsEarlierCopy) }
+    }
+
     @discardableResult
     func markNewestCurrent(ifItHolds content: ClipboardContent) -> ClipboardEntry.ID? {
         memory.markNewestCurrent(ifItHolds: content)
@@ -246,15 +249,15 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         saveEntries(changed)
     }
 
-    /// Writes the entries with these IDs as they are in memory now, together with those earlier writes did not
-    /// save: an entry in memory is saved, the record of one that is gone or kept in memory only is deleted. Only
+    /// Writes the entries with these IDs as they are in memory now, with those earlier writes did not save: an entry
+    /// in memory is saved, the record of one gone or kept in memory only (an image not saved yet) is deleted. Only
     /// these records are touched, so records this session did not load stay as they are.
     private func saveEntries(_ ids: Set<ClipboardEntry.ID>) {
         let pending = ids.union(unsaved)
         var sealFailed = false
         var change = StoredChange()
         var inMemory: Set<ClipboardEntry.ID> = []
-        for entry in memory.entries where pending.contains(entry.id) {
+        for entry in memory.entries where pending.contains(entry.id) && entry.content.image?.isSaved != false {
             inMemory.insert(entry.id)
             if let record = storedRecord(for: entry, sealFailed: &sealFailed) {
                 change.saved.append(record)

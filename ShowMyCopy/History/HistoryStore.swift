@@ -12,8 +12,8 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     var entries: [ClipboardEntry] { get }
 
     /// The entry whose content is on the pasteboard now, or nil when the latest pasteboard change was not recorded
-    /// (a skipped password, a transient, empty, too large or unsupported item, or an image still being saved). The
-    /// newest entry is not always current.
+    /// (a skipped password, a transient, empty, too large or unsupported item). The newest entry is not always
+    /// current.
     var currentEntryID: ClipboardEntry.ID? { get }
 
     /// The limits in effect.
@@ -54,6 +54,19 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// new size. The store owns the thumbnails from this call on: those it does not take (the entry is gone, holds
     /// other content or has them already) are deleted at once.
     func addThumbnails(_ files: [FileReference], toEntry id: ClipboardEntry.ID)
+
+    /// Completes an image recorded before its data was saved (`ImageReference.isSaved` is false), so the monitor
+    /// does not wait for it: the entry that holds `unsaved` gets `image`, the image as saved, with its hash, size and
+    /// preview. It keeps its place, date, source app and current state; the limits apply to its new size.
+    ///
+    /// When another entry already holds the same image, the two become one at this entry's place and the other is
+    /// removed: the newer copy keeps its date and source app. With `keepsEarlierCopy`, used for the image found on
+    /// the pasteboard at launch, the entry just below it keeps its own instead when it holds the image, as
+    /// `markNewestCurrent(ifItHolds:)` does for other content.
+    ///
+    /// The store owns the blobs of `image` from this call on: those no entry uses afterwards (the entry is gone, or
+    /// another entry's copy of the image is kept) are deleted.
+    func completeImage(_ unsaved: ImageReference, with image: ImageReference, keepsEarlierCopy: Bool)
 
     /// Makes the newest entry current, without changing it, when it holds `content`. Returns its ID, or nil when
     /// the newest entry holds other content.

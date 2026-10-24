@@ -53,7 +53,7 @@ struct AppContainerImageTests {
                 store: store, blobs: blobs, defaults: defaults, fileThumbnails: FakeFileThumbnailMaker())
             pasteboard.copyFiles([URL(filePath: "/Users/me/a.jpg")])
             container.monitor.poll()
-            await container.monitor.finishStoringImages()
+            await container.monitor.finishEnriching()
             let entry = try #require(store.entries.first)
             #expect(entry.content.blobIDs.count == 1)
             #expect(base.allIDs() == Set(entry.content.blobIDs))
@@ -79,7 +79,7 @@ struct AppContainerImageTests {
             #expect(container.blobs != nil)
             pasteboard.copy([.png: Data([0x89, 0x50])])
             container.monitor.poll()
-            await container.monitor.finishStoringImages()
+            await container.monitor.finishEnriching()
             let entry = try #require(store.entries.first)
             #expect(entry.kind == .image)
 
@@ -96,7 +96,7 @@ struct AppContainerImageTests {
             let container = makeContainer(store: store, blobs: blobs, defaults: defaults)
             pasteboard.copy([.png: Data([0x89, 0x50])])
             container.monitor.poll()
-            await container.monitor.finishStoringImages()
+            await container.monitor.finishEnriching()
             let entry = try #require(store.entries.first)
             let image = try #require(entry.content.image)
             let model = container.historyWindow.model
@@ -120,7 +120,7 @@ struct AppContainerImageTests {
             let container = makeContainer(store: store, blobs: nil, defaults: defaults)
             pasteboard.copy([.png: Data([0x89, 0x50])])
             container.monitor.poll()
-            await container.monitor.finishStoringImages()
+            await container.monitor.finishEnriching()
             #expect(store.entries.isEmpty)
         }
     }

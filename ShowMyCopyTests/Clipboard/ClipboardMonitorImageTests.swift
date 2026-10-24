@@ -12,8 +12,8 @@ struct ClipboardMonitorImageTests {
     private let date = Date(timeIntervalSince1970: 1_790_000_000)
     private let preview = SourceApp(bundleIdentifier: "com.apple.Preview", name: "Preview")
     private let png = Data([0x89, 0x50, 0x4E, 0x47, 9, 9])
-    /// Stops saving an image before it starts, when armed.
-    private let gate = BlockingGate()
+    /// Holds saving an image before anything is written, when armed.
+    private let gate = AsyncGate()
 
     init() {
         inFlight = InFlightBlobStore(base: blobs)
@@ -30,7 +30,7 @@ struct ClipboardMonitorImageTests {
             now: { [date] in now ?? date },
             passwordPolicy: { policy },
             blobs: blobs ?? inFlight,
-            imageIngestor: ImageIngestor(thumbnails: FakeThumbnailMaker(), hasher: GatedHasher(gate: gate))
+            imageIngestor: ImageIngestor(thumbnails: FakeThumbnailMaker(gate: gate))
         )
     }
 
@@ -57,7 +57,7 @@ struct ClipboardMonitorImageTests {
         #expect(recorded.date == date)
         #expect(history.currentEntryID == recorded.id)
 
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         let entry = try #require(history.entries.first)
         let image = try #require(entry.content.image)
         #expect(entry.id == recorded.id)
@@ -85,7 +85,7 @@ struct ClipboardMonitorImageTests {
         #expect(history.currentEntryID == history.entries.first?.id)
 
         gate.open()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(history.entries.map(\.kind) == [.text, .image])
         #expect(history.entries.first?.text == "after the image")
         #expect(history.currentEntryID == history.entries.first?.id)
@@ -97,12 +97,12 @@ struct ClipboardMonitorImageTests {
         monitor.poll()
         pasteboard.copy([.png: png])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         pasteboard.copy("between")
         monitor.poll()
         pasteboard.copy([.png: png])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
 
         #expect(history.entries.map(\.kind) == [.image, .text])
         #expect(history.currentEntryID == history.entries.first?.id)
@@ -124,7 +124,7 @@ struct ClipboardMonitorImageTests {
         #expect(history.entries.map(\.kind) == [.image, .text, .image])
 
         gate.open()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(history.entries.map(\.kind) == [.image, .text])
         #expect(history.currentEntryID == history.entries.first?.id)
         expectEveryBlobBelongsToAnEntry()
@@ -135,7 +135,7 @@ struct ClipboardMonitorImageTests {
         monitor.poll()
         pasteboard.copy([.png: Data([0, 1, 2])])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(history.entries.isEmpty)
         #expect(history.currentEntryID == nil)
         #expect(blobs.allIDs().isEmpty)
@@ -147,7 +147,7 @@ struct ClipboardMonitorImageTests {
         monitor.poll()
         pasteboard.copy([.png: png])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(history.entries.isEmpty)
         #expect(failing.allIDs().isEmpty)
     }
@@ -156,14 +156,14 @@ struct ClipboardMonitorImageTests {
         let monitor = makeMonitor()
         pasteboard.copy([.png: png])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         let entry = try #require(history.entries.first)
         history.markCurrentSkipped()
 
         // The next launch finds the same image on the pasteboard.
         let relaunched = makeMonitor(now: date + 100)
         relaunched.poll()
-        await relaunched.finishStoringImages()
+        await relaunched.finishEnriching()
         #expect(history.entries == [entry])
         #expect(history.currentEntryID == entry.id)
         #expect(blobs.writeCount == 2)
@@ -183,7 +183,7 @@ struct ClipboardMonitorImageTests {
         monitor.acknowledge(changeCount: written ?? 0)
         history.record(text: "picked", sourceApp: nil, at: date + 1)
         gate.open()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
 
         #expect(history.entries.map(\.kind) == [.text, .image])
         #expect(history.currentEntryID == picked)
@@ -206,7 +206,7 @@ struct ClipboardMonitorImageTests {
         let copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor, blobs: inFlight)
         #expect(copier.copy(older))
         gate.open()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
 
         #expect(history.entries.map(\.text) == ["older", "copied while the image is saved", nil])
         let image = try #require(history.entries.last?.content.image)
@@ -233,7 +233,7 @@ struct ClipboardMonitorImageTests {
         #expect(history.currentEntryID == unsaved.id)
 
         gate.open()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         let entry = try #require(history.entries.first)
         #expect(entry.id == unsaved.id)
         #expect(entry.content.image?.isSaved == true)
@@ -254,7 +254,7 @@ struct ClipboardMonitorImageTests {
         history.remove(id: try #require(history.entries.first).id)
 
         gate.open()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(history.entries.isEmpty)
         #expect(blobs.allIDs().isEmpty)
     }
@@ -264,7 +264,7 @@ struct ClipboardMonitorImageTests {
         monitor.poll()
         pasteboard.copy([.png: png], markers: [PasteboardMarker.concealed])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(history.entries.isEmpty)
         #expect(blobs.writeCount == 0)
     }

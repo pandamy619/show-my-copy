@@ -4,7 +4,8 @@ import AppKit
 enum CapturedItem: Equatable, Sendable {
     /// Content to record. `isSecret`: a password, by its marker or because a password manager copied it.
     case content(ClipboardContent, isSecret: Bool)
-    /// An image to store before it is recorded. Never a secret: a secret is kept as text or not at all.
+    /// An image, recorded at once and saved in the background. Never a secret: a secret is kept as text or not at
+    /// all.
     case image(CapturedImage)
     /// Not recorded.
     case skipped(SkipReason)
@@ -32,9 +33,9 @@ enum CapturedItem: Equatable, Sendable {
 ///
 /// Reading happens on the main actor: `NSPasteboard` is not `Sendable`, and its contents can change between calls,
 /// which the monitor detects with `changeCount`. So readers only check sizes and copy the bytes out. An image is
-/// returned as `CapturedItem.image` with its raw bytes; `ImageIngestor` hashes it, makes the thumbnail and writes it
-/// to disk off the main actor before the monitor records it. Keep that work out of the readers, or large copies
-/// will block the UI.
+/// returned as `CapturedItem.image` with its raw bytes; it is recorded at once, and `ImageIngestor` hashes it, makes
+/// the thumbnail and writes it to disk off the main actor afterwards (`CaptureEnrichment`). Keep that work out of the
+/// readers, or large copies will block the UI.
 ///
 /// A secret (by marker or password manager) is read by the readers that keep secrets only, which is plain text: a
 /// password is never kept as rich text, an image or files.

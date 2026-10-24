@@ -25,10 +25,15 @@ enum ThumbnailError: Error, Equatable, Sendable {
 
 /// Measures copied image data and draws a small PNG thumbnail of it. The app uses ImageIO
 /// (`ImageIOThumbnailMaker`, macOS only), which decodes only as much of the image as the thumbnail needs.
+///
+/// Called off the main actor while an image recorded already is saved (`ImageIngestor`). `async`, so a maker may
+/// suspend instead of holding a thread; `ImageIOThumbnailMaker` does its work at once on the caller's thread.
 protocol ThumbnailMaking: Sendable {
     /// The image's size and a thumbnail at most `maximumPixelSize` pixels on its longer side (never larger than
     /// the image). `declaredType` is the type the data was copied as. Throws `notAnImage` when the data cannot be
     /// read as an image or fails `ImageDecodingPolicy`. Only an image within the policy's pixel limit is decoded;
     /// a larger one is measured from its header and has no thumbnail.
-    func inspect(_ data: Data, declaredType: String, maximumPixelSize: Int) throws(ThumbnailError) -> ImageInspection
+    func inspect(
+        _ data: Data, declaredType: String, maximumPixelSize: Int
+    ) async throws(ThumbnailError) -> ImageInspection
 }

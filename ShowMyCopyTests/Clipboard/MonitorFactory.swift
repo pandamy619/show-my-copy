@@ -30,12 +30,13 @@ enum MonitorFactory {
             schedule: PollingSchedule(interval: interval, sleep: sleep, activity: activity),
             expiry: PasswordExpiry(history: history, now: now),
             clearedClipboard: ClearedClipboardCheck(history: history),
+            capture: blobs.map { blobs in
+                CaptureEnrichment(
+                    history: history, blobs: blobs, images: imageIngestor, fileThumbnails: fileThumbnailIngestor)
+            },
             frontmostApp: frontmostApp,
             now: now,
-            passwordPolicy: passwordPolicy,
-            blobs: blobs,
-            imageIngestor: imageIngestor,
-            fileThumbnailIngestor: fileThumbnailIngestor
+            passwordPolicy: passwordPolicy
         )
     }
 

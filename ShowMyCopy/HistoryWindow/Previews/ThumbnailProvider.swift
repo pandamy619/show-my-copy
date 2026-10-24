@@ -37,9 +37,10 @@ final class ThumbnailProvider {
         failures = BoundedCache(countLimit: limits.failures, costLimit: 0)
     }
 
-    /// What a row can show right away: the cached thumbnail, `failed` when there is none to load, or `loading`.
+    /// What a row can show right away: the cached thumbnail, `failed` when there is none to load, or `loading`,
+    /// also for an image whose data is still being saved: its thumbnail comes with it.
     func state(for image: ImageReference) -> PreviewLoadState<any PreviewImage> {
-        state(of: image.thumbnail)
+        image.isSaved ? state(of: image.thumbnail) : .loading
     }
 
     /// What a file row or preview item can show right away. A file shows its icon instead until it is loaded.

@@ -114,6 +114,38 @@ final class InMemoryHistoryStore: HistoryStore {
         trim()
     }
 
+    func completeImage(_ unsaved: ImageReference, with image: ImageReference, keepsEarlierCopy: Bool) {
+        // Whatever of these no entry uses at the end is deleted.
+        var released = Set(unsaved.blobIDs + image.blobIDs)
+        guard let index = entries.firstIndex(where: { $0.content.image == unsaved }) else {
+            deleteUnused(released)
+            return
+        }
+        let content = ClipboardContent.image(image)
+        var completed = entries[index].replacingContent(content, contentHash: hasher.hash(content))
+        var merged = [entries[index].id]
+        let other = entries.firstIndex { $0.contentHash == completed.contentHash }
+        if let other {
+            merged.append(entries[other].id)
+            released.formUnion(entries[other].content.blobIDs)
+            if keepsEarlierCopy, other == index + 1 {
+                // The image on the pasteboard at launch is the entry from before: nothing says it was copied again.
+                completed = entries[other]
+            }
+        }
+        let wasCurrent = currentEntryID.map(merged.contains) == true
+        entries[index] = completed
+        if let other {
+            entries.remove(at: other)
+        }
+        entriesChanged()
+        if wasCurrent {
+            currentEntryID = completed.id
+        }
+        trim()
+        deleteUnused(released)
+    }
+
     /// An entry whose content cannot be concealed (an image or files) is removed instead: a secret is never kept
     /// as an image file or a file reference.
     func conceal(id: ClipboardEntry.ID, expiresAt: Date) {
@@ -228,6 +260,12 @@ final class InMemoryHistoryStore: HistoryStore {
         deleteBlobs(content.blobIDs.filter { !existingBlobs.contains($0) })
         currentEntryID = nil
         return UUID()
+    }
+
+    /// Deletes those of `ids` that no entry uses.
+    private func deleteUnused(_ ids: Set<BlobID>) {
+        let used = Set(entries.flatMap(\.content.blobIDs))
+        deleteBlobs(ids.subtracting(used).sorted { $0.uuid.uuidString < $1.uuid.uuidString })
     }
 
     private func deleteBlobs(of removed: [ClipboardEntry]) {

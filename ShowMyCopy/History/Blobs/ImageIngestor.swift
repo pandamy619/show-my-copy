@@ -40,23 +40,13 @@ struct ImageIngestor: Sendable {
         known: [ContentHash: ImageReference],
         reservation: BlobReservation
     ) async throws(ImageIngestError) -> IngestedImage {
-        try store(image, as: blobID, known: known, reservation: reservation)
-    }
-
-    /// The work of `ingest`, on the caller's thread.
-    func store(
-        _ image: CapturedImage,
-        as blobID: BlobID,
-        known: [ContentHash: ImageReference],
-        reservation: BlobReservation
-    ) throws(ImageIngestError) -> IngestedImage {
         let contentHash = hasher.digest(of: image.data)
         if let existing = known[contentHash] {
             return IngestedImage(reference: existing, isNew: false)
         }
         let inspection: ImageInspection
         do {
-            inspection = try thumbnails.inspect(
+            inspection = try await thumbnails.inspect(
                 image.data, declaredType: image.typeIdentifier, maximumPixelSize: ThumbnailReference.maximumPixelSize)
         } catch {
             AppLogger.clipboard.info("Skipped image data that could not be read as an image")

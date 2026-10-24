@@ -11,9 +11,12 @@ final class FakeFileThumbnailMaker: FileThumbnailMaking {
     private let made = Mutex<[String]>([])
     private let started = Mutex<(names: Set<String>, waiters: [(String, CheckedContinuation<Void, Never>)])>(([], []))
     private let pixelSize: Int
+    /// Where making a thumbnail can be held.
+    private let gate: AsyncGate?
 
-    init(pixelSize: Int = 256) {
+    init(pixelSize: Int = 256, gate: AsyncGate? = nil) {
         self.pixelSize = pixelSize
+        self.gate = gate
     }
 
     /// The names whose kind was asked for, in order.
@@ -66,6 +69,7 @@ final class FakeFileThumbnailMaker: FileThumbnailMaking {
         for waiter in waiting {
             waiter.resume()
         }
+        await gate?.pass()
         if name.contains("slow") {
             // Until the time limit cancels it.
             await suspendUntilCancelled()

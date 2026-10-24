@@ -43,7 +43,7 @@ struct ClipboardMonitorFileThumbnailTests {
         let recorded = try #require(history.entries.first)
         #expect(recorded.content.blobIDs.isEmpty)
         #expect(history.currentEntryID == recorded.id)
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
 
         let entry = try #require(history.entries.first)
         #expect(entry.id == recorded.id)
@@ -72,7 +72,7 @@ struct ClipboardMonitorFileThumbnailTests {
         monitor.poll()
         #expect(history.entries.map(\.kind) == [.text, .files, .text, .files])
 
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         // The thumbnails go to their own entries, which keep their places; the newest copy stays current.
         #expect(history.entries.map(\.kind) == [.text, .files, .text, .files])
         #expect(history.entries[1].content.blobIDs.count == 1)
@@ -87,7 +87,7 @@ struct ClipboardMonitorFileThumbnailTests {
         pasteboard.copyFiles([photo, video])
         monitor.poll()
         history.remove(id: try #require(history.entries.first).id)
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(history.entries.isEmpty)
         #expect(blobs.allIDs().isEmpty)
     }
@@ -101,13 +101,13 @@ struct ClipboardMonitorFileThumbnailTests {
         monitor.poll()
         pasteboard.copyFiles([photo])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         pasteboard.copy([.png: Data([0x89, 0x50, 0x4E, 0x47, 1])])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         pasteboard.copyFiles([video])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(history.entries.map(\.kind) == [.files, .image, .files])
     }
 
@@ -116,12 +116,12 @@ struct ClipboardMonitorFileThumbnailTests {
         monitor.poll()
         pasteboard.copyFiles([photo])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         pasteboard.copy("between")
         monitor.poll()
         pasteboard.copyFiles([photo])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
 
         #expect(history.entries.map(\.kind) == [.files, .text])
         #expect(blobs.allIDs() == Set(history.entries[0].content.blobIDs))
@@ -132,7 +132,7 @@ struct ClipboardMonitorFileThumbnailTests {
         let monitor = makeMonitor()
         pasteboard.copyFiles([photo])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         let entry = try #require(history.entries.first)
         history.markCurrentSkipped()
         let asked = maker.thumbnailNames.count
@@ -140,7 +140,7 @@ struct ClipboardMonitorFileThumbnailTests {
         // The next launch finds the same files on the pasteboard.
         let relaunched = makeMonitor(now: date + 100)
         relaunched.poll()
-        await relaunched.finishStoringImages()
+        await relaunched.finishEnriching()
         #expect(history.entries == [entry])
         #expect(history.currentEntryID == entry.id)
         #expect(maker.thumbnailNames.count == asked)
@@ -158,7 +158,7 @@ struct ClipboardMonitorFileThumbnailTests {
         let written = pasteboard.write("picked")
         monitor.acknowledge(changeCount: written ?? 0)
         history.record(text: "picked", sourceApp: nil, at: date + 1)
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
 
         #expect(history.currentEntryID == picked)
         #expect(history.entries.first?.id == picked)
@@ -170,15 +170,15 @@ struct ClipboardMonitorFileThumbnailTests {
         monitor.poll()
         pasteboard.copyFiles([photo])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         pasteboard.copyFiles([photo, video])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         pasteboard.copy("between")
         monitor.poll()
         pasteboard.copyFiles([photo])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         #expect(maker.thumbnailNames == ["IMG_0001.jpg", "IMG_0001.jpg", "clip.mov"])
         #expect(blobs.allIDs() == Set(history.entries.flatMap(\.content.blobIDs)))
     }
@@ -188,7 +188,7 @@ struct ClipboardMonitorFileThumbnailTests {
         monitor.poll()
         pasteboard.copyFiles([photo], markers: [PasteboardMarker.concealed])
         monitor.poll()
-        await monitor.finishStoringImages()
+        await monitor.finishEnriching()
         // The reader keeps a secret as concealed text, never as files.
         #expect(!history.entries.contains { $0.kind == .files })
         #expect(maker.askedNames.isEmpty)

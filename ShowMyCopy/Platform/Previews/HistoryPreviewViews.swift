@@ -44,8 +44,11 @@ struct EntryThumbnail: View {
         .frame(width: Self.size, height: Self.size)
         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
         .accessibilityHidden(true)
-        .task(id: image.blobID) {
-            guard state.isLoading else {
+        // Keyed by the whole reference: an image recorded before its data was saved gets its thumbnail a moment
+        // later, in the same row.
+        .task(id: image) {
+            state = provider.state(for: image)
+            guard state.isLoading, image.isSaved else {
                 return
             }
             let loaded = await provider.thumbnail(for: image)

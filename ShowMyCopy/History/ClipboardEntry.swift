@@ -88,6 +88,11 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
     /// The same entry holding `content`, which must have the same hash, such as files that got thumbnails. The
     /// size and preview are made again from it; everything else stays.
     func replacingContent(_ content: ClipboardContent) -> ClipboardEntry {
+        replacingContent(content, contentHash: contentHash)
+    }
+
+    /// The same entry holding `content` with its hash, such as an image whose data was saved after it was recorded.
+    func replacingContent(_ content: ClipboardContent, contentHash: ContentHash) -> ClipboardEntry {
         ClipboardEntry(
             id: id, content: content, contentHash: contentHash, date: date, sourceApp: sourceApp,
             isConcealed: isConcealed, expiresAt: expiresAt, isPinned: isPinned)
@@ -109,8 +114,9 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
         case .richText(_, let plain):
             EntryPreview.text(plain)
         case .image(let image):
-            // Not localized: a format name and a pixel size read the same in every language.
-            "\(image.formatName) \(image.pixelWidth) × \(image.pixelHeight)"
+            // Not localized: a format name and a pixel size read the same in every language. The size of an image
+            // whose data is not saved yet is not known.
+            image.isSaved ? "\(image.formatName) \(image.pixelWidth) × \(image.pixelHeight)" : image.formatName
         case .files(let files):
             EntryPreview.text(files.map(\.name).joined(separator: "\n"))
         }

@@ -63,7 +63,13 @@ final class AppContainer {
         let passwordSettings = PasswordSettings(history: store, defaults: defaults, now: now)
         let settingsWindow = makeSettingsWindow(store, historySettings, passwordSettings)
 
-        let ingestors = Self.makeIngestors(thumbnails: thumbnails, fileThumbnails: fileThumbnails)
+        // Images are recorded only with a way to make thumbnails, and copied photo and video files get thumbnails
+        // only with a way to make them; both also need somewhere to keep them.
+        let capture = blobs.map { blobs in
+            CaptureEnrichment(
+                history: store, blobs: blobs, images: thumbnails.map { ImageIngestor(thumbnails: $0) },
+                fileThumbnails: fileThumbnails.map { FileThumbnailIngestor(maker: $0) })
+        }
         // The monitor reads the password setting on every change, so a new choice applies to the next copy.
         let monitor = ClipboardMonitor(
             pasteboard: pasteboard,
@@ -71,12 +77,10 @@ final class AppContainer {
             schedule: PollingSchedule(sleep: sleep, activity: pollingActivity),
             expiry: PasswordExpiry(history: store, now: now),
             clearedClipboard: ClearedClipboardCheck(history: store),
+            capture: capture,
             frontmostApp: frontmostApp,
             now: now,
-            passwordPolicy: { [passwordSettings] in passwordSettings.policy },
-            blobs: blobs,
-            imageIngestor: ingestors.images,
-            fileThumbnailIngestor: ingestors.files
+            passwordPolicy: { [passwordSettings] in passwordSettings.policy }
         )
         let copier = EntryCopier(history: store, pasteboard: pasteboard, monitor: monitor, blobs: blobs, now: now)
         // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.
@@ -114,15 +118,6 @@ final class AppContainer {
         self.copier = copier
         self.historyWindow = historyWindow
         self.settingsWindow = settingsWindow
-    }
-
-    /// Images are recorded only with a way to make thumbnails, and copied photo and video files get thumbnails only
-    /// with a way to make them; both also need somewhere to keep them, `blobs`.
-    private static func makeIngestors(
-        thumbnails: (any ThumbnailMaking)?,
-        fileThumbnails: (any FileThumbnailMaking)?
-    ) -> (images: ImageIngestor?, files: FileThumbnailIngestor?) {
-        (thumbnails.map { ImageIngestor(thumbnails: $0) }, fileThumbnails.map { FileThumbnailIngestor(maker: $0) })
     }
 
     /// Starts watching the clipboard and the system.
