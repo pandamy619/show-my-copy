@@ -13,6 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !Self.isRunningTests else {
             return
         }
+        // Settings show on the first launch only, so their flag also tells a new install from an older one.
+        let firstLaunch = FirstLaunch()
+        HistorySettings.settleSizeLimitDefault(in: .standard, isNewInstall: firstLaunch.shouldShowSettings)
         let blobs = Self.openBlobStore()
         let container = AppContainer(
             store: Self.makeHistoryStore(blobs: blobs),
@@ -28,7 +31,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         container.start()
         self.container = container
 
-        let firstLaunch = FirstLaunch()
         if firstLaunch.shouldShowSettings {
             container.showSettings()
             firstLaunch.settingsWereShown()

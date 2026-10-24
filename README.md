@@ -26,7 +26,7 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Previews.** → (or Show Preview in a row's context menu) shows the selected entry larger: the full image, styled text with its formatting, or the copied files with their sizes. ← or Esc closes it. Passwords are never previewed.
 - **Entry limit** from 10 to 1000, 50 by default. Lowering it asks before removing old entries.
 - **Clear history** in Settings, with confirmation. It deletes the history from disk too.
-- **Storage at a glance.** Settings show how much the history takes, split into text, rich text, images, files and passwords, its size on disk, how much memory the app uses, and a warning if the history cannot be saved. An optional size limit of 100 MB, 500 MB or 1 GB asks before removing old entries.
+- **Storage at a glance.** Settings show how much the history takes, split into text, rich text, images, files and passwords, its size on disk, how much memory the app uses, and a warning if the history cannot be saved. A size limit of 100 MB, 500 MB or 1 GB (1 GB by default; it can be turned off) asks before removing old entries.
 - **Pauses while the Mac sleeps or the screen is locked.**
 - **Passwords are not kept** by default: items that password managers mark as concealed and anything copied from a known password manager are skipped, as are items marked as transient or auto-generated. When a password manager clears a password it copied without a marker, the entry leaves the history too.
 - **Save passwords, if you want.** Turn it on in Settings to keep passwords hidden in the history: an eye button reveals one, search skips them, and they are removed after 1 minute, 10 minutes or 1 hour.
