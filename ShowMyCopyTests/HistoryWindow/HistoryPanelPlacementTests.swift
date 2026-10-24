@@ -48,13 +48,6 @@ struct HistoryPanelResizeTests {
         #expect(compact.height < HistoryPanelPlacement.fullSize.height)
     }
 
-    @Test func compactSizeMakesRoomForTheTitleBar() {
-        let compact = HistoryPanelPlacement.size(showsEntries: false, topInset: 28)
-        #expect(compact.height == HistoryPanelPlacement.compactHeight + 28)
-        // The full panel keeps its size: the list scrolls in whatever height is left.
-        #expect(HistoryPanelPlacement.size(showsEntries: true, topInset: 28) == HistoryPanelPlacement.fullSize)
-    }
-
     @Test func growingKeepsTheTopAndLeftEdges() {
         let compact = CGRect(x: 480, y: 623, width: 480, height: 97)
         let grown = HistoryPanelPlacement.frame(

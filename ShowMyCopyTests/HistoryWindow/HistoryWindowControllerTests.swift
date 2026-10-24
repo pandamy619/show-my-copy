@@ -164,8 +164,10 @@ struct HistoryWindowControllerTests {
         controller.show()
 
         let frame = try #require(controller.panel?.frame)
-        #expect(frame.size == compactSize(of: controller))
-        #expect(frame.height < HistoryPanelPlacement.fullSize.height)
+        // Exactly the search bar, the divider and one message row: the content starts at the top edge, with no
+        // room kept for the hidden title bar.
+        #expect(frame.size == compactSize)
+        #expect(frame.height == HistoryPanelPlacement.compactHeight)
     }
 
     @Test func historyOpensAFullPanel() throws {
@@ -190,7 +192,7 @@ struct HistoryWindowControllerTests {
 
         // A search with no matches.
         controller.model.query = "nothing like it"
-        let searched = try await frame(of: controller, becoming: compactSize(of: controller))
+        let searched = try await frame(of: controller, becoming: compactSize)
         #expect(searched.maxY == compact.maxY)
 
         controller.model.query = ""
@@ -198,7 +200,7 @@ struct HistoryWindowControllerTests {
 
         // History cleared from Settings.
         _ = history.clear()
-        let cleared = try await frame(of: controller, becoming: compactSize(of: controller))
+        let cleared = try await frame(of: controller, becoming: compactSize)
         #expect(cleared == compact)
     }
 
@@ -214,11 +216,8 @@ struct HistoryWindowControllerTests {
         #expect(frame.size == HistoryPanelPlacement.fullSize)
     }
 
-    private func compactSize(of controller: HistoryWindowController) -> CGSize {
-        guard let panel = controller.panel else {
-            return .zero
-        }
-        return HistoryWindowController.size(of: panel, showsEntries: false)
+    private var compactSize: CGSize {
+        HistoryPanelPlacement.size(showsEntries: false)
     }
 
     /// The controller resizes the panel on the main actor right after the model changes. Waits for that turn.
