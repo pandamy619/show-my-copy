@@ -25,6 +25,8 @@ protocol PasteboardBackend: AnyObject {
     func readObjects(forClasses classArray: [AnyClass], options: [NSPasteboard.ReadingOptionKey: Any]?) -> [Any]?
     func prepareForNewContents(with options: NSPasteboard.ContentsOptions) -> Int
     func setString(_ string: String, forType dataType: NSPasteboard.PasteboardType) -> Bool
+    func setData(_ data: Data?, forType dataType: NSPasteboard.PasteboardType) -> Bool
+    func writeObjects(_ objects: [any NSPasteboardWriting]) -> Bool
 }
 
 extension NSPasteboard: PasteboardBackend {}
@@ -70,7 +72,7 @@ final class SystemPasteboard: PasteboardReading {
 
 extension SystemPasteboard: PasteboardWriting {
     @discardableResult
-    func write(_ text: String, concealed: Bool) -> Int? {
+    func write(_ payload: PasteboardPayload, concealed: Bool) -> Int? {
         // `.currentHostOnly` keeps an entry the user picked off Universal Clipboard, so history from this Mac is
         // not sent to the user's other devices again. For a password it also keeps it off the user's other devices.
         //
@@ -78,14 +80,14 @@ extension SystemPasteboard: PasteboardWriting {
         // `prepareForNewContents`), not when it adds data to contents it owns. So the count returned here is the
         // count of this app's item, and it stays the same while the text and markers are added.
         let changeCount = pasteboard.prepareForNewContents(with: .currentHostOnly)
-        // The concealed marker goes before the text, so a clipboard manager that reads the item as soon as the text
-        // appears already sees it. Without the marker it would keep the password, so do not write the text then.
+        // The concealed marker goes before the content, so a clipboard manager that reads the item as soon as the
+        // content appears already sees it. Without the marker it would keep the password, so do not write it then.
         if concealed {
             guard pasteboard.setString("", forType: NSPasteboard.PasteboardType(PasteboardMarker.concealed)) else {
                 return nil
             }
         }
-        guard pasteboard.setString(text, forType: .string) else {
+        guard writeContent(payload) else {
             return nil
         }
         if let bundleIdentifier {
@@ -98,5 +100,19 @@ extension SystemPasteboard: PasteboardWriting {
             return nil
         }
         return changeCount
+    }
+
+    private func writeContent(_ payload: PasteboardPayload) -> Bool {
+        switch payload {
+        case .text(let text):
+            return pasteboard.setString(text, forType: .string)
+        case .richText(let rtf, let plain):
+            return pasteboard.setData(rtf, forType: .rtf) && pasteboard.setString(plain, forType: .string)
+        case .image(let data, let typeIdentifier):
+            return pasteboard.setData(data, forType: NSPasteboard.PasteboardType(typeIdentifier))
+        case .files(let urls):
+            // One item per file, like Finder. The source marker then goes on the first item.
+            return pasteboard.writeObjects(urls.map { $0 as NSURL })
+        }
     }
 }

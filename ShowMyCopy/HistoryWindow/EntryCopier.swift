@@ -6,17 +6,21 @@ final class EntryCopier: EntryCopying {
     private let history: any HistoryStore
     private let pasteboard: any PasteboardWriting
     private let monitor: any PasteboardChangeTracking
+    /// Where image data is read from. Without it images cannot be copied back.
+    private let blobs: (any BlobStore)?
     private let now: @MainActor () -> Date
 
     init(
         history: any HistoryStore,
         pasteboard: any PasteboardWriting,
         monitor: any PasteboardChangeTracking,
+        blobs: (any BlobStore)? = nil,
         now: @escaping @MainActor () -> Date = { Date() }
     ) {
         self.history = history
         self.pasteboard = pasteboard
         self.monitor = monitor
+        self.blobs = blobs
         self.now = now
     }
 
@@ -39,16 +43,10 @@ final class EntryCopier: EntryCopying {
             AppLogger.clipboard.info("Did not copy a password whose time in the history is up")
             return false
         }
-        let written: Int?
-        switch entry.content {
-        case .text(let text):
-            written = pasteboard.write(text, concealed: entry.isConcealed)
-        case .richText(_, let plain):
-            written = pasteboard.write(plain, concealed: entry.isConcealed)
-        case .image, .files:
-            written = nil
+        guard let payload = payload(for: entry.content) else {
+            return false
         }
-        guard let changeCount = written else {
+        guard let changeCount = pasteboard.write(payload, concealed: entry.isConcealed) else {
             AppLogger.clipboard.info("Could not put the picked entry on the pasteboard")
             return false
         }
@@ -61,5 +59,30 @@ final class EntryCopier: EntryCopying {
             expiresAt: entry.expiresAt
         )
         return true
+    }
+
+    /// What to put on the pasteboard for `content`: styled text with its plain text, an image in its original
+    /// format (read from the blob store now, the only time the full image is read), files as their URLs. Nil when
+    /// the image data cannot be read.
+    private func payload(for content: ClipboardContent) -> PasteboardPayload? {
+        switch content {
+        case .text(let text):
+            return .text(text)
+        case .richText(let rtf, let plain):
+            return .richText(rtf: rtf, plain: plain)
+        case .image(let image):
+            guard let blobs else {
+                AppLogger.clipboard.error("Cannot copy an image without its saved data")
+                return nil
+            }
+            do {
+                return .image(try blobs.read(image.blobID), typeIdentifier: image.typeIdentifier)
+            } catch {
+                AppLogger.clipboard.error("Could not read the saved image to copy it")
+                return nil
+            }
+        case .files(let files):
+            return .files(files.map(\.url))
+        }
     }
 }
