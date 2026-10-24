@@ -3,7 +3,7 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// New installs get a 1 GB size limit; installs from before the default changed keep what they had.
+/// Without a saved choice the size limit is 1 GB; a saved choice is kept.
 @MainActor
 struct SizeLimitDefaultTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
@@ -25,52 +25,33 @@ struct SizeLimitDefaultTests {
         #expect(HistorySizeLimit.default.byteLimit == 1_000_000_000)
     }
 
-    @Test func newInstallSavesOneGigabyte() throws {
+    @Test func withNothingSavedTheLimitIsOneGigabyte() throws {
         try withDefaults { defaults in
-            HistorySettings.settleSizeLimitDefault(in: defaults, isNewInstall: true)
-            #expect(savedValue(in: defaults) == 1_000_000_000)
+            #expect(HistorySettings.storedSizeLimit(in: defaults) == .gigabyte1)
             #expect(HistorySettings.storedRetention(in: defaults).byteLimit == 1_000_000_000)
+            // Reading the default does not save it, so a later default would apply to everyone who never chose.
+            #expect(savedValue(in: defaults) == nil)
         }
     }
 
-    /// An install from before the default changed has never had a size limit. Its history may be larger than 1 GB,
-    /// and removing images at launch, without being asked, would surprise. It keeps No limit, saved, so it is
-    /// a choice the user can see and change in Settings.
-    @Test func existingInstallThatNeverChoseKeepsNoLimit() throws {
+    @Test(arguments: [
+        (0, HistorySizeLimit.noLimit), (100_000_000, .megabytes100), (500_000_000, .megabytes500),
+        (1_000_000_000, .gigabyte1),
+    ])
+    func aSavedChoiceIsKept(saved: Int, limit: HistorySizeLimit) throws {
         try withDefaults { defaults in
-            HistorySettings.settleSizeLimitDefault(in: defaults, isNewInstall: false)
-            #expect(savedValue(in: defaults) == 0)
-            #expect(HistorySettings.storedSizeLimit(in: defaults) == .noLimit)
-            #expect(HistorySettings.storedRetention(in: defaults).byteLimit == nil)
+            defaults.set(saved, forKey: SettingsKey.historyByteLimit)
+            #expect(HistorySettings.storedSizeLimit(in: defaults) == limit)
+            #expect(savedValue(in: defaults) == saved)
         }
     }
 
-    /// The first launch saves the default, so later launches, no longer new, do not turn it into No limit.
-    @Test func laterLaunchesOfANewInstallKeepOneGigabyte() throws {
-        try withDefaults { defaults in
-            HistorySettings.settleSizeLimitDefault(in: defaults, isNewInstall: true)
-            HistorySettings.settleSizeLimitDefault(in: defaults, isNewInstall: false)
-            #expect(savedValue(in: defaults) == 1_000_000_000)
-        }
-    }
-
-    @Test(arguments: [0, 100_000_000, 300_000_000, 500_000_000, 1_000_000_000, 5_000_000_000])
-    func savedChoiceIsKeptExactly(saved: Int) throws {
-        for isNewInstall in [true, false] {
-            try withDefaults { defaults in
-                defaults.set(saved, forKey: SettingsKey.historyByteLimit)
-                HistorySettings.settleSizeLimitDefault(in: defaults, isNewInstall: isNewInstall)
-                #expect(savedValue(in: defaults) == saved)
-            }
-        }
-    }
-
-    @Test func deliberateNoLimitSurvivesASettle() throws {
+    @Test func deliberateNoLimitIsKept() throws {
         try withDefaults { defaults in
             let settings = HistorySettings(history: ClipboardHistory(), defaults: defaults)
             settings.applySizeLimit(.noLimit)
-            HistorySettings.settleSizeLimitDefault(in: defaults, isNewInstall: true)
             #expect(HistorySettings.storedSizeLimit(in: defaults) == .noLimit)
+            #expect(HistorySettings.storedRetention(in: defaults).byteLimit == nil)
         }
     }
 
@@ -78,7 +59,6 @@ struct SizeLimitDefaultTests {
     /// files, pinned entries stay.
     @Test func defaultTrimsTheOldestEntriesThroughRetention() throws {
         try withDefaults { defaults in
-            HistorySettings.settleSizeLimitDefault(in: defaults, isNewInstall: true)
             let blobs = InMemoryBlobStore()
             // Small blobs that say they are 600 MB, so two do not fit in 1 GB.
             func bigImage(_ byte: UInt8) throws -> ClipboardEntry {
