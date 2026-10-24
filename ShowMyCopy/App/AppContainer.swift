@@ -69,6 +69,7 @@ final class AppContainer {
             history: store,
             schedule: PollingSchedule(sleep: sleep, activity: pollingActivity),
             expiry: PasswordExpiry(history: store, now: now),
+            clearedClipboard: ClearedClipboardCheck(history: store),
             frontmostApp: frontmostApp,
             now: now,
             passwordPolicy: { [passwordSettings] in passwordSettings.policy },

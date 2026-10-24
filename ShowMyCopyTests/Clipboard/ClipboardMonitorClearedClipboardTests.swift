@@ -119,14 +119,14 @@ struct ClipboardMonitorClearedClipboardTests {
 
     @Test func clearAtTheEndOfTheWindowStillCounts() {
         let monitor = makeMonitorWithUnmarkedPassword()
-        environment.now += ClipboardMonitor.clearedClipboardWindow
+        environment.now += ClearedClipboardCheck.window
         clearAndConfirm(monitor)
         #expect(history.entries.map(\.text) == ["older"])
     }
 
     @Test func clearAfterTheWindowKeepsTheEntry() {
         let monitor = makeMonitorWithUnmarkedPassword()
-        environment.now += ClipboardMonitor.clearedClipboardWindow + 1
+        environment.now += ClearedClipboardCheck.window + 1
         clearAndConfirm(monitor)
 
         #expect(history.entries.map(\.text) == ["hunter2", "older"])

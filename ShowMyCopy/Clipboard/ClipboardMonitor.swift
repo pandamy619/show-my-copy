@@ -4,7 +4,8 @@ import AppKit
 ///
 /// `schedule` says when to look at the pasteboard; on each look the monitor compares `changeCount` and reads the
 /// contents only when the count changed. It decides who copied and what the password settings allow;
-/// `PasteboardSnapshotReader` decides what the item is. Expired passwords go on every look (`expiry`).
+/// `PasteboardSnapshotReader` decides what the item is. Expired passwords go on every look (`expiry`), and an
+/// emptied clipboard may mark the entry copied just before as a password (`clearedClipboard`).
 ///
 /// A copied image is stored by `imageIngestor` off the main actor before it is recorded. Until then the monitor reads
 /// no further change, so copies are recorded in the order they were made. Copied files are recorded at once; the
@@ -12,15 +13,12 @@ import AppKit
 /// and added to their entries, so no copy is missed while they are made.
 @MainActor
 final class ClipboardMonitor: PasteboardChangeTracking {
-    /// How soon after a copy an emptied clipboard counts as a password manager clearing the password it copied.
-    /// 1Password and Bitwarden clear after about 90 seconds by default.
-    nonisolated static let clearedClipboardWindow: TimeInterval = 180
-
     private let pasteboard: any PasteboardReading
     private let reader: PasteboardSnapshotReader
     private let history: any HistoryStore
     private let schedule: PollingSchedule
     private let expiry: PasswordExpiry
+    private let clearedClipboard: ClearedClipboardCheck
     private let frontmostApp: @MainActor () -> SourceApp?
     private let now: @MainActor () -> Date
     private let passwordPolicy: @MainActor () -> PasswordPolicy
@@ -42,6 +40,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         history: any HistoryStore,
         schedule: PollingSchedule,
         expiry: PasswordExpiry,
+        clearedClipboard: ClearedClipboardCheck,
         frontmostApp: @escaping @MainActor () -> SourceApp?,
         now: @escaping @MainActor () -> Date,
         passwordPolicy: @escaping @MainActor () -> PasswordPolicy,
@@ -57,6 +56,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         self.history = history
         self.schedule = schedule
         self.expiry = expiry
+        self.clearedClipboard = clearedClipboard
         self.frontmostApp = frontmostApp
         self.now = now
         self.passwordPolicy = passwordPolicy
@@ -114,12 +114,16 @@ final class ClipboardMonitor: PasteboardChangeTracking {
             return
         }
         let changeCount = pasteboard.changeCount
-        guard changeCount != lastChangeCount else {
+        if changeCount == lastChangeCount {
             if schedule.isWatching {
                 // Nothing changed while the monitor was away, so the next change happens while it is watching.
                 sourceOfNextChangeIsUnknown = false
             }
-            return
+            // An app that empties the clipboard may fill it a moment later without a new change count, so an
+            // emptied clipboard is looked at once more.
+            guard clearedClipboard.isWaiting(at: changeCount) else {
+                return
+            }
         }
         // Text copied before launch, during sleep or while the screen was locked (for example on another device
         // through Universal Clipboard) came from an unknown app, not from the one in front now.
@@ -136,17 +140,27 @@ final class ClipboardMonitor: PasteboardChangeTracking {
             AppLogger.clipboard.debug("The pasteboard changed while it was read; reading it again on the next poll")
             return
         }
+        if item == .cleared, clearedClipboard.isWaiting(at: changeCount) {
+            clearedClipboard.confirm(policy: policy)
+            return
+        }
+        // A new change, or the emptied clipboard was filled: either way it was not left empty.
+        clearedClipboard.dismiss()
         let copy = Copy(
             sourceApp: sourceApp, date: date, isFirstRead: lastChangeCount == nil, changeCount: changeCount)
         sourceOfNextChangeIsUnknown = false
         lastChangeCount = changeCount
+        handle(item, copy: copy, policy: policy)
+    }
+
+    private func handle(_ item: CapturedItem, copy: Copy, policy: PasswordPolicy) {
         switch item {
         case .skipped:
             history.markCurrentSkipped()
         case .image(let image):
             storeImage(image, copy: copy)
         case .cleared:
-            clipboardWasCleared(at: date, policy: policy)
+            clearedClipboard.clipboardWasEmptied(changeCount: copy.changeCount, at: copy.date)
         case .content(.files(let files), isSecret: false) where fileThumbnailIngestor != nil:
             recordFiles(files, copy: copy)
         case .content(let content, let isSecret):
@@ -247,26 +261,6 @@ final class ClipboardMonitor: PasteboardChangeTracking {
             return
         }
         history.record(content, sourceApp: copy.sourceApp, at: copy.date)
-    }
-
-    /// Password managers empty the clipboard a while after copying a password. A password copied without a marker,
-    /// for example from a browser extension, is recognized only then: if the entry recorded last is still on the
-    /// clipboard and was copied a short time ago, it is most likely that password.
-    private func clipboardWasCleared(at date: Date, policy: PasswordPolicy) {
-        defer { history.markCurrentSkipped() }
-        guard let currentID = history.currentEntryID,
-            let current = history.entries.first(where: { $0.id == currentID }),
-            date.timeIntervalSince(current.date) <= Self.clearedClipboardWindow
-        else {
-            return
-        }
-        if policy.savesPasswords {
-            history.conceal(id: currentID, expiresAt: date + policy.lifetime)
-            AppLogger.clipboard.debug("The clipboard was cleared soon after a copy; the entry is now concealed")
-        } else {
-            history.remove(id: currentID)
-            AppLogger.clipboard.debug("The clipboard was cleared soon after a copy; the entry was removed")
-        }
     }
 }
 

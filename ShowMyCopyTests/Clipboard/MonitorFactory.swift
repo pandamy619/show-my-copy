@@ -28,6 +28,7 @@ enum MonitorFactory {
             history: history,
             schedule: PollingSchedule(interval: interval, sleep: sleep, activity: activity),
             expiry: PasswordExpiry(history: history, now: now),
+            clearedClipboard: ClearedClipboardCheck(history: history),
             frontmostApp: frontmostApp,
             now: now,
             passwordPolicy: passwordPolicy,
