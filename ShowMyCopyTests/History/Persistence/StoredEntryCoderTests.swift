@@ -37,7 +37,9 @@ struct StoredEntryCoderTests {
         #expect(!record.isConcealed)
         #expect(record.expiresAt == nil)
         #expect(!record.isPinned)
-        #expect(record.schemaVersion == StoredEntryRecord.currentSchemaVersion)
+        // Version 1, so an older app version still reads text records.
+        #expect(record.schemaVersion == 1)
+        #expect(record.blobIDs.isEmpty)
     }
 
     @Test func plainTextRoundTrips() throws {
