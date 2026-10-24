@@ -48,8 +48,13 @@ protocol BlobStore: Sendable {
     /// The size of the blob in bytes, or nil when it is not stored.
     func size(of id: BlobID) -> Int?
 
-    /// The total size of every stored blob in bytes.
+    /// The total size of every stored blob in bytes. May list the blobs and read their sizes, so call it off the
+    /// main actor.
     func totalBytes() -> Int64
+
+    /// The total counted again from the stored blobs, for a store that keeps a running total
+    /// (`MeasuredBlobStore`). Reads the file system: call it off the main actor.
+    func recountTotalBytes() -> Int64
 
     /// Every stored blob, for the sweep that deletes blobs no record references.
     func allIDs() throws(BlobStoreError) -> Set<BlobID>
@@ -66,6 +71,11 @@ extension BlobStore {
     /// Whether the blob is stored.
     func contains(_ id: BlobID) -> Bool {
         size(of: id) != nil
+    }
+
+    /// A store without a running total counts every time.
+    func recountTotalBytes() -> Int64 {
+        totalBytes()
     }
 }
 

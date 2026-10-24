@@ -29,8 +29,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     /// Opens the settings window, or brings it to the front if it is already open.
     func show() {
-        // The store files can change size without a change to the history. Show their size as it is now.
-        usage.refreshDiskBytes()
+        // The store files can change size without a change to the history. Show their size as it is now, and count
+        // the saved images again, in the background.
+        Task { [usage] in
+            await usage.refreshDiskBytes(recountingImages: true)
+        }
         let window = self.window ?? makeWindow()
         self.window = window
         // Closing this window hides the app. Show its windows again.

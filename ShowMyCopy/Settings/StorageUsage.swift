@@ -82,9 +82,10 @@ final class StorageUsage {
     @ObservationIgnored private let diskUsage: (any ReportsDiskUsage)?
     @ObservationIgnored private let damagedHistory: (any KeepsDamagedHistory)?
     @ObservationIgnored private var cachedBreakdown: (revision: Int, breakdown: StorageBreakdown)?
-    @ObservationIgnored private var cachedDiskBytes: (revision: Int, bytes: Int64?)?
-    /// Changes when the size on disk should be read again, so views update `diskBytes`.
-    private var diskToken = 0
+    /// Whether the size on disk is being measured. One measurement runs at a time.
+    @ObservationIgnored private var isMeasuringDisk = false
+    /// A measurement asked for while one ran, to run after it; true when it counts the images again.
+    @ObservationIgnored private var pendingMeasurement: Bool?
     /// What the last `clearHistory()` removed and the history's revision right after it.
     @ObservationIgnored private var lastClear: (result: ClearResult, revision: Int)?
     /// How often the breakdown was computed, so tests can check the cache.
@@ -119,24 +120,39 @@ final class StorageUsage {
         errorReporter?.storageError.map(StorageWarning.init)
     }
 
-    /// How many bytes the saved history takes on disk, or nil when it is not saved in files. Read again after
-    /// `history.revision` changes and after `refreshDiskBytes()`, not on every view update.
-    var diskBytes: Int64? {
-        _ = diskToken
-        let revision = history.revision
-        if let cachedDiskBytes, cachedDiskBytes.revision == revision {
-            return cachedDiskBytes.bytes
-        }
-        let bytes = diskUsage?.storedBytes()
-        cachedDiskBytes = (revision, bytes)
-        return bytes
-    }
+    /// How many bytes the saved history takes on disk, as last measured by `refreshDiskBytes`, or nil before that
+    /// and when it is not saved in files.
+    private(set) var diskBytes: Int64?
 
-    /// Reads the size on disk again, when the settings open: the database can change size without a change to
-    /// the history, for example when SQLite moves its log into the store.
-    func refreshDiskBytes() {
-        cachedDiskBytes = nil
-        diskToken &+= 1
+    /// Measures the size on disk again, off the main actor, and updates `diskBytes`. Call it when the settings open
+    /// (`recountingImages`: the saved images are counted again from the disk, in the background) and after the
+    /// history changes while they are shown (the images' running total is used, so nothing lists their folder). The
+    /// database can also change size without a change to the history, for example when SQLite moves its log into
+    /// the store.
+    ///
+    /// One measurement runs at a time: one asked for meanwhile runs right after it, and returns at once.
+    func refreshDiskBytes(recountingImages: Bool = false) async {
+        guard let diskUsage else {
+            return
+        }
+        guard !isMeasuringDisk else {
+            pendingMeasurement = pendingMeasurement == true || recountingImages
+            return
+        }
+        isMeasuringDisk = true
+        var recounts = recountingImages
+        while true {
+            let bytes = await diskUsage.storedBytes(recountingBlobs: recounts)
+            if bytes != diskBytes {
+                diskBytes = bytes
+            }
+            guard let next = pendingMeasurement else {
+                break
+            }
+            pendingMeasurement = nil
+            recounts = next
+        }
+        isMeasuringDisk = false
     }
 
     /// The breakdown of the current entries. Computed again only after `history.revision` changes, so a view can

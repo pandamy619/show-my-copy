@@ -77,6 +77,11 @@ struct StorageSection: View {
                     draftSizeLimitChanged(to: pendingSizeLimit)
                 }
             }
+            // The size on disk follows the history while this is shown, measured in the background. A newer change
+            // cancels the measurement of the one before.
+            .task(id: usage.history.revision) {
+                await usage.refreshDiskBytes()
+            }
             if let pendingSizeLimit {
                 let change = settings.proposeSizeLimit(pendingSizeLimit)
                 InlineConfirmation(

@@ -49,7 +49,7 @@ struct StoredChange: Equatable, Sendable {
 /// Image data is written to a `BlobStore` off the main actor (`ImageIngestor`); an image entry is saved once its data
 /// is, and a record keeps only the blob IDs, in `payload` and in plain in `blobIDs`.
 @MainActor
-protocol HistoryPersistence: AnyObject {
+protocol HistoryPersistence: AnyObject, Sendable {
     /// Every saved record, in any order.
     func loadAll() throws(HistoryPersistenceError) -> [StoredEntryRecord]
 
@@ -57,12 +57,12 @@ protocol HistoryPersistence: AnyObject {
     func apply(_ change: StoredChange) throws(HistoryPersistenceError)
 
     /// How many bytes the saved history takes on disk, or nil when it is not saved in files or their size is not
-    /// known.
-    func storedBytes() -> Int64?
+    /// known. Reads the file system, so it is called off the main actor (`ReportsDiskUsage`).
+    nonisolated func storedBytes() -> Int64?
 }
 
 extension HistoryPersistence {
-    func storedBytes() -> Int64? {
+    nonisolated func storedBytes() -> Int64? {
         nil
     }
 }
@@ -70,9 +70,9 @@ extension HistoryPersistence {
 /// A history store that can say how much space the saved history takes on disk.
 @MainActor
 protocol ReportsDiskUsage: AnyObject {
-    /// Bytes on disk, or nil when nothing is saved in files. Reads the file system, so call it only when the
-    /// number is shown.
-    func storedBytes() -> Int64?
+    /// Bytes on disk, or nil when nothing is saved in files, measured off the main actor. Saved images are counted
+    /// from a running total; `recountingBlobs` counts them again from the disk. Call it only when the number is shown.
+    func storedBytes(recountingBlobs: Bool) async -> Int64?
 }
 
 /// A history store that may keep a copy of a history that could not be opened (see `HistoryLeftovers`).

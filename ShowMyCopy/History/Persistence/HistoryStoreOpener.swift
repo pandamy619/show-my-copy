@@ -212,15 +212,15 @@ enum StoreFileCheck: Equatable, Sendable {
 /// history in use so that nothing deletes data they may still need, such as the images they reference, and so that
 /// Clear History and turning off Save passwords can delete them. Every call reads or changes the file system.
 @MainActor
-protocol HistoryLeftovers: AnyObject {
+protocol HistoryLeftovers: AnyObject, Sendable {
     /// Whether any of the files exists.
     func hasFiles() -> Bool
 
     /// The size of the damaged copy with its SQLite side files, or nil when there is none.
     func damagedCopyBytes() -> Int64?
 
-    /// The size of every file, or nil when there is none.
-    func totalBytes() -> Int64?
+    /// The size of every file, or nil when there is none. Called off the main actor (`ReportsDiskUsage`).
+    nonisolated func totalBytes() -> Int64?
 
     /// Deletes the damaged copy. Returns whether none is left.
     @discardableResult
@@ -243,7 +243,7 @@ final class LeftoverStoreFiles: HistoryLeftovers {
         self.unopenedStore = unopenedStore
     }
 
-    private var stores: [URL] {
+    private nonisolated var stores: [URL] {
         [damagedStore] + [unopenedStore].compactMap { $0 }
     }
 
@@ -257,7 +257,7 @@ final class LeftoverStoreFiles: HistoryLeftovers {
         StoreFiles.totalBytes(ofStoreAt: damagedStore)
     }
 
-    func totalBytes() -> Int64? {
+    nonisolated func totalBytes() -> Int64? {
         let sizes = stores.compactMap(StoreFiles.totalBytes(ofStoreAt:))
         return sizes.isEmpty ? nil : sizes.reduce(0, +)
     }

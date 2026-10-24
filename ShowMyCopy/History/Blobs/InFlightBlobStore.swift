@@ -70,6 +70,10 @@ final class InFlightBlobStore: BlobStore {
         base.totalBytes()
     }
 
+    func recountTotalBytes() -> Int64 {
+        base.recountTotalBytes()
+    }
+
     /// The stored blobs that no work holds: those a sweep may judge.
     func allIDs() throws(BlobStoreError) -> Set<BlobID> {
         let stored = try base.allIDs()

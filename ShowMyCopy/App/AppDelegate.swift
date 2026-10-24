@@ -20,7 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // One store for the history and the work that saves images in the background, so neither deletes what the
         // other is about to use.
-        let blobs = Self.openBlobStore().map { InFlightBlobStore(base: $0) }
+        // Settings show their size from a running total, so nothing lists the folder after every change.
+        let blobs = Self.openBlobStore().map { InFlightBlobStore(base: MeasuredBlobStore(base: $0)) }
         // The saved history is decoded in the background; the app starts watching the clipboard once it is loaded.
         Task {
             let store = await Self.loadHistoryStore(blobs: blobs)

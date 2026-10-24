@@ -67,8 +67,9 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
     }
 
     /// The size of `History.store` and its SQLite side files. It need not drop right after entries are deleted:
-    /// SQLite may keep the free space for new ones.
-    func storedBytes() -> Int64? {
+    /// SQLite may keep the free space for new ones. Reads only the files' metadata, never the context, so it runs off
+    /// the main actor.
+    nonisolated func storedBytes() -> Int64? {
         storeURL.flatMap(StoreFiles.totalBytes(ofStoreAt:))
     }
 
