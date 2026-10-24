@@ -4,7 +4,10 @@ import Testing
 
 @testable import ShowMyCopy
 
+/// One test at a time: a test that waits for a resize suspends, and a test that opens its own panel meanwhile takes
+/// the key window from it, which closes the waiting test's panel. Only one panel is ever open in the app.
 @MainActor
+@Suite(.serialized)
 struct HistoryWindowControllerTests {
     private let pasteboard = FakePasteboard()
     private let history = ClipboardHistory()
@@ -227,6 +230,8 @@ struct HistoryWindowControllerTests {
         for _ in 0..<100 where controller.panel?.frame.size != size {
             await Task.yield()
         }
+        // A closed panel is not resized; it is sized when it opens again.
+        try #require(controller.isVisible, "the panel closed while the test waited for the resize")
         let frame = try #require(controller.panel?.frame)
         #expect(frame.size == size)
         return frame
