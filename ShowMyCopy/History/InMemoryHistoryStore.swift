@@ -97,6 +97,23 @@ final class InMemoryHistoryStore: HistoryStore {
         return entry.id
     }
 
+    func addThumbnails(_ files: [FileReference], toEntry id: ClipboardEntry.ID) {
+        let offered = ClipboardContent.files(files)
+        guard let index = entries.firstIndex(where: { $0.id == id }) else {
+            deleteBlobs(offered.blobIDs)
+            return
+        }
+        let filled = entries[index].content.addingMissingThumbnails(from: offered)
+        let taken = Set(filled.blobIDs)
+        deleteBlobs(offered.blobIDs.filter { !taken.contains($0) })
+        guard filled != entries[index].content else {
+            return
+        }
+        entries[index] = entries[index].replacingContent(filled)
+        entriesChanged()
+        trim()
+    }
+
     /// An entry whose content cannot be concealed (an image or files) is removed instead: a secret is never kept
     /// as an image file or a file reference.
     func conceal(id: ClipboardEntry.ID, expiresAt: Date) {

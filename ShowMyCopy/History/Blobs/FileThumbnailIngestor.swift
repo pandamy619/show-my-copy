@@ -6,9 +6,10 @@ import os
 ///
 /// After a relaunch the sandbox no longer lets the app read a copied file, so its thumbnail is made right when it is
 /// copied and kept in the blob store, like an image's thumbnail. Only the thumbnail is kept, never the file's data.
-/// The work is bounded: only the first `Limits.maximumFiles` files of a copy are looked at, each gets at most
-/// `Limits.timeoutPerFile`, and all of them together `Limits.totalBudget`. A file that is not a photo or video,
-/// cannot be read, is not on this Mac or takes too long keeps its icon. Runs off the main actor.
+/// The work is bounded: only the first `Limits.maximumFiles` files of a copy are looked at (those without a
+/// thumbnail), each gets at most `Limits.timeoutPerFile`, and all of them together `Limits.totalBudget`. A file that
+/// is not a photo or video, cannot be read, is not on this Mac or takes too long keeps its icon. Runs off the main
+/// actor.
 struct FileThumbnailIngestor: Sendable {
     struct Limits: Equatable, Sendable {
         /// How many files of one copy are looked at, from the first. Rows show the first file; the preview lists
@@ -16,11 +17,12 @@ struct FileThumbnailIngestor: Sendable {
         let maximumFiles: Int
         /// How long one thumbnail may take. QuickLook may have to read a large video from a slow disk.
         let timeoutPerFile: Duration
-        /// How long all thumbnails of one copy may take. The monitor reads no new copy meanwhile, so this stays
-        /// short.
+        /// How long all thumbnails of one copy may take. The files are recorded before and the thumbnails of the
+        /// next copy wait for these, so this stays short.
         let totalBudget: Duration
 
-        static let standard = Limits(maximumFiles: 4, timeoutPerFile: .seconds(3), totalBudget: .seconds(5))
+        static let standard = Limits(
+            maximumFiles: 4, timeoutPerFile: .milliseconds(1500), totalBudget: .seconds(2))
     }
 
     let blobs: any BlobStore
@@ -40,13 +42,14 @@ struct FileThumbnailIngestor: Sendable {
         self.sleep = sleep
     }
 
-    /// `files` with thumbnails for the photos and videos among the first `limits.maximumFiles`, in the same order.
-    /// The thumbnails are written to the blob store; whoever does not record the files calls `discard`. Never fails:
-    /// a file without a thumbnail is still worth recording.
+    /// `files` in the same order, each with the thumbnail made now or none: thumbnails for the photos and videos
+    /// among the first `limits.maximumFiles` that have none yet. A thumbnail a file already had is not returned, so
+    /// handing the result on or discarding it never touches it. The new thumbnails are written to the blob store;
+    /// whoever does not hand them to a history store calls `discard`.
     @concurrent
     func ingest(_ files: [FileReference]) async -> [FileReference] {
         let made = await makeThumbnails(for: files)
-        var result = files
+        var result = files.map { $0.withThumbnail(nil) }
         for (index, thumbnail) in made.sorted(by: { $0.key < $1.key }) {
             let id: BlobID
             do {
@@ -58,7 +61,7 @@ struct FileThumbnailIngestor: Sendable {
             let reference = ThumbnailReference(
                 blobID: id, pixelWidth: thumbnail.image.pixelWidth, pixelHeight: thumbnail.image.pixelHeight,
                 byteSize: thumbnail.image.pngData.count)
-            result[index] = files[index].withThumbnail(FileThumbnail(kind: thumbnail.kind, reference: reference))
+            result[index] = result[index].withThumbnail(FileThumbnail(kind: thumbnail.kind, reference: reference))
         }
         return result
     }
@@ -85,7 +88,9 @@ struct FileThumbnailIngestor: Sendable {
     /// start many QuickLook requests at once.
     private func makeThumbnails(for files: [FileReference]) async -> [Int: Made] {
         // Only file URLs: QuickLook is never asked for anything that could be fetched over the network.
-        let candidates = files.prefix(max(limits.maximumFiles, 0)).enumerated().filter { $0.element.url.isFileURL }
+        let candidates = files.prefix(max(limits.maximumFiles, 0)).enumerated().filter {
+            $0.element.url.isFileURL && $0.element.thumbnail == nil
+        }
         guard !candidates.isEmpty else {
             return [:]
         }

@@ -119,6 +119,10 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         change { $0.record(content, sourceApp: sourceApp, at: date, concealed: concealed, expiresAt: expiresAt) }
     }
 
+    func addThumbnails(_ files: [FileReference], toEntry id: ClipboardEntry.ID) {
+        change { $0.addThumbnails(files, toEntry: id) }
+    }
+
     @discardableResult
     func markNewestCurrent(ifItHolds content: ClipboardContent) -> ClipboardEntry.ID? {
         memory.markNewestCurrent(ifItHolds: content)
