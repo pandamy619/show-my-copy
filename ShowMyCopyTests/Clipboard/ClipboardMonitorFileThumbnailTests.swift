@@ -30,15 +30,18 @@ struct ClipboardMonitorFileThumbnailTests {
         )
     }
 
-    @Test func recordsCopiedFilesWithThumbnailsOnceTheyAreMade() async throws {
+    @Test func recordsCopiedFilesAtOnceAndAddsTheirThumbnailsWhenMade() async throws {
         let monitor = makeMonitor()
         monitor.poll()
         pasteboard.copyFiles([photo, document, video])
         monitor.poll()
-        #expect(history.entries.isEmpty)
+        let recorded = try #require(history.entries.first)
+        #expect(recorded.content.blobIDs.isEmpty)
+        #expect(history.currentEntryID == recorded.id)
         await monitor.finishStoringImages()
 
         let entry = try #require(history.entries.first)
+        #expect(entry.id == recorded.id)
         guard case .files(let files) = entry.content else {
             Issue.record("Expected files")
             return
@@ -51,32 +54,37 @@ struct ClipboardMonitorFileThumbnailTests {
         #expect(blobs.allIDs() == Set(entry.content.blobIDs))
     }
 
-    @Test func nothingIsCurrentWhileThumbnailsAreMade() async {
-        let monitor = makeMonitor()
-        pasteboard.copy("text")
-        monitor.poll()
-        #expect(history.currentEntryID != nil)
-
-        pasteboard.copyFiles([photo])
-        monitor.poll()
-        #expect(history.currentEntryID == nil)
-        await monitor.finishStoringImages()
-        #expect(history.currentEntryID == history.entries.first?.id)
-    }
-
-    @Test func nextCopyIsReadOnceTheFilesAreRecorded() async {
+    @Test func copiesMadeWhileThumbnailsAreMadeAreNotLost() async throws {
         let monitor = makeMonitor()
         monitor.poll()
         pasteboard.copyFiles([video])
         monitor.poll()
         pasteboard.copy("after the video")
         monitor.poll()
-        #expect(history.entries.isEmpty)
+        pasteboard.copyFiles([photo])
+        monitor.poll()
+        pasteboard.copy("last")
+        monitor.poll()
+        #expect(history.entries.map(\.kind) == [.text, .files, .text, .files])
 
         await monitor.finishStoringImages()
+        // The thumbnails go to their own entries, which keep their places; the newest copy stays current.
+        #expect(history.entries.map(\.kind) == [.text, .files, .text, .files])
+        #expect(history.entries[1].content.blobIDs.count == 1)
+        #expect(history.entries[3].content.blobIDs.count == 1)
+        #expect(history.currentEntryID == history.entries.first?.id)
+        #expect(maker.thumbnailNames == ["clip.mov", "IMG_0001.jpg"])
+    }
+
+    @Test func filesRemovedBeforeTheirThumbnailsAreReadyLeaveNoBlobs() async throws {
+        let monitor = makeMonitor()
         monitor.poll()
-        #expect(history.entries.map(\.kind) == [.text, .files])
-        #expect(history.entries.first?.text == "after the video")
+        pasteboard.copyFiles([photo, video])
+        monitor.poll()
+        history.remove(id: try #require(history.entries.first).id)
+        await monitor.finishStoringImages()
+        #expect(history.entries.isEmpty)
+        #expect(blobs.allIDs().isEmpty)
     }
 
     @Test func filesAndImagesKeepTheirOrder() async {
@@ -133,18 +141,40 @@ struct ClipboardMonitorFileThumbnailTests {
         #expect(blobs.writeCount == 1)
     }
 
-    @Test func filesAreDroppedWhenTheAppWritesWhileThumbnailsAreMade() async {
+    @Test func entryCopiedBackWhileThumbnailsAreMadeStaysCurrent() async throws {
         let monitor = makeMonitor()
+        pasteboard.copy("picked")
         monitor.poll()
+        let picked = try #require(history.currentEntryID)
         pasteboard.copyFiles([photo, video])
         monitor.poll()
-        // An entry is copied back from the history before the thumbnails are made.
+        // The user copies an older entry back from the history before the thumbnails are made.
         let written = pasteboard.write("picked")
         monitor.acknowledge(changeCount: written ?? 0)
+        history.record(text: "picked", sourceApp: nil, at: date + 1)
         await monitor.finishStoringImages()
 
-        #expect(history.entries.isEmpty)
-        #expect(blobs.allIDs().isEmpty)
+        #expect(history.currentEntryID == picked)
+        #expect(history.entries.first?.id == picked)
+        #expect(history.entries[1].content.blobIDs.count == 2)
+    }
+
+    @Test func thumbnailsAreNotMadeAgainForFilesThatHaveThem() async {
+        let monitor = makeMonitor()
+        monitor.poll()
+        pasteboard.copyFiles([photo])
+        monitor.poll()
+        await monitor.finishStoringImages()
+        pasteboard.copyFiles([photo, video])
+        monitor.poll()
+        await monitor.finishStoringImages()
+        pasteboard.copy("between")
+        monitor.poll()
+        pasteboard.copyFiles([photo])
+        monitor.poll()
+        await monitor.finishStoringImages()
+        #expect(maker.thumbnailNames == ["IMG_0001.jpg", "IMG_0001.jpg", "clip.mov"])
+        #expect(blobs.allIDs() == Set(history.entries.flatMap(\.content.blobIDs)))
     }
 
     @Test func secretMarkedFilesGetNoThumbnails() async {

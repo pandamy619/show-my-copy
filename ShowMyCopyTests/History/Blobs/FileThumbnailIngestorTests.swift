@@ -106,6 +106,24 @@ struct FileThumbnailIngestorTests {
         #expect(result.map(\.name) == ["c.mov", "a.jpg", "b.png"])
     }
 
+    @Test func filesThatHaveAThumbnailAreSkippedAndOnlyNewThumbnailsAreReturned() async {
+        let existing = ContentFixtures.fileWithThumbnail("/Users/me/a.jpg")
+        let copied = [existing, ContentFixtures.file("/Users/me/b.jpg")]
+        let result = await ingestor().ingest(copied)
+        #expect(maker.askedNames == ["b.jpg"])
+        // The thumbnail the file had is not returned, so discarding the result never deletes it.
+        #expect(result[0] == existing.withThumbnail(nil))
+        #expect(result[1].thumbnail != nil)
+        #expect(blobs.writeCount == 1)
+    }
+
+    @Test func standardLimitsKeepTheWaitShort() {
+        let limits = FileThumbnailIngestor.Limits.standard
+        #expect(limits.maximumFiles == 4)
+        #expect(limits.timeoutPerFile == .milliseconds(1500))
+        #expect(limits.totalBudget == .seconds(2))
+    }
+
     @Test func urlsThatAreNotFileURLsAreNeverLookedAt() async throws {
         let remote = FileReference(url: try #require(URL(string: "https://example.com/a.jpg")))
         let result = await ingestor().ingest([remote])

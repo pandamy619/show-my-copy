@@ -309,4 +309,86 @@ struct FileThumbnailPersistenceTests {
         #expect(record.schemaVersion == 3)
         #expect(makeStore(now: start + 2).entries.map(\.content) == [.files([photo])])
     }
+
+    @Test func addedThumbnailsAreSaved() throws {
+        let store = makeStore()
+        let id = store.record(ContentFixtures.files("/a.jpg"), sourceApp: nil, at: start)
+        let photo = try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)
+        store.addThumbnails([photo], toEntry: id)
+        let record = try #require(disk.records.values.first)
+        #expect(record.blobIDs == photo.thumbnailBlobIDs.map(\.uuid))
+        #expect(makeStore(now: start + 1).entries.map(\.content) == [.files([photo])])
+    }
+}
+
+/// Thumbnails made after their files were recorded, so the monitor does not wait for them.
+@MainActor
+struct FileThumbnailAddingTests {
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+    private let blobs = InMemoryBlobStore()
+
+    private func makeStore(retention: RetentionPolicy = .default) -> InMemoryHistoryStore {
+        InMemoryHistoryStore(retention: retention, blobs: blobs)
+    }
+
+    @Test func thumbnailsAreAddedWithoutMovingTheEntry() throws {
+        let store = makeStore()
+        let id = store.record(ContentFixtures.files("/a.jpg", "/b.txt"), sourceApp: nil, at: start)
+        let textID = store.record(text: "newer", sourceApp: nil, at: start + 1)
+        let revision = store.revision
+        let photo = try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)
+
+        store.addThumbnails([photo, ContentFixtures.file("/b.txt")], toEntry: id)
+        #expect(store.entries.map(\.id) == [textID, id])
+        #expect(store.currentEntryID == textID)
+        let entry = store.entries[1]
+        #expect(entry.content == .files([photo, ContentFixtures.file("/b.txt")]))
+        #expect(entry.date == start)
+        #expect(entry.byteSize == entry.content.byteSize)
+        #expect(store.revision != revision)
+        #expect(blobs.allIDs() == photo.thumbnailBlobIDs)
+
+        store.remove(id: id)
+        #expect(blobs.allIDs().isEmpty)
+    }
+
+    @Test func thumbnailsForAnEntryThatIsGoneAreDeleted() throws {
+        let store = makeStore()
+        let id = store.record(ContentFixtures.files("/a.jpg"), sourceApp: nil, at: start)
+        store.remove(id: id)
+        store.addThumbnails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: id)
+        #expect(store.entries.isEmpty)
+        #expect(blobs.allIDs().isEmpty)
+    }
+
+    @Test func thumbnailsTheEntryAlreadyHasAreDeleted() throws {
+        let store = makeStore()
+        let first = try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)
+        let id = store.record(.files([first]), sourceApp: nil, at: start)
+        let revision = store.revision
+        store.addThumbnails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: id)
+        #expect(store.entries.map(\.content) == [.files([first])])
+        #expect(store.revision == revision)
+        #expect(blobs.allIDs() == first.thumbnailBlobIDs)
+    }
+
+    @Test func thumbnailsOfOtherFilesAreDeleted() throws {
+        let store = makeStore()
+        let id = store.record(ContentFixtures.files("/a.jpg"), sourceApp: nil, at: start)
+        store.addThumbnails([try ContentFixtures.fileWithThumbnail("/other.jpg", in: blobs)], toEntry: id)
+        let textID = store.record(text: "text", sourceApp: nil, at: start + 1)
+        store.addThumbnails([try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs)], toEntry: textID)
+        #expect(store.entries.map(\.content) == [.text("text"), ContentFixtures.files("/a.jpg")])
+        #expect(blobs.allIDs().isEmpty)
+    }
+
+    @Test func thumbnailsThatPassTheByteLimitTrimTheHistory() throws {
+        let store = makeStore(retention: RetentionPolicy(byteLimit: 3000))
+        let id = store.record(ContentFixtures.files("/a.jpg"), sourceApp: nil, at: start)
+        store.addThumbnails(
+            [try ContentFixtures.fileWithThumbnail("/a.jpg", in: blobs, thumbnail: Data(count: 4000))], toEntry: id)
+        // Too large with its thumbnail: it goes, and its thumbnail with it.
+        #expect(store.entries.isEmpty)
+        #expect(blobs.allIDs().isEmpty)
+    }
 }
