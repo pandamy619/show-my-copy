@@ -10,14 +10,14 @@ struct TaskMemoryReaderTests {
         #expect(bytes < 64_000_000_000)
     }
 
-    @Test func growsWhenTheProcessTouchesMoreMemory() throws {
+    @Test func countsMemoryTheProcessHolds() throws {
+        // Other tests run in parallel and free memory, so the footprint before and after can't be compared.
+        // While 64 MB that were written to are held, the footprint must include them.
         let reader = TaskMemoryReader()
-        let before = try #require(reader.residentBytes())
-        // 64 MB written to, so the pages count toward the footprint.
         var block = [UInt8](repeating: 1, count: 64_000_000)
         block[block.count - 1] = 2
-        let after = try #require(reader.residentBytes())
+        let bytes = try #require(reader.residentBytes())
         #expect(block.last == 2)
-        #expect(after > before + 32_000_000)
+        #expect(bytes > 64_000_000)
     }
 }
