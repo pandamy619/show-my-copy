@@ -24,9 +24,7 @@ struct StoredEntryCoder: Sendable {
     /// The record to write for `entry`, or nil when the entry is kept in memory only: a concealed entry without
     /// a sealer. Throws `sealFailed` when sealing a concealed entry fails.
     func record(for entry: ClipboardEntry) throws(HistoryPersistenceError) -> StoredEntryRecord? {
-        guard let payload = entry.content.storedPayload else {
-            return nil
-        }
+        let payload = entry.content.storedPayload
         var record = StoredEntryRecord(
             id: entry.id,
             kind: entry.kind.rawValue,
@@ -40,7 +38,8 @@ struct StoredEntryCoder: Sendable {
             isConcealed: entry.isConcealed,
             expiresAt: entry.expiresAt,
             isPinned: entry.isPinned,
-            schemaVersion: StoredEntryRecord.currentSchemaVersion
+            schemaVersion: StoredEntryRecord.schemaVersion(for: entry.kind),
+            blobIDs: entry.content.blobIDs.map(\.uuid)
         )
         guard entry.isConcealed else {
             return record
@@ -142,26 +141,17 @@ struct StoredEntryCoder: Sendable {
 }
 
 extension ClipboardContent {
-    /// The content's data as it is written to disk, before sealing, or nil for content kept in memory only.
-    var storedPayload: Data? {
-        switch self {
-        case .text(let text):
-            Data(text.utf8)
-        case .richText, .image, .files:
-            nil
-        }
+    /// The content's data as it is written to disk, before sealing: UTF-8 for text, the `StoredPayload` layout
+    /// for the other kinds. An image's payload holds its blob IDs and metadata, never the image data.
+    var storedPayload: Data {
+        StoredPayload.encode(self)
     }
 
     /// The content saved as `storedPayload`, or nil when the data is not valid for `kind`.
     init?(kind: Kind, storedPayload payload: Data) {
-        switch kind {
-        case .text:
-            guard let text = String(data: payload, encoding: .utf8) else {
-                return nil
-            }
-            self = .text(text)
-        case .richText, .image, .files:
+        guard let content = StoredPayload.decode(kind, from: payload) else {
             return nil
         }
+        self = content
     }
 }

@@ -24,6 +24,9 @@ final class StoredEntry {
     var expiresAt: Date?
     var isPinned: Bool
     var schemaVersion: Int
+    /// `StoredEntryRecord.blobIDs` as UUID strings separated by spaces, or nil when there are none. Added in
+    /// schema version 2; optional, so stores from version 1 open with a lightweight migration and read as nil.
+    var blobIDs: String?
 
     init(record: StoredEntryRecord) {
         id = record.id
@@ -39,6 +42,7 @@ final class StoredEntry {
         expiresAt = record.expiresAt
         isPinned = record.isPinned
         schemaVersion = record.schemaVersion
+        blobIDs = Self.joined(record.blobIDs)
     }
 
     /// Takes every field from `record` except the ID, which never changes.
@@ -55,6 +59,7 @@ final class StoredEntry {
         expiresAt = record.expiresAt
         isPinned = record.isPinned
         schemaVersion = record.schemaVersion
+        blobIDs = Self.joined(record.blobIDs)
     }
 
     var record: StoredEntryRecord {
@@ -71,7 +76,17 @@ final class StoredEntry {
             isConcealed: isConcealed,
             expiresAt: expiresAt,
             isPinned: isPinned,
-            schemaVersion: schemaVersion
+            schemaVersion: schemaVersion,
+            blobIDs: Self.split(blobIDs)
         )
+    }
+
+    private static func joined(_ ids: [UUID]) -> String? {
+        ids.isEmpty ? nil : ids.map(\.uuidString).joined(separator: " ")
+    }
+
+    /// Text that is not a UUID is dropped: a blob nobody references is deleted by the sweep at launch.
+    private static func split(_ text: String?) -> [UUID] {
+        (text ?? "").split(separator: " ").compactMap { UUID(uuidString: String($0)) }
     }
 }
