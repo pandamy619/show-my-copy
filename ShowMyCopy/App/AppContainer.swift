@@ -62,21 +62,7 @@ final class AppContainer {
         let passwordSettings = PasswordSettings(history: store, defaults: defaults, now: now)
         let settingsWindow = makeSettingsWindow(store, historySettings, passwordSettings)
 
-        // Images are recorded only with somewhere to keep them and a way to make thumbnails. `store` must delete
-        // blobs in the same `blobs`.
-        let imageIngestor: ImageIngestor? =
-            if let blobs, let thumbnails {
-                ImageIngestor(blobs: blobs, thumbnails: thumbnails)
-            } else {
-                nil
-            }
-        // Copied photo and video files get thumbnails only with somewhere to keep them, in the same `blobs`.
-        let fileThumbnailIngestor: FileThumbnailIngestor? =
-            if let blobs, let fileThumbnails {
-                FileThumbnailIngestor(blobs: blobs, maker: fileThumbnails)
-            } else {
-                nil
-            }
+        let ingestors = Self.makeIngestors(blobs: blobs, thumbnails: thumbnails, fileThumbnails: fileThumbnails)
         // The monitor reads the password setting on every change, so a new choice applies to the next copy.
         let monitor = ClipboardMonitor(
             pasteboard: pasteboard,
@@ -86,8 +72,8 @@ final class AppContainer {
             sleep: sleep,
             activity: pollingActivity,
             passwordPolicy: { [passwordSettings] in passwordSettings.policy },
-            imageIngestor: imageIngestor,
-            fileThumbnailIngestor: fileThumbnailIngestor
+            imageIngestor: ingestors.images,
+            fileThumbnailIngestor: ingestors.files
         )
         let copier = EntryCopier(history: store, pasteboard: pasteboard, monitor: monitor, blobs: blobs, now: now)
         // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.
@@ -125,6 +111,22 @@ final class AppContainer {
         self.copier = copier
         self.historyWindow = historyWindow
         self.settingsWindow = settingsWindow
+    }
+
+    /// Images are recorded only with somewhere to keep them and a way to make thumbnails, and copied photo and video
+    /// files get thumbnails only with somewhere to keep them. The store must delete blobs in the same `blobs`.
+    private static func makeIngestors(
+        blobs: (any BlobStore)?,
+        thumbnails: (any ThumbnailMaking)?,
+        fileThumbnails: (any FileThumbnailMaking)?
+    ) -> (images: ImageIngestor?, files: FileThumbnailIngestor?) {
+        guard let blobs else {
+            return (nil, nil)
+        }
+        return (
+            thumbnails.map { ImageIngestor(blobs: blobs, thumbnails: $0) },
+            fileThumbnails.map { FileThumbnailIngestor(blobs: blobs, maker: $0) }
+        )
     }
 
     /// Starts watching the clipboard and the system.

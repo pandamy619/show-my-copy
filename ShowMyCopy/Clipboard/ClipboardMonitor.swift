@@ -283,8 +283,30 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         history.record(content, sourceApp: copy.sourceApp, at: copy.date)
     }
 
-    // MARK: - File thumbnails
+    /// Password managers empty the clipboard a while after copying a password. A password copied without a marker,
+    /// for example from a browser extension, is recognized only then: if the entry recorded last is still on the
+    /// clipboard and was copied a short time ago, it is most likely that password.
+    private func clipboardWasCleared(at date: Date, policy: PasswordPolicy) {
+        defer { history.markCurrentSkipped() }
+        guard let currentID = history.currentEntryID,
+            let current = history.entries.first(where: { $0.id == currentID }),
+            date.timeIntervalSince(current.date) <= Self.clearedClipboardWindow
+        else {
+            return
+        }
+        if policy.savesPasswords {
+            history.conceal(id: currentID, expiresAt: date + policy.lifetime)
+            AppLogger.clipboard.debug("The clipboard was cleared soon after a copy; the entry is now concealed")
+        } else {
+            history.remove(id: currentID)
+            AppLogger.clipboard.debug("The clipboard was cleared soon after a copy; the entry was removed")
+        }
+    }
+}
 
+// MARK: - File thumbnails
+
+extension ClipboardMonitor {
     /// Makes thumbnails of the copied photos and videos off the main actor, then records the files. Like an image,
     /// nothing is current meanwhile. Files still on the pasteboard at launch that are the newest entry already are
     /// not read again: the entry keeps what it has.
@@ -318,25 +340,5 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         }
         // The store deletes the thumbnails it does not keep, such as those of files it already has thumbnails for.
         history.record(.files(files), sourceApp: copy.sourceApp, at: copy.date)
-    }
-
-    /// Password managers empty the clipboard a while after copying a password. A password copied without a marker,
-    /// for example from a browser extension, is recognized only then: if the entry recorded last is still on the
-    /// clipboard and was copied a short time ago, it is most likely that password.
-    private func clipboardWasCleared(at date: Date, policy: PasswordPolicy) {
-        defer { history.markCurrentSkipped() }
-        guard let currentID = history.currentEntryID,
-            let current = history.entries.first(where: { $0.id == currentID }),
-            date.timeIntervalSince(current.date) <= Self.clearedClipboardWindow
-        else {
-            return
-        }
-        if policy.savesPasswords {
-            history.conceal(id: currentID, expiresAt: date + policy.lifetime)
-            AppLogger.clipboard.debug("The clipboard was cleared soon after a copy; the entry is now concealed")
-        } else {
-            history.remove(id: currentID)
-            AppLogger.clipboard.debug("The clipboard was cleared soon after a copy; the entry was removed")
-        }
     }
 }

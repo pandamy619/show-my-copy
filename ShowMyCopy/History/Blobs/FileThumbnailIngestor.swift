@@ -104,7 +104,7 @@ struct FileThumbnailIngestor: Sendable {
                 let image = await Self.run(within: limits.timeoutPerFile, sleep: sleep) {
                     await maker.thumbnail(of: file.url, maximumPixelSize: ThumbnailReference.maximumPixelSize)
                 }
-                guard let image = image ?? nil else {
+                guard let finished = image, let image = finished else {
                     AppLogger.clipboard.debug("No thumbnail for a copied file; it keeps its icon")
                     continue
                 }
