@@ -39,10 +39,7 @@ enum MonitorFactory {
     /// A sleep that never ends on its own: it returns only by throwing when its task is cancelled, as when the
     /// monitor stops. Tests that need the loop to run use `ManualSleeper`.
     nonisolated static func sleepUntilCancelled(_ duration: Duration) async throws {
-        let (stream, continuation) = AsyncStream<Never>.makeStream()
-        // Iterating ends only when the task is cancelled: nothing ever finishes the stream.
-        for await _ in stream {}
-        withExtendedLifetime(continuation) {}
+        await suspendUntilCancelled()
         throw CancellationError()
     }
 }

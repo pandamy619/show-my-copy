@@ -8,6 +8,8 @@ struct ClipboardMonitorFileThumbnailTests {
     private let pasteboard = FakePasteboard()
     private let blobs = CountingBlobStore()
     private let maker = FakeFileThumbnailMaker()
+    /// The time limits of the thumbnails never end: the fake maker is done long before.
+    private let timers = ManualTimers()
     private let history: InMemoryHistoryStore
     private let date = Date(timeIntervalSince1970: 1_790_000_000)
     private let finder = SourceApp(bundleIdentifier: "com.apple.finder", name: "Finder")
@@ -26,7 +28,7 @@ struct ClipboardMonitorFileThumbnailTests {
             frontmostApp: { [finder] in finder },
             now: { [date] in now ?? date },
             passwordPolicy: { passwordPolicy },
-            fileThumbnailIngestor: FileThumbnailIngestor(blobs: blobs, maker: maker)
+            fileThumbnailIngestor: FileThumbnailIngestor(blobs: blobs, maker: maker, sleep: timers.sleep)
         )
     }
 
@@ -91,7 +93,7 @@ struct ClipboardMonitorFileThumbnailTests {
         let monitor = MonitorFactory.make(
             pasteboard: pasteboard, history: history,
             imageIngestor: ImageIngestor(blobs: blobs, thumbnails: FakeThumbnailMaker()),
-            fileThumbnailIngestor: FileThumbnailIngestor(blobs: blobs, maker: maker))
+            fileThumbnailIngestor: FileThumbnailIngestor(blobs: blobs, maker: maker, sleep: timers.sleep))
         monitor.poll()
         pasteboard.copyFiles([photo])
         monitor.poll()

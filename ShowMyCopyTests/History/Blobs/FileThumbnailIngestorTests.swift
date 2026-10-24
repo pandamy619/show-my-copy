@@ -9,6 +9,7 @@ import Testing
 final class FakeFileThumbnailMaker: FileThumbnailMaking {
     private let asked = Mutex<[String]>([])
     private let made = Mutex<[String]>([])
+    private let started = Mutex<(names: Set<String>, waiters: [(String, CheckedContinuation<Void, Never>)])>(([], []))
     private let pixelSize: Int
 
     init(pixelSize: Int = 256) {
@@ -37,12 +38,37 @@ final class FakeFileThumbnailMaker: FileThumbnailMaking {
         }
     }
 
+    /// Waits until the thumbnail of the file called `name` is asked for.
+    func waitUntilAsked(for name: String) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let isAsked = started.withLock { started in
+                guard started.names.contains(name) else {
+                    started.waiters.append((name, continuation))
+                    return false
+                }
+                return true
+            }
+            if isAsked {
+                continuation.resume()
+            }
+        }
+    }
+
     func thumbnail(of url: URL, maximumPixelSize: Int) async -> ImageInspection.Thumbnail? {
         let name = url.lastPathComponent
         made.withLock { $0.append(name) }
+        let waiting = started.withLock { started in
+            started.names.insert(name)
+            let waiting = started.waiters.filter { $0.0 == name }.map(\.1)
+            started.waiters.removeAll { $0.0 == name }
+            return waiting
+        }
+        for waiter in waiting {
+            waiter.resume()
+        }
         if name.contains("slow") {
-            // Until the timeout cancels it.
-            try? await Task.sleep(for: .seconds(60))
+            // Until the time limit cancels it.
+            await suspendUntilCancelled()
             return nil
         }
         if name.contains("broken") {
@@ -56,6 +82,8 @@ final class FakeFileThumbnailMaker: FileThumbnailMaking {
 struct FileThumbnailIngestorTests {
     private let blobs = CountingBlobStore()
     private let maker = FakeFileThumbnailMaker()
+    /// The time limits end only when a test fires them.
+    private let timers = ManualTimers()
 
     private func ingestor(
         maker: (any FileThumbnailMaking)? = nil,
@@ -67,7 +95,8 @@ struct FileThumbnailIngestorTests {
         FileThumbnailIngestor(
             blobs: blobs ?? self.blobs, maker: maker ?? self.maker,
             limits: FileThumbnailIngestor.Limits(
-                maximumFiles: maximumFiles, timeoutPerFile: timeoutPerFile, totalBudget: totalBudget))
+                maximumFiles: maximumFiles, timeoutPerFile: timeoutPerFile, totalBudget: totalBudget),
+            sleep: timers.sleep)
     }
 
     private func files(_ names: String...) -> [FileReference] {
@@ -133,14 +162,28 @@ struct FileThumbnailIngestorTests {
     }
 
     @Test func fileThatTakesTooLongKeepsItsIcon() async {
-        let result = await ingestor(timeoutPerFile: .milliseconds(200)).ingest(files("slow.mov", "fast.jpg"))
+        let ingestor = ingestor(timeoutPerFile: .milliseconds(200))
+        let copied = files("slow.mov", "fast.jpg")
+        let ingesting = Task { await ingestor.ingest(copied) }
+        await maker.waitUntilAsked(for: "slow.mov")
+        await timers.waitForSleep(of: .milliseconds(200))
+        timers.fire(.milliseconds(200))
+
+        let result = await ingesting.value
         #expect(result[0].thumbnail == nil)
         #expect(result[1].thumbnail != nil)
         #expect(blobs.writeCount == 1)
     }
 
     @Test func filesLeftWhenTheTimeIsUpKeepTheirIcons() async {
-        let result = await ingestor(totalBudget: .milliseconds(200)).ingest(files("a.jpg", "slow.mov", "c.jpg"))
+        let ingestor = ingestor(totalBudget: .milliseconds(200))
+        let copied = files("a.jpg", "slow.mov", "c.jpg")
+        let ingesting = Task { await ingestor.ingest(copied) }
+        await maker.waitUntilAsked(for: "slow.mov")
+        await timers.waitForSleep(of: .milliseconds(200))
+        timers.fire(.milliseconds(200))
+
+        let result = await ingesting.value
         #expect(result.map { $0.thumbnail != nil } == [true, false, false])
         // The third file is not even asked for.
         #expect(maker.thumbnailNames == ["a.jpg", "slow.mov"])
@@ -186,12 +229,16 @@ struct FileThumbnailIngestorTests {
     }
 
     @Test func runGivesTheResultOrNilAfterTheTimeout() async {
-        let sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        let sleep = timers.sleep
         #expect(await FileThumbnailIngestor.run(within: .seconds(10), sleep: sleep) { 7 } == 7)
-        let late = await FileThumbnailIngestor.run(within: .milliseconds(50), sleep: sleep) { () -> Int in
-            try? await Task.sleep(for: .seconds(60))
-            return 7
+        let running = Task {
+            await FileThumbnailIngestor.run(within: .milliseconds(50), sleep: sleep) { () -> Int in
+                await suspendUntilCancelled()
+                return 7
+            }
         }
-        #expect(late == nil)
+        await timers.waitForSleep(of: .milliseconds(50))
+        timers.fire(.milliseconds(50))
+        #expect(await running.value == nil)
     }
 }
