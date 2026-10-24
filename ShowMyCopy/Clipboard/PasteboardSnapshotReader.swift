@@ -32,10 +32,21 @@ enum CapturedItem: Equatable, Sendable {
 /// with its own size limit, which it checks before it builds anything from the data.
 ///
 /// Reading happens on the main actor: `NSPasteboard` is not `Sendable`, and its contents can change between calls,
-/// which the monitor detects with `changeCount`. So readers only check sizes and copy the bytes out. An image is
-/// returned as `CapturedItem.image` with its raw bytes; it is recorded at once, and `ImageIngestor` hashes it, makes
-/// the thumbnail and writes it to disk off the main actor afterwards (`CaptureEnrichment`). Keep that work out of the
-/// readers, or large copies will block the UI.
+/// which the monitor detects with `changeCount`. So readers only check sizes and copy the bytes out.
+///
+/// A limit AppKit sets: `NSPasteboard` has no call that tells how large a type's data is before reading it, and
+/// `data(forType:)` copies all of it into the app (making the copying app produce data it only promised), on the
+/// thread that asks. AppKit does not document `NSPasteboard` as safe to use from other threads while the main thread
+/// writes to it (copying an entry back), so the reads stay here, and the sizes of text, styled text and images are
+/// checked right after reading, before anything is decoded or kept. A copy of hundreds of megabytes can therefore
+/// pause the app and take that much memory for a moment before it is skipped. What can be done is done: the count
+/// of copied files is checked before any URL is read; the types are looked at before any data; one image type is
+/// read, not every one offered; and styled text reads its plain text first and skips the item without reading the
+/// larger RTF when the plain text is already over its limit.
+///
+/// An image is returned as `CapturedItem.image` with its raw bytes; it is recorded at once, and `ImageIngestor`
+/// hashes it, makes the thumbnail and writes it to disk off the main actor afterwards (`CaptureEnrichment`). Keep that
+/// work out of the readers, or large copies will block the UI.
 ///
 /// A secret (by marker or password manager) is read by the readers that keep secrets only, which is plain text: a
 /// password is never kept as rich text, an image or files.

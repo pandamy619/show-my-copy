@@ -107,10 +107,14 @@ struct ImageContentReader: PasteboardContentReader {
 }
 
 /// Reads styled text: the RTF data and the plain text that comes with it.
+///
+/// The plain text is read first. It is never larger than the RTF it comes with, so styled text whose plain text is
+/// over its limit is skipped without reading the RTF at all (see `PasteboardSnapshotReader` on why sizes are known
+/// only after reading). RTF over its own limit is kept as the plain text already read.
 struct RichTextContentReader: PasteboardContentReader {
     nonisolated static let defaultMaximumBytes = 1_048_576
 
-    /// The largest RTF data kept, in bytes. Styled text over it is kept as plain text by the text reader.
+    /// The largest RTF data kept, in bytes. Styled text over it is kept as plain text.
     let maximumBytes: Int
     private let text: TextContentReader
 
@@ -123,21 +127,26 @@ struct RichTextContentReader: PasteboardContentReader {
     }
 
     func read(from pasteboard: any PasteboardReading) -> ContentReading {
-        guard pasteboard.types.contains(.rtf), let rtf = pasteboard.data(forType: .rtf), !rtf.isEmpty else {
+        guard pasteboard.types.contains(.rtf) else {
             return .nothing
         }
-        guard rtf.count <= maximumBytes else {
-            AppLogger.clipboard.debug("Styled text over the size limit is kept as plain text")
-            return .nothing
-        }
+        let plain: String
         switch text.read(from: pasteboard) {
-        case .content(.text(let plain)):
-            return .content(.richText(rtf: rtf, plain: plain))
+        case .content(.text(let found)):
+            plain = found
         case .content, .image, .nothing:
             // Without plain text the history could not show or search it.
             return .nothing
         case .tooLarge(let limit):
             return .tooLarge(limit: limit)
         }
+        guard let rtf = pasteboard.data(forType: .rtf), !rtf.isEmpty else {
+            return .nothing
+        }
+        guard rtf.count <= maximumBytes else {
+            AppLogger.clipboard.debug("Styled text over the size limit is kept as plain text")
+            return .content(.text(plain))
+        }
+        return .content(.richText(rtf: rtf, plain: plain))
     }
 }
