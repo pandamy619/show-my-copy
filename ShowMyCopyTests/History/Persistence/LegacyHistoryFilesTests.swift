@@ -7,28 +7,16 @@ import Testing
 struct LegacyHistoryFilesTests {
     private let fileManager = FileManager.default
 
-    /// A new Application Support folder in the temporary directory, removed after `body`.
     private func withApplicationSupport(_ body: (URL) throws -> Void) throws {
-        let directory = fileManager.temporaryDirectory
-            .appending(path: "ShowMyCopyTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer {
-            do {
-                try fileManager.removeItem(at: directory)
-            } catch {
-                Issue.record("Could not remove the temporary directory: \(error)")
-            }
-        }
-        try body(directory)
+        try TemporaryFolder.with(body)
     }
 
     private func write(_ name: String, in folder: URL) throws {
-        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
-        try Data("saved".utf8).write(to: folder.appending(path: name, directoryHint: .notDirectory))
+        try TemporaryFolder.write(to: name, in: folder)
     }
 
     private func exists(_ name: String, in folder: URL) -> Bool {
-        fileManager.fileExists(atPath: folder.appending(path: name).path(percentEncoded: false))
+        TemporaryFolder.exists(name, in: folder)
     }
 
     /// Files as the builds before the reset left them in `Application Support/ShowMyCopy`.

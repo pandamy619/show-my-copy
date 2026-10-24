@@ -171,11 +171,12 @@ struct PersistentHistoryStoreBlobTests {
     private func makeStore(
         blobs: (any BlobStore)?,
         retention: RetentionPolicy = .default,
-        now: Date? = nil
+        now: Date? = nil,
+        leftovers: (any HistoryLeftovers)? = nil
     ) -> PersistentHistoryStore {
         PersistentHistoryStore(
             persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true, retention: retention,
-            now: now ?? start, blobs: blobs)
+            now: now ?? start, blobs: blobs, leftovers: leftovers)
     }
 
     private func makeStore(now: Date? = nil) -> PersistentHistoryStore {
@@ -239,6 +240,21 @@ struct PersistentHistoryStoreBlobTests {
             persistence: InMemoryHistoryPersistence(), sealer: nil, savesPasswords: false, now: start,
             openError: error, blobs: blobs)
         #expect(blobs.allIDs() == Set(image.blobIDs))
+    }
+
+    /// A copy of a history that could not be opened may reference any image, so no image is an orphan while it is
+    /// kept: not at the launch that moved it aside, and not at the launches after.
+    @Test func nothingIsSweptWhileACopyOfAnUnreadableHistoryIsKept() throws {
+        let leftovers = FakeHistoryLeftovers()
+        let image = try ContentFixtures.storedImage(in: blobs)
+
+        _ = makeStore(blobs: blobs, now: start, leftovers: leftovers)
+        _ = makeStore(blobs: blobs, now: start + 1, leftovers: leftovers)
+        #expect(blobs.allIDs() == Set(image.blobIDs))
+
+        leftovers.hasDamagedCopy = false
+        _ = makeStore(blobs: blobs, now: start + 2, leftovers: leftovers)
+        #expect(blobs.allIDs().isEmpty)
     }
 
     @Test func withoutABlobStoreImageRecordsAreLeftOnDiskUnloaded() throws {

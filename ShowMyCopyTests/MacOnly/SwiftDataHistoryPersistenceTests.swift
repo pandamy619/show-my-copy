@@ -7,6 +7,10 @@ import Testing
 @MainActor
 struct SwiftDataHistoryPersistenceTests {
     private let date = Date(timeIntervalSince1970: 1_790_000_000)
+    private let defaultsSuite = "ShowMyCopyTests.\(UUID().uuidString)"
+    private var defaults: UserDefaults {
+        UserDefaults(suiteName: defaultsSuite) ?? .standard
+    }
 
     private func makeRecord(
         id: UUID = UUID(),
@@ -32,6 +36,11 @@ struct SwiftDataHistoryPersistenceTests {
 
     private func sorted(_ records: [StoredEntryRecord]) -> [StoredEntryRecord] {
         records.sorted { $0.date > $1.date }
+    }
+
+    /// Opens the store in `directory` with its own count of failed launches, not the app's.
+    private func open(in directory: URL) -> SwiftDataHistoryPersistence.Opened {
+        SwiftDataHistoryPersistence.open(in: directory, defaults: defaults)
     }
 
     /// A new folder in the temporary directory, removed after `body`.
@@ -160,12 +169,12 @@ struct SwiftDataHistoryPersistenceTests {
     @Test func historySurvivesReopeningTheStoreOnDisk() throws {
         try withTemporaryDirectory { directory in
             let record = makeRecord()
-            let first = SwiftDataHistoryPersistence.open(in: directory)
+            let first = open(in: directory)
             #expect(first.error == nil)
             #expect(first.persistence is SwiftDataHistoryPersistence)
             try first.persistence.insert([record])
 
-            let second = SwiftDataHistoryPersistence.open(in: directory)
+            let second = open(in: directory)
             #expect(second.error == nil)
             #expect(try second.persistence.loadAll() == [record])
         }
@@ -173,7 +182,7 @@ struct SwiftDataHistoryPersistenceTests {
 
     @Test func storeFolderIsExcludedFromBackups() throws {
         try withTemporaryDirectory { directory in
-            _ = SwiftDataHistoryPersistence.open(in: directory)
+            _ = open(in: directory)
             let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
             #expect(values.isExcludedFromBackup == true)
         }
@@ -182,18 +191,42 @@ struct SwiftDataHistoryPersistenceTests {
     @Test func damagedStoreIsMovedAsideAndANewOneStarts() throws {
         try withTemporaryDirectory { directory in
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let storeURL = directory.appending(path: SwiftDataHistoryPersistence.storeFileName)
+            let storeURL = directory.appending(path: HistoryStoreOpener.storeFileName)
             try Data(repeating: 0x42, count: 4096).write(to: storeURL)
 
-            let opened = SwiftDataHistoryPersistence.open(in: directory)
+            let opened = open(in: directory)
             #expect(opened.error == .storeReset)
             #expect(opened.persistence is SwiftDataHistoryPersistence)
             #expect(try opened.persistence.loadAll().isEmpty)
-            let damaged = directory.appending(path: SwiftDataHistoryPersistence.damagedStoreFileName)
+            let damaged = directory.appending(path: HistoryStoreOpener.damagedStoreFileName)
             #expect(FileManager.default.fileExists(atPath: damaged.path(percentEncoded: false)))
 
             try opened.persistence.insert([makeRecord()])
-            #expect(try SwiftDataHistoryPersistence.open(in: directory).persistence.loadAll().count == 1)
+            #expect(try open(in: directory).persistence.loadAll().count == 1)
+        }
+    }
+
+    /// A database that is damaged inside still starts with the SQLite header: it may be another build's, so it is
+    /// left where it is until it has failed on several launches in a row.
+    @Test func aDamagedDatabaseIsKeptUntilItFailsOnSeveralLaunches() throws {
+        try withTemporaryDirectory { directory in
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let storeURL = directory.appending(path: HistoryStoreOpener.storeFileName)
+            let damagedDatabase = StoreFileCheck.sqliteHeader + Data(repeating: 0x42, count: 4080)
+            try damagedDatabase.write(to: storeURL)
+            defer { defaults.removePersistentDomain(forName: defaultsSuite) }
+
+            for _ in 1..<HistoryStoreOpener.failedLaunchesBeforeReset {
+                let opened = open(in: directory)
+                #expect(opened.error == .openFailed)
+                #expect(opened.persistence is InMemoryHistoryPersistence)
+                #expect(FileManager.default.contents(atPath: storeURL.path(percentEncoded: false)) == damagedDatabase)
+            }
+            let opened = open(in: directory)
+            #expect(opened.error == .storeReset)
+            #expect(opened.persistence is SwiftDataHistoryPersistence)
+            let damaged = directory.appending(path: HistoryStoreOpener.damagedStoreFileName)
+            #expect(FileManager.default.contents(atPath: damaged.path(percentEncoded: false)) == damagedDatabase)
         }
     }
 
@@ -205,10 +238,10 @@ struct SwiftDataHistoryPersistenceTests {
 
     @Test func sizeOnDiskIsTheSizeOfTheStoreFiles() throws {
         try withTemporaryDirectory { directory in
-            let opened = SwiftDataHistoryPersistence.open(in: directory)
+            let opened = open(in: directory)
             try opened.persistence.insert([makeRecord(text: String(repeating: "a", count: 10_000))])
 
-            let storeURL = directory.appending(path: SwiftDataHistoryPersistence.storeFileName)
+            let storeURL = directory.appending(path: HistoryStoreOpener.storeFileName)
             let bytes = try #require(opened.persistence.storedBytes())
             #expect(bytes > 10_000)
             #expect(bytes == StoreFiles.totalBytes(ofStoreAt: storeURL))

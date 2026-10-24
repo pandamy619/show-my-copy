@@ -85,11 +85,12 @@ extension FakeHistoryPersistence {
         retention: RetentionPolicy = .default,
         now: Date,
         openError: HistoryPersistenceError? = nil,
-        blobs: (any BlobStore)? = nil
+        blobs: (any BlobStore)? = nil,
+        leftovers: (any HistoryLeftovers)? = nil
     ) -> PersistentHistoryStore {
         PersistentHistoryStore(
             persistence: self, sealer: sealer, savesPasswords: savesPasswords, retention: retention, now: now,
-            openError: openError, blobs: blobs)
+            openError: openError, blobs: blobs, leftovers: leftovers)
     }
 
     /// The texts of the saved records that `sealer` can read.
