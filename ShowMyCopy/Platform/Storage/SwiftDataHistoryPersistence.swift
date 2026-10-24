@@ -136,19 +136,12 @@ extension SwiftDataHistoryPersistence {
     /// Where a store that could not be opened is moved. Only the latest one is kept.
     static let damagedStoreFileName = "History.store.damaged"
 
-    /// Opens the history in Application Support/ShowMyCopy, inside the app's sandbox container.
+    /// Opens the history in `HistoryFolder`, inside the app's sandbox container.
     static func openDefault() -> Opened {
-        let directory: URL
-        do {
-            directory = try FileManager.default
-                .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-                .appending(path: "ShowMyCopy", directoryHint: .isDirectory)
-        } catch {
-            AppLogger.history.error(
-                "Could not find Application Support: \(String(describing: error), privacy: .private)")
+        guard let applicationSupport = HistoryFolder.applicationSupport() else {
             return Opened(persistence: InMemoryHistoryPersistence(), error: .openFailed)
         }
-        return open(in: directory)
+        return open(in: HistoryFolder.directory(inApplicationSupport: applicationSupport))
     }
 
     /// Opens or creates `History.store` in `directory`. A store that cannot be opened (damaged, or from a format

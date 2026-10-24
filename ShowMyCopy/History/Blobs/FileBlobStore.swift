@@ -1,8 +1,8 @@
 import Foundation
 import os
 
-/// Keeps each blob in its own file, named by its ID, in one folder: `Application Support/ShowMyCopy/Blobs` in the
-/// app's sandbox container, next to the history database.
+/// Keeps each blob in its own file, named by its ID, in one folder: `Application Support/ShowMyCopy/History/Blobs`
+/// in the app's sandbox container, next to the history database.
 ///
 /// The folder is excluded from backups like the database: images can hold anything that was copied, and a backup
 /// would keep them after the entry is deleted. Files are written atomically, so a crash leaves either the whole
@@ -36,23 +36,16 @@ struct FileBlobStore: BlobStore {
         self.directory = directory
     }
 
-    /// `Application Support/ShowMyCopy/Blobs` in the user's (sandboxed) Application Support folder.
+    /// `Application Support/ShowMyCopy/History/Blobs` in the user's (sandboxed) Application Support folder.
     static func openDefault() throws(BlobStoreError) -> FileBlobStore {
-        let applicationSupport: URL
-        do {
-            applicationSupport = try FileManager.default.url(
-                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        } catch {
-            AppLogger.history.error(
-                "Could not find Application Support: \(String(describing: error), privacy: .private)")
+        guard let applicationSupport = HistoryFolder.applicationSupport() else {
             throw .openFailed
         }
         return try FileBlobStore(directory: directory(inApplicationSupport: applicationSupport))
     }
 
     static func directory(inApplicationSupport applicationSupport: URL) -> URL {
-        applicationSupport
-            .appending(path: "ShowMyCopy", directoryHint: .isDirectory)
+        HistoryFolder.directory(inApplicationSupport: applicationSupport)
             .appending(path: folderName, directoryHint: .isDirectory)
     }
 

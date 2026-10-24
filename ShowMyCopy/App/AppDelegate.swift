@@ -16,6 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Settings show on the first launch only, so their flag also tells a new install from an older one.
         let firstLaunch = FirstLaunch()
         HistorySettings.settleSizeLimitDefault(in: .standard, isNewInstall: firstLaunch.shouldShowSettings)
+        // Before anything opens the history: development builds saved it in a format that is gone.
+        if let applicationSupport = HistoryFolder.applicationSupport() {
+            LegacyHistoryFiles(appFolder: HistoryFolder.appFolder(inApplicationSupport: applicationSupport)).delete()
+        }
         let blobs = Self.openBlobStore()
         let container = AppContainer(
             store: Self.makeHistoryStore(blobs: blobs),
