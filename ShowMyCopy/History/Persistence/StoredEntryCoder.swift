@@ -8,11 +8,9 @@ struct StoredEntryCoder: Sendable {
     /// What a saved record turned out to be.
     enum Decoded: Equatable, Sendable {
         case entry(ClipboardEntry)
-        /// Damaged, or a password that cannot be opened (the key is gone or another one, or the data was changed).
-        /// It is of no use to anyone any more and should be deleted.
+        /// Damaged, of an unknown kind, or a password that cannot be opened (the key is gone or another one, or the
+        /// data was changed). It is of no use to anyone any more and should be deleted.
         case unreadable
-        /// Saved by a newer app version (a new schema or content kind). It should be left on disk.
-        case unsupported
     }
 
     /// Sealed data is padded to a multiple of this many bytes, so its size does not tell a password's length.
@@ -38,7 +36,6 @@ struct StoredEntryCoder: Sendable {
             isConcealed: entry.isConcealed,
             expiresAt: entry.expiresAt,
             isPinned: entry.isPinned,
-            schemaVersion: StoredEntryRecord.schemaVersion(for: entry.content),
             blobIDs: entry.content.blobIDs.map(\.uuid)
         )
         guard entry.isConcealed else {
@@ -62,8 +59,8 @@ struct StoredEntryCoder: Sendable {
     /// The entry a saved record holds. Its hash and preview are made again from the content, so a concealed entry
     /// gets them back after its payload is opened.
     func decode(_ record: StoredEntryRecord) -> Decoded {
-        guard supports(record), let kind = ClipboardContent.Kind(rawValue: record.kind) else {
-            return .unsupported
+        guard let kind = ClipboardContent.Kind(rawValue: record.kind) else {
+            return .unreadable
         }
         var payload = record.payload
         if record.isConcealed {
@@ -93,13 +90,6 @@ struct StoredEntryCoder: Sendable {
                 isPinned: record.isPinned
             )
         )
-    }
-
-    /// Whether this app version can read `record`: false for a record saved by a newer version (a new schema or
-    /// content kind). Reads only plain fields, so it never opens a sealed payload.
-    func supports(_ record: StoredEntryRecord) -> Bool {
-        record.schemaVersion <= StoredEntryRecord.currentSchemaVersion
-            && ClipboardContent.Kind(rawValue: record.kind) != nil
     }
 
     private func open(_ sealed: Data) -> Data? {
@@ -141,8 +131,8 @@ struct StoredEntryCoder: Sendable {
 }
 
 extension ClipboardContent {
-    /// The content's data as it is written to disk, before sealing: UTF-8 for text, the `StoredPayload` layout
-    /// for the other kinds. An image's payload holds its blob IDs and metadata, never the image data.
+    /// The content's data as it is written to disk, before sealing, in the `StoredPayload` layout. An image's
+    /// payload holds its blob IDs and metadata, never the image data.
     var storedPayload: Data {
         StoredPayload.encode(self)
     }

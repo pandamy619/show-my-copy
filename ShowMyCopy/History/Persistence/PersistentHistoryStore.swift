@@ -20,9 +20,8 @@ import os
 /// Each write is one transaction (`HistoryPersistence.apply`), so a failed one leaves the disk as it was. It never
 /// loses what is in memory either: it is logged, shown through `storageError`, and the next change writes what the
 /// failed ones did not, so the disk catches up with memory as soon as writing works. A write touches only the
-/// records of entries this session loaded or made, never the others on disk: records from a newer app version,
-/// images left unloaded without a blob store, or the whole saved history when it could not be read. Only Clear
-/// History deletes those.
+/// records of entries this session loaded or made, never the others on disk: images left unloaded
+/// without a blob store, or the whole saved history when it could not be read. Only Clear History deletes those.
 @MainActor
 @Observable
 final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsDiskUsage {
@@ -157,7 +156,7 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
         change { $0.remove(id: id) }
     }
 
-    /// Removes every entry from memory and every record from disk, also records this version could not load,
+    /// Removes every entry from memory and every record from disk, also records that were not loaded,
     /// and with them every saved image. When that fails, the next write tries again.
     @discardableResult
     func clear() -> ClearResult {
@@ -169,7 +168,7 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
             // Memory and disk are both empty, so they match again.
             finishWrite(sealFailed: false)
             if sweepsBlobs, let blobs {
-                // No record is left, so no blob is used: also those of records this version did not load.
+                // No record is left, so no blob is used: also those of records that were not loaded.
                 Self.deleteOrphans(in: blobs, keeping: [])
             }
         }
@@ -296,8 +295,8 @@ private struct FoundRecords {
 // MARK: - Loading
 
 extension PersistentHistoryStore {
-    /// Sorts the saved records into entries to load and records to delete. Records from a newer app version, and
-    /// records with blobs while there is no blob store, are in neither: they stay on disk.
+    /// Sorts the saved records into entries to load and records to delete. Records with blobs while there is no
+    /// blob store are in neither: they stay on disk.
     private static func sort(
         _ records: [StoredEntryRecord],
         coder: StoredEntryCoder,
@@ -308,12 +307,12 @@ extension PersistentHistoryStore {
         var found = FoundRecords()
         for record in records {
             // Decided before opening: opening asks for the key, which can show a Keychain prompt.
-            if isUnwantedPassword(record, savesPasswords: savesPasswords, at: now, coder: coder) {
+            if isUnwantedPassword(record, savesPasswords: savesPasswords, at: now) {
                 found.unwanted.append(record.id)
                 continue
             }
             var missing: Set<BlobID> = []
-            if !record.blobIDs.isEmpty, coder.supports(record) {
+            if !record.blobIDs.isEmpty {
                 guard let blobs else {
                     // Nowhere to read the data from now; a later launch with the blob store loads it.
                     continue
@@ -330,9 +329,6 @@ extension PersistentHistoryStore {
                 found.entries.append(content == entry.content ? entry : entry.replacingContent(content))
             case .unreadable:
                 found.unreadable.append(record.id)
-            case .unsupported:
-                // Saved by a newer app version: leave it for that version.
-                break
             }
         }
         return found
@@ -353,14 +349,8 @@ extension PersistentHistoryStore {
     }
 
     /// Whether `record` is a saved password that is no longer wanted: expired at `now`, or saving passwords is off.
-    /// Records from a newer app version are left to that version.
-    private static func isUnwantedPassword(
-        _ record: StoredEntryRecord,
-        savesPasswords: Bool,
-        at now: Date,
-        coder: StoredEntryCoder
-    ) -> Bool {
-        guard record.isConcealed, coder.supports(record) else {
+    private static func isUnwantedPassword(_ record: StoredEntryRecord, savesPasswords: Bool, at now: Date) -> Bool {
+        guard record.isConcealed else {
             return false
         }
         guard savesPasswords else {

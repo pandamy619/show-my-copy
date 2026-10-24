@@ -5,7 +5,8 @@ import SwiftData
 /// hashed or left out is decided by `StoredEntryCoder`, so this model holds no rules and needs no tests of its own
 /// beyond the round trip.
 ///
-/// A new field must be optional or have a default value, so SwiftData can migrate existing stores on its own.
+/// There is one layout, without versions: until the first release, a change to it replaces the store (see
+/// `LegacyHistoryFiles`). From the first release on, this becomes a versioned schema with a migration plan.
 @Model
 final class StoredEntry {
     #Unique<StoredEntry>([\.id])
@@ -23,9 +24,7 @@ final class StoredEntry {
     var isConcealed: Bool
     var expiresAt: Date?
     var isPinned: Bool
-    var schemaVersion: Int
-    /// `StoredEntryRecord.blobIDs` as UUID strings separated by spaces, or nil when there are none. Added in
-    /// schema version 2; optional, so stores from version 1 open with a lightweight migration and read as nil.
+    /// `StoredEntryRecord.blobIDs` as UUID strings separated by spaces, or nil when there are none.
     var blobIDs: String?
 
     init(record: StoredEntryRecord) {
@@ -41,7 +40,6 @@ final class StoredEntry {
         isConcealed = record.isConcealed
         expiresAt = record.expiresAt
         isPinned = record.isPinned
-        schemaVersion = record.schemaVersion
         blobIDs = Self.joined(record.blobIDs)
     }
 
@@ -58,7 +56,6 @@ final class StoredEntry {
         isConcealed = record.isConcealed
         expiresAt = record.expiresAt
         isPinned = record.isPinned
-        schemaVersion = record.schemaVersion
         blobIDs = Self.joined(record.blobIDs)
     }
 
@@ -76,7 +73,6 @@ final class StoredEntry {
             isConcealed: isConcealed,
             expiresAt: expiresAt,
             isPinned: isPinned,
-            schemaVersion: schemaVersion,
             blobIDs: Self.split(blobIDs)
         )
     }

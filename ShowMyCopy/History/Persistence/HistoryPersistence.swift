@@ -27,7 +27,7 @@ enum HistoryPersistenceError: Error, Equatable, Sendable {
 
 /// One change to the saved records, written as a whole or not at all.
 struct StoredChange: Equatable, Sendable {
-    /// Deletes every saved record first, also those this app version could not load: only for Clear History.
+    /// Deletes every saved record first, also those not loaded: only for Clear History.
     var deletesAll = false
     /// Records to delete. IDs that are not saved are ignored.
     var deleted: [UUID] = []
