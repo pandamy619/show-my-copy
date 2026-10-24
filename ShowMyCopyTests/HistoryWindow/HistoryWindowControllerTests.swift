@@ -223,13 +223,12 @@ struct HistoryWindowControllerTests {
         HistoryPanelPlacement.size(showsEntries: false)
     }
 
-    /// The controller resizes the panel on the main actor right after the model changes. Waits for that turn.
+    /// The controller resizes the panel on the main actor right after the model changes. Waits for that resize.
     private func frame(
         of controller: HistoryWindowController, becoming size: CGSize
     ) async throws -> CGRect {
-        for _ in 0..<100 where controller.panel?.frame.size != size {
-            await Task.yield()
-        }
+        let resize = try #require(controller.pendingResize, "no resize was scheduled")
+        await resize.value
         // A closed panel is not resized; it is sized when it opens again.
         try #require(controller.isVisible, "the panel closed while the test waited for the resize")
         let frame = try #require(controller.panel?.frame)

@@ -10,6 +10,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     private let onOpenSettings: @MainActor () -> Void
     /// Read by tests to check the panel's frame.
     private(set) var panel: HistoryPanel?
+    /// The resize scheduled by the last change of what the list shows. Tests await it instead of guessing when the
+    /// main actor gets to it.
+    private(set) var pendingResize: Task<Void, Never>?
 
     init(
         history: any HistoryStore,
@@ -99,11 +102,18 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         withObservationTracking {
             _ = model.showsEntries
         } onChange: { [weak self] in
-            // Called once, before the new value is stored. Re-arm and resize after the change, on the main actor.
-            Task { @MainActor [weak self] in
-                self?.observeShowsEntries()
-                self?.fitPanelToContent()
+            // Called once, before the new value is stored, by the code that changes it. The model and the history
+            // are main-actor types, so that is the main actor. Re-arm and resize after the change.
+            MainActor.assumeIsolated {
+                self?.scheduleResize()
             }
+        }
+    }
+
+    private func scheduleResize() {
+        pendingResize = Task { @MainActor [weak self] in
+            self?.observeShowsEntries()
+            self?.fitPanelToContent()
         }
     }
 
