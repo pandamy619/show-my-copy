@@ -505,6 +505,16 @@
         }
       }
     },
+    "Photo, %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фото, %@"
+          }
+        }
+      }
+    },
     "Press the shortcut above to show your history." : {
       "localizations" : {
         "ru" : {
@@ -957,6 +967,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Неизвестное приложение"
+          }
+        }
+      }
+    },
+    "Video, %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видео, %@"
           }
         }
       }

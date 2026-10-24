@@ -10,6 +10,8 @@ struct FilePreviewItem: Identifiable, Equatable, Sendable {
     let path: String
     /// The size when the file was copied, or nil for a folder or a file the app could not read.
     let byteSize: Int?
+    /// The thumbnail of a photo or video, shown instead of the icon, or nil.
+    let thumbnail: FileThumbnail?
     /// Nil while it is being checked.
     var availability: FileAvailability?
 
@@ -18,6 +20,7 @@ struct FilePreviewItem: Identifiable, Equatable, Sendable {
         name = EntryPreview.text(file.name)
         path = file.path
         byteSize = file.byteSize
+        thumbnail = file.thumbnail
         self.availability = availability
     }
 }

@@ -1,6 +1,7 @@
 import Foundation
 
-/// Thumbnails for the image rows of the history window.
+/// Thumbnails for the image rows of the history window, and for copied photo and video files in rows and in the
+/// preview.
 ///
 /// A row asks for its thumbnail when it appears, so only the rows on screen are read. The thumbnail blob is read
 /// and decoded off the main actor, and the result is kept in a small cache bounded by count and decoded bytes, so
@@ -38,7 +39,28 @@ final class ThumbnailProvider {
 
     /// What a row can show right away: the cached thumbnail, `failed` when there is none to load, or `loading`.
     func state(for image: ImageReference) -> PreviewLoadState<any PreviewImage> {
-        guard let id = image.thumbnail?.blobID, blobs != nil, decoder != nil else {
+        state(of: image.thumbnail)
+    }
+
+    /// What a file row or preview item can show right away. A file shows its icon instead until it is loaded.
+    func state(for file: FileThumbnail) -> PreviewLoadState<any PreviewImage> {
+        state(of: file.reference)
+    }
+
+    /// Loads the thumbnail of `image`, or gives the cached one. Nil when the image has no thumbnail or it could not
+    /// be read or decoded. Cancelling the caller (a row that scrolled away) does not cancel the shared load: its
+    /// result is still cached for the next time the row appears.
+    func thumbnail(for image: ImageReference) async -> (any PreviewImage)? {
+        await thumbnail(of: image.thumbnail)
+    }
+
+    /// Loads the thumbnail of a copied photo or video file, like `thumbnail(for:)` of an image.
+    func thumbnail(for file: FileThumbnail) async -> (any PreviewImage)? {
+        await thumbnail(of: file.reference)
+    }
+
+    private func state(of thumbnail: ThumbnailReference?) -> PreviewLoadState<any PreviewImage> {
+        guard let id = thumbnail?.blobID, blobs != nil, decoder != nil else {
             return .failed
         }
         if let cached = cache.value(for: id) {
@@ -47,11 +69,8 @@ final class ThumbnailProvider {
         return failures.contains(id) ? .failed : .loading
     }
 
-    /// Loads the thumbnail of `image`, or gives the cached one. Nil when the image has no thumbnail or it could not
-    /// be read or decoded. Cancelling the caller (a row that scrolled away) does not cancel the shared load: its
-    /// result is still cached for the next time the row appears.
-    func thumbnail(for image: ImageReference) async -> (any PreviewImage)? {
-        guard let id = image.thumbnail?.blobID, let blobs, let decoder else {
+    private func thumbnail(of thumbnail: ThumbnailReference?) async -> (any PreviewImage)? {
+        guard let id = thumbnail?.blobID, let blobs, let decoder else {
             return nil
         }
         if let cached = cache.value(for: id) {

@@ -94,7 +94,7 @@ struct FileRowTitle: View {
         HStack(spacing: 6) {
             if files.count == 1 {
                 Text(verbatim: names)
-                    .accessibilityLabel(Text("File, \(names)"))
+                    .accessibilityLabel(fileAccessibilityLabel(name: names, thumbnail: files.first?.thumbnail))
             } else {
                 Text(verbatim: names)
                 Text("\(files.count) files")
@@ -138,6 +138,7 @@ struct PreviewAccessibility: ViewModifier {
 struct EntryPreviewPane: View {
     let entry: ClipboardEntry
     let preview: EntryPreviewModel
+    let thumbnails: ThumbnailProvider
     let icons: any FileIconProviding
     let onClose: @MainActor () -> Void
 
@@ -215,7 +216,7 @@ struct EntryPreviewPane: View {
         case .image(_, let state):
             imagePreview(state)
         case .files(let items):
-            FilesPreview(items: items, icons: icons)
+            FilesPreview(items: items, thumbnails: thumbnails, icons: icons)
         case nil:
             Color.clear
         }
@@ -275,9 +276,10 @@ private struct PlainTextPreview: View {
     }
 }
 
-/// The copied files, with their icons, sizes and a mark on those that may be unavailable.
+/// The copied files, with their thumbnails or icons, sizes and a mark on those that may be unavailable.
 private struct FilesPreview: View {
     let items: [FilePreviewItem]
+    let thumbnails: ThumbnailProvider
     let icons: any FileIconProviding
 
     var body: some View {
@@ -285,11 +287,13 @@ private struct FilesPreview: View {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(items) { item in
                     HStack(spacing: 10) {
-                        FileIcon(path: item.path, size: 32, icons: icons)
+                        FileThumbnailIcon(
+                            path: item.path, thumbnail: item.thumbnail, size: 32, provider: thumbnails, icons: icons)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(verbatim: item.name)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
+                                .accessibilityLabel(fileAccessibilityLabel(name: item.name, thumbnail: item.thumbnail))
                             if let size = item.byteSize {
                                 Text(verbatim: ByteCount.fileSize(size))
                                     .font(.caption)

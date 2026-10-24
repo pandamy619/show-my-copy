@@ -30,7 +30,9 @@ struct HistoryView: View {
                     .accessibilityHidden(previewed != nil)
                     .overlay {
                         if let previewed {
-                            EntryPreviewPane(entry: previewed, preview: model.preview, icons: icons) {
+                            EntryPreviewPane(
+                                entry: previewed, preview: model.preview, thumbnails: model.thumbnails, icons: icons
+                            ) {
                                 model.preview.close()
                             }
                         }
@@ -260,7 +262,10 @@ private struct HistoryRow: View {
             case .image(let image):
                 EntryThumbnail(image: image, provider: model.thumbnails)
             case .files(let files):
-                FileIcon(path: files.first?.path ?? "/", size: 32, icons: icons)
+                // The first file's thumbnail when it is a photo or video that has one, otherwise its icon.
+                FileThumbnailIcon(
+                    path: files.first?.path ?? "/", thumbnail: files.first?.thumbnail, size: 32,
+                    provider: model.thumbnails, icons: icons)
             case .text, .richText:
                 EmptyView()
             }
