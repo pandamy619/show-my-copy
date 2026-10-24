@@ -231,16 +231,16 @@ private struct StorageBar: View {
             }
             .frame(height: Self.barHeight)
             .clipShape(Capsule())
-            HStack(spacing: 12) {
-                ForEach(breakdown.parts) { part in
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(Self.color(of: part.category))
-                            .frame(width: 8, height: 8)
-                        Text(Self.title(of: part.category))
-                        Text(verbatim: ByteCount.fileSize(part.bytes))
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
+            // In one row while it fits; with many kinds of content (or long translations), one part per line.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    ForEach(breakdown.parts) { part in
+                        legendItem(part)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(breakdown.parts) { part in
+                        legendItem(part)
                     }
                 }
             }
@@ -249,6 +249,19 @@ private struct StorageBar: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("History by type"))
         .accessibilityValue(Text(verbatim: accessibilityValue))
+    }
+
+    private func legendItem(_ part: StorageBreakdown.Part) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(Self.color(of: part.category))
+                .frame(width: 8, height: 8)
+            Text(Self.title(of: part.category))
+            Text(verbatim: ByteCount.fileSize(part.bytes))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .fixedSize()
     }
 
     private var accessibilityValue: String {
