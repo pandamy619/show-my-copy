@@ -35,6 +35,23 @@ struct HistoryWindowModelTests {
         #expect(model.items.count == 3)
     }
 
+    @Test func showsEntriesOnlyWhenSomethingIsListed() {
+        let model = HistoryWindowModel(history: ClipboardHistory())
+        #expect(!model.showsEntries)
+
+        model.history.record(text: "hello", sourceApp: notes, at: start)
+        #expect(model.showsEntries)
+
+        model.query = "nothing like it"
+        #expect(!model.showsEntries)
+
+        model.query = "hel"
+        #expect(model.showsEntries)
+
+        _ = model.history.clear()
+        #expect(!model.showsEntries)
+    }
+
     @Test func emptyHistoryHasNoSelection() {
         let model = HistoryWindowModel(history: ClipboardHistory())
         #expect(model.items.isEmpty)

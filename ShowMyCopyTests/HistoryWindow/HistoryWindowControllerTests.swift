@@ -159,6 +159,80 @@ struct HistoryWindowControllerTests {
         #expect(controller.model.items.map(\.text) == ["older"])
     }
 
+    @Test func emptyHistoryOpensACompactPanel() throws {
+        let controller = makeController()
+        controller.show()
+
+        let frame = try #require(controller.panel?.frame)
+        #expect(frame.size == compactSize(of: controller))
+        #expect(frame.height < HistoryPanelPlacement.fullSize.height)
+    }
+
+    @Test func historyOpensAFullPanel() throws {
+        pasteboard.copy("hello")
+        let controller = makeController()
+        controller.show()
+
+        let frame = try #require(controller.panel?.frame)
+        #expect(frame.size == HistoryPanelPlacement.fullSize)
+    }
+
+    @Test func panelGrowsAndShrinksDownwardWhileShown() async throws {
+        let controller = makeController()
+        controller.show()
+        let compact = try #require(controller.panel?.frame)
+
+        // A copy arrives while the panel is open.
+        history.record(text: "hello", sourceApp: nil, at: start)
+        let grown = try await frame(of: controller, becoming: HistoryPanelPlacement.fullSize)
+        #expect(grown.maxY == compact.maxY)
+        #expect(grown.minX == compact.minX)
+
+        // A search with no matches.
+        controller.model.query = "nothing like it"
+        let searched = try await frame(of: controller, becoming: compactSize(of: controller))
+        #expect(searched.maxY == compact.maxY)
+
+        controller.model.query = ""
+        _ = try await frame(of: controller, becoming: HistoryPanelPlacement.fullSize)
+
+        // History cleared from Settings.
+        _ = history.clear()
+        let cleared = try await frame(of: controller, becoming: compactSize(of: controller))
+        #expect(cleared == compact)
+    }
+
+    @Test func reopeningSizesThePanelForTheCurrentHistory() throws {
+        let controller = makeController()
+        controller.show()
+        controller.hide()
+
+        pasteboard.copy("hello")
+        controller.show()
+
+        let frame = try #require(controller.panel?.frame)
+        #expect(frame.size == HistoryPanelPlacement.fullSize)
+    }
+
+    private func compactSize(of controller: HistoryWindowController) -> CGSize {
+        guard let panel = controller.panel else {
+            return .zero
+        }
+        return HistoryWindowController.size(of: panel, showsEntries: false)
+    }
+
+    /// The controller resizes the panel on the main actor right after the model changes. Waits for that turn.
+    private func frame(
+        of controller: HistoryWindowController, becoming size: CGSize
+    ) async throws -> CGRect {
+        for _ in 0..<100 where controller.panel?.frame.size != size {
+            await Task.yield()
+        }
+        let frame = try #require(controller.panel?.frame)
+        #expect(frame.size == size)
+        return frame
+    }
+
     @Test func showUnhidesTheApp() {
         // Closing Settings hides the app to give focus back to the previous app. A hidden app shows no windows.
         NSApplication.shared.hide(nil)
