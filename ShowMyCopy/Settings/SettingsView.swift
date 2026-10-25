@@ -9,9 +9,9 @@ struct SettingsView<ShortcutRecorder: View>: View {
     let usage: StorageUsage
     let shortcutRecorder: ShortcutRecorder
 
-    @State private var draftLimit: Int
-    /// A lower limit the user picked that would delete entries. Applied only after they confirm.
-    @State private var pendingLimit: Int?
+    /// The entry limit being picked. A lower limit that would delete entries is applied only after the user
+    /// confirms it.
+    @State private var entryLimit: LimitDraft<Int>
 
     init(
         history: any HistoryStore,
@@ -25,7 +25,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
         _passwords = Bindable(passwords)
         self.usage = usage
         self.shortcutRecorder = shortcutRecorder()
-        _draftLimit = State(initialValue: settings.limit)
+        _entryLimit = State(initialValue: LimitDraft(settings: settings, limit: .entries))
     }
 
     var body: some View {
@@ -40,12 +40,9 @@ struct SettingsView<ShortcutRecorder: View>: View {
         .formStyle(.grouped)
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
-        .onChange(of: draftLimit) { _, newValue in
-            draftLimitChanged(to: newValue)
-        }
         .onChange(of: history.revision) {
             // The history can change while a confirmation is shown. Re-check what the change would do.
-            draftLimitChanged(to: draftLimit)
+            entryLimit.historyChanged()
         }
         .task {
             // Memory changes all the time, so it is read again while the settings are open. The window stays
@@ -80,26 +77,27 @@ struct SettingsView<ShortcutRecorder: View>: View {
         Section("History") {
             LabeledContent("Items to keep") {
                 HStack(spacing: 6) {
-                    TextField("Number of items", value: $draftLimit, format: .number)
+                    TextField("Number of items", value: $entryLimit.value, format: .number)
                         .labelsHidden()
                         .multilineTextAlignment(.trailing)
                         .frame(width: 64)
-                    Stepper("Number of items", value: $draftLimit, in: RetentionPolicy.entryLimitRange, step: 10)
-                        .labelsHidden()
+                    Stepper(
+                        "Number of items", value: $entryLimit.value, in: RetentionPolicy.entryLimitRange, step: 10
+                    )
+                    .labelsHidden()
                 }
             }
             LabeledContent("In history") {
                 Text("\(history.entries.count) items now")
                     .monospacedDigit()
             }
-            if let pendingLimit {
-                let change = settings.proposeLimit(pendingLimit)
+            if let change = entryLimit.pending {
                 InlineConfirmation(
                     message: .removingOldestItems(change.removedCount),
                     detail: .freeing(bytes: change.freedBytes),
                     confirmTitle: "Remove",
-                    onConfirm: confirmPendingLimit,
-                    onCancel: cancelPendingLimit
+                    onConfirm: { entryLimit.confirm() },
+                    onCancel: { entryLimit.cancel() }
                 )
             }
         }
@@ -152,39 +150,8 @@ struct SettingsView<ShortcutRecorder: View>: View {
         }
     }
 
-    private func draftLimitChanged(to value: Int) {
-        let change = settings.proposeLimit(value)
-        guard change.limit == value else {
-            // Out of range: show the clamped value. This calls back here with it.
-            draftLimit = change.limit
-            return
-        }
-        if change.needsConfirmation {
-            pendingLimit = change.limit
-        } else {
-            pendingLimit = nil
-            if change.limit != settings.limit {
-                settings.applyLimit(change.limit)
-            }
-        }
-    }
-
-    private func confirmPendingLimit() {
-        if let pendingLimit {
-            settings.applyLimit(pendingLimit)
-        }
-        pendingLimit = nil
-        draftLimit = settings.limit
-    }
-
-    private func cancelPendingLimit() {
-        pendingLimit = nil
-        draftLimit = settings.limit
-    }
-
     private func resetDrafts() {
-        pendingLimit = nil
-        draftLimit = settings.limit
+        entryLimit.reset()
         usage.forgetRecentClear()
     }
 }

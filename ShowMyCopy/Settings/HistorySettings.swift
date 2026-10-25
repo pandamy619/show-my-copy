@@ -46,7 +46,9 @@ enum HistorySizeLimit: Int, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Stores the history limits in UserDefaults and applies them to the clipboard history.
+/// Stores the history limits in UserDefaults and applies them to the clipboard history. Every limit works the same
+/// way (`RetentionLimit`): read it with `value(of:)`, see what a new value would remove with `propose`, and save and
+/// apply it with `apply`.
 @MainActor
 @Observable
 final class HistorySettings {
@@ -55,7 +57,7 @@ final class HistorySettings {
     /// The time a forecast measures the age limit against: the history's clock.
     @ObservationIgnored private let now: @MainActor () -> Date
 
-    /// Leaves `history` as it is. Call `applyStoredLimit()` when the app starts, before the first entry is
+    /// Leaves `history` as it is. Call `applyStoredLimits()` when the app starts, before the first entry is
     /// recorded. Creating the settings does not change the history, so the app decides when that happens.
     init(history: any HistoryStore, defaults: UserDefaults, now: @escaping @MainActor () -> Date) {
         self.history = history
@@ -63,65 +65,44 @@ final class HistorySettings {
         self.now = now
     }
 
-    /// The limit in effect. The history is the single source of truth.
-    var limit: Int { history.limit }
+    /// The value of `limit` in effect. The history is the single source of truth.
+    func value<Value>(of limit: RetentionLimit<Value>) -> Value {
+        limit.value(history.retention)
+    }
+
+    /// The entry limit in effect.
+    var limit: Int { value(of: .entries) }
 
     /// The size limit in effect, as one of the options.
-    var sizeLimit: HistorySizeLimit { HistorySizeLimit(byteLimit: history.retention.byteLimit) }
+    var sizeLimit: HistorySizeLimit { value(of: .size) }
 
-    /// The saved limit, or the default when nothing valid is saved. Always within `RetentionPolicy.entryLimitRange`.
-    nonisolated static func storedLimit(in defaults: UserDefaults) -> Int {
-        guard let value = defaults.object(forKey: SettingsKey.historyLimit) as? Int else {
-            return RetentionPolicy.defaultEntryLimit
-        }
-        return RetentionPolicy.clamped(value)
-    }
-
-    /// The saved size limit, or the default when nothing valid is saved. 0 is No limit, a negative or non-number
-    /// value is ignored and other sizes are moved to an option.
-    nonisolated static func storedSizeLimit(in defaults: UserDefaults) -> HistorySizeLimit {
-        guard let value = defaults.object(forKey: SettingsKey.historyByteLimit) as? Int, value >= 0 else {
-            return .default
-        }
-        return value == 0 ? .noLimit : HistorySizeLimit(byteLimit: value)
-    }
-
-    /// Both saved limits as one policy. Load the saved history with it, so loading deletes exactly what
-    /// `applyStoredLimit()` would.
+    /// Every saved limit as one policy. Load the saved history with it, so loading deletes exactly what
+    /// `applyStoredLimits()` would.
     nonisolated static func storedRetention(in defaults: UserDefaults) -> RetentionPolicy {
-        RetentionPolicy(entryLimit: storedLimit(in: defaults), byteLimit: storedSizeLimit(in: defaults).byteLimit)
+        RetentionLimits.stored(in: defaults)
     }
 
     /// Applies the saved limits to the history at once, deleting the oldest entries that no longer fit.
-    func applyStoredLimit() {
+    func applyStoredLimits() {
         history.setRetention(Self.storedRetention(in: defaults))
     }
 
-    /// Describes what setting `newLimit` would do, without changing anything.
-    func proposeLimit(_ newLimit: Int) -> LimitChange<Int> {
-        let limit = RetentionPolicy.clamped(newLimit)
-        return forecast(limit, under: history.retention.withEntryLimit(limit))
+    /// Describes what setting `limit` to `newValue` would do, without changing anything. The change holds the value
+    /// as it would be applied, such as an entry limit moved into its range.
+    func propose<Value>(_ newValue: Value, for limit: RetentionLimit<Value>) -> LimitChange<Value> {
+        let value = limit.normalized(newValue)
+        return forecast(value, under: limit.apply(value, history.retention))
     }
 
-    /// Saves `newLimit` and applies it, deleting the oldest entries that no longer fit.
-    func applyLimit(_ newLimit: Int) {
-        let limit = RetentionPolicy.clamped(newLimit)
-        defaults.set(limit, forKey: SettingsKey.historyLimit)
-        history.setLimit(limit)
+    /// Saves `newValue` for `limit` and applies it, deleting the oldest entries that no longer fit. Every choice is
+    /// saved, also No limit, so a later default does not override it.
+    func apply<Value>(_ newValue: Value, for limit: RetentionLimit<Value>) {
+        let value = limit.normalized(newValue)
+        limit.save(value, in: defaults)
+        history.setRetention(limit.apply(value, history.retention))
     }
 
-    /// Describes what setting `newLimit` would do, without changing anything.
-    func proposeSizeLimit(_ newLimit: HistorySizeLimit) -> LimitChange<HistorySizeLimit> {
-        forecast(newLimit, under: history.retention.withByteLimit(newLimit.byteLimit))
-    }
-
-    /// Saves `newLimit` and applies it, deleting the oldest entries that no longer fit. No limit is saved too.
-    func applySizeLimit(_ newLimit: HistorySizeLimit) {
-        defaults.set(newLimit.rawValue, forKey: SettingsKey.historyByteLimit)
-        history.setRetention(history.retention.withByteLimit(newLimit.byteLimit))
-    }
-
-    /// What applying `policy` to the history would remove, reported as a change to `limit`.
+    /// What applying `policy` to the history now would remove, reported as a change to `limit`.
     func forecast<Limit>(_ limit: Limit, under policy: RetentionPolicy) -> LimitChange<Limit> {
         let entries = history.entries
         let kept = policy.kept(entries, at: now())

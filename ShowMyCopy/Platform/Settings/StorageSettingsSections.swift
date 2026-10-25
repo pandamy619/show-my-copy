@@ -7,14 +7,14 @@ struct StorageSection: View {
     let settings: HistorySettings
     let usage: StorageUsage
 
-    @State private var draftSizeLimit: HistorySizeLimit
-    /// A smaller size limit the user picked that would delete entries. Applied only after they confirm.
-    @State private var pendingSizeLimit: HistorySizeLimit?
+    /// The size limit being picked. A smaller limit that would delete entries is applied only after the user
+    /// confirms it.
+    @State private var sizeLimit: LimitDraft<HistorySizeLimit>
 
     init(settings: HistorySettings, usage: StorageUsage) {
         self.settings = settings
         self.usage = usage
-        _draftSizeLimit = State(initialValue: settings.sizeLimit)
+        _sizeLimit = State(initialValue: LimitDraft(settings: settings, limit: .size))
     }
 
     var body: some View {
@@ -62,34 +62,28 @@ struct StorageSection: View {
                     Text("Not available")
                 }
             }
-            Picker("Size limit", selection: $draftSizeLimit) {
+            Picker("Size limit", selection: $sizeLimit.value) {
                 ForEach(HistorySizeLimit.allCases) { limit in
                     Self.title(of: limit).tag(limit)
                 }
             }
             // Attached to one row: modifiers on a Section can apply to each of its rows.
-            .onChange(of: draftSizeLimit) { _, newValue in
-                draftSizeLimitChanged(to: newValue)
-            }
             .onChange(of: usage.history.revision) {
                 // The history can change while a confirmation is shown. Re-check what the change would do.
-                if let pendingSizeLimit {
-                    draftSizeLimitChanged(to: pendingSizeLimit)
-                }
+                sizeLimit.historyChanged()
             }
             // The size on disk follows the history while this is shown, measured in the background. A newer change
             // cancels the measurement of the one before.
             .task(id: usage.history.revision) {
                 await usage.refreshDiskBytes()
             }
-            if let pendingSizeLimit {
-                let change = settings.proposeSizeLimit(pendingSizeLimit)
+            if let change = sizeLimit.pending {
                 InlineConfirmation(
                     message: .removingOldestItems(change.removedCount),
                     detail: .freeing(bytes: change.freedBytes),
                     confirmTitle: "Remove",
-                    onConfirm: confirmPendingSizeLimit,
-                    onCancel: cancelPendingSizeLimit
+                    onConfirm: { sizeLimit.confirm() },
+                    onCancel: { sizeLimit.cancel() }
                 )
             } else {
                 VStack(alignment: .leading, spacing: 4) {
@@ -137,31 +131,6 @@ struct StorageSection: View {
         } else {
             Text("No limit")
         }
-    }
-
-    private func draftSizeLimitChanged(to limit: HistorySizeLimit) {
-        let change = settings.proposeSizeLimit(limit)
-        if change.needsConfirmation {
-            pendingSizeLimit = limit
-        } else {
-            pendingSizeLimit = nil
-            if limit != settings.sizeLimit {
-                settings.applySizeLimit(limit)
-            }
-        }
-    }
-
-    private func confirmPendingSizeLimit() {
-        if let pendingSizeLimit {
-            settings.applySizeLimit(pendingSizeLimit)
-        }
-        pendingSizeLimit = nil
-        draftSizeLimit = settings.sizeLimit
-    }
-
-    private func cancelPendingSizeLimit() {
-        pendingSizeLimit = nil
-        draftSizeLimit = settings.sizeLimit
     }
 }
 

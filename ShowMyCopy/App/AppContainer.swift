@@ -156,7 +156,7 @@ final class AppContainer {
     func start() {
         // The monitor records what is on the pasteboard as soon as it starts. Apply the saved limit first, so the
         // history never holds more entries than the user allowed.
-        historySettings.applyStoredLimit()
+        historySettings.applyStoredLimits()
         // The saved history may still hold passwords from a session in which removing them from disk failed,
         // for example after saving passwords was turned off. Saving them is off now, so they go.
         if !passwordSettings.savesPasswords {
