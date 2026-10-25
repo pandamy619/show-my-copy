@@ -48,6 +48,8 @@ Requires Xcode 26 and macOS 15+.
 
 Open `ShowMyCopy.xcodeproj` and run the `ShowMyCopy` scheme.
 
+Settings every target shares (Swift 6 with complete concurrency checking, warnings as errors, the deployment target, the sandbox and no network access) are in `Config/Shared.xcconfig`; `make lint` checks the sandbox and network settings every target ends up with.
+
 | Command | Description |
 |---|---|
 | `make test` | unit tests (Swift Testing) |
