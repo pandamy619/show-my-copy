@@ -3,28 +3,24 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// An image is recorded before its data is saved and completed afterwards (`completeImage`). Both history stores
-/// must do that alike, so every test runs against each.
+/// An image is recorded before its data is saved and completed afterwards (`completeImage`), in both stores.
 @MainActor
-struct HistoryStoreImageCompletionTests {
-    enum Store: CaseIterable, Sendable {
-        case inMemory
-        case persistent
-    }
-
-    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+struct HistoryStoreImageCompletionContractTests {
+    private let harness: StoreHarness
+    private let start = StoreHarness.start
     private let blobs = InMemoryBlobStore()
-    private let disk = FakeHistoryPersistence()
     private let safari = SourceApp(bundleIdentifier: "com.apple.Safari", name: "Safari")
 
-    private func makeStore(_ store: Store) -> any HistoryStore {
-        switch store {
-        case .inMemory:
-            InMemoryHistoryStore(blobs: blobs)
-        case .persistent:
-            PersistentHistoryStore.loadedNow(
-                persistence: disk, sealer: nil, savesPasswords: false, now: start, blobs: blobs)
-        }
+    init() {
+        harness = StoreHarness(blobs: blobs)
+    }
+
+    private var disk: FakeHistoryPersistence {
+        harness.disk
+    }
+
+    private func makeStore(_ kind: StoreKind) throws -> any HistoryStore {
+        try harness.make(kind)
     }
 
     private func unsaved(byteSize: Int = 6) -> ImageReference {
@@ -55,9 +51,9 @@ struct HistoryStoreImageCompletionTests {
         #expect(ImageReference.unsaved(blobID: first.blobID, typeIdentifier: "public.png", byteSize: 6) == first)
     }
 
-    @Test(arguments: Store.allCases)
-    func completedImageKeepsItsPlaceDateSourceAndCurrentState(store kind: Store) throws {
-        let store = makeStore(kind)
+    @Test(arguments: StoreKind.allCases)
+    func completedImageKeepsItsPlaceDateSourceAndCurrentState(store kind: StoreKind) throws {
+        let store = try makeStore(kind)
         let pending = unsaved()
         let id = store.record(.image(pending), sourceApp: safari, at: start)
         store.record(text: "newer", sourceApp: nil, at: start + 1)
@@ -80,9 +76,9 @@ struct HistoryStoreImageCompletionTests {
         #expect(store.entries.map(\.kind) == [.image, .text])
     }
 
-    @Test(arguments: Store.allCases)
-    func completingAnImageAnotherEntryHoldsMakesThemOneAtTheNewerCopy(store kind: Store) throws {
-        let store = makeStore(kind)
+    @Test(arguments: StoreKind.allCases)
+    func completingAnImageAnotherEntryHoldsMakesThemOneAtTheNewerCopy(store kind: StoreKind) throws {
+        let store = try makeStore(kind)
         let earlier = try saved(1)
         store.record(.image(earlier), sourceApp: nil, at: start)
         store.record(text: "between", sourceApp: nil, at: start + 1)
@@ -102,9 +98,9 @@ struct HistoryStoreImageCompletionTests {
         #expect(blobs.allIDs() == Set(earlier.blobIDs))
     }
 
-    @Test(arguments: Store.allCases)
-    func sameImageSavedTwiceKeepsTheNewerData(store kind: Store) throws {
-        let store = makeStore(kind)
+    @Test(arguments: StoreKind.allCases)
+    func sameImageSavedTwiceKeepsTheNewerData(store kind: StoreKind) throws {
+        let store = try makeStore(kind)
         let first = unsaved()
         let second = unsaved()
         store.record(.image(first), sourceApp: nil, at: start)
@@ -120,9 +116,9 @@ struct HistoryStoreImageCompletionTests {
         #expect(blobs.allIDs() == Set(secondImage.blobIDs))
     }
 
-    @Test(arguments: Store.allCases)
-    func imageFoundAtLaunchKeepsTheEntryItRepeats(store kind: Store) throws {
-        let store = makeStore(kind)
+    @Test(arguments: StoreKind.allCases)
+    func imageFoundAtLaunchKeepsTheEntryItRepeats(store kind: StoreKind) throws {
+        let store = try makeStore(kind)
         let earlier = try saved(1)
         let earlierID = store.record(.image(earlier), sourceApp: safari, at: start)
         store.markCurrentSkipped()
@@ -139,9 +135,9 @@ struct HistoryStoreImageCompletionTests {
         #expect(store.currentEntryID == earlierID)
     }
 
-    @Test(arguments: Store.allCases)
-    func keepingTheEarlierCopyAppliesOnlyToTheEntryJustBelow(store kind: Store) throws {
-        let store = makeStore(kind)
+    @Test(arguments: StoreKind.allCases)
+    func keepingTheEarlierCopyAppliesOnlyToTheEntryJustBelow(store kind: StoreKind) throws {
+        let store = try makeStore(kind)
         let earlier = try saved(1)
         store.record(.image(earlier), sourceApp: safari, at: start)
         store.record(text: "between", sourceApp: nil, at: start + 1)
@@ -155,9 +151,9 @@ struct HistoryStoreImageCompletionTests {
         #expect(store.entries.first?.date == start + 100)
     }
 
-    @Test(arguments: Store.allCases)
-    func imageWhoseEntryIsGoneHasItsNewBlobsDeleted(store kind: Store) throws {
-        let store = makeStore(kind)
+    @Test(arguments: StoreKind.allCases)
+    func imageWhoseEntryIsGoneHasItsNewBlobsDeleted(store kind: StoreKind) throws {
+        let store = try makeStore(kind)
         let kept = try saved(1)
         store.record(.image(kept), sourceApp: nil, at: start)
         let pending = unsaved()
@@ -173,7 +169,7 @@ struct HistoryStoreImageCompletionTests {
     }
 
     @Test func unsavedImageIsKeptInMemoryOnlyUntilItIsComplete() throws {
-        let store = makeStore(.persistent)
+        let store = try makeStore(.persistent)
         let pending = unsaved()
         let id = store.record(.image(pending), sourceApp: nil, at: start)
         #expect(disk.record(id) == nil)

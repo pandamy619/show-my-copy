@@ -193,18 +193,6 @@ struct PersistentHistoryStoreTests {
         #expect(!savedTexts().contains("item 4"))
     }
 
-    @Test func expiredPasswordsAreRemovedBeforeTheLimitIsApplied() {
-        let first = makeStore(retention: RetentionPolicy(entryLimit: 20))
-        for index in 0..<10 {
-            first.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
-        }
-        first.record(text: "hunter2", sourceApp: nil, at: start + 10, concealed: true, expiresAt: start + 60)
-
-        let second = makeStore(retention: RetentionPolicy(entryLimit: 10), now: start + 100)
-        #expect(second.entries.count == 10)
-        #expect(second.entries.last?.text == "item 0")
-    }
-
     @Test func nothingIsWrittenOnLoadWhenNothingIsRemoved() {
         let first = makeStore()
         first.record(text: "a", sourceApp: nil, at: start)

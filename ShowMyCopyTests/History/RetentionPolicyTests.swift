@@ -123,30 +123,3 @@ struct RetentionPolicyTests {
         #expect(policy.withByteLimit(nil) == RetentionPolicy(entryLimit: 20))
     }
 }
-
-@MainActor
-struct HistoryByteLimitTests {
-    private let start = Date(timeIntervalSince1970: 1_790_000_000)
-
-    @Test func historyKeepsItsByteLimit() {
-        let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 20))
-        for index in 0..<5 {
-            history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
-        }
-        #expect(history.entries.map(\.text) == ["item 4", "item 3", "item 2"])
-        #expect(history.stats().totalBytes == 18)
-    }
-
-    @Test func changingTheEntryLimitKeepsTheByteLimit() {
-        let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 20))
-        history.setLimit(200)
-        #expect(history.retention == RetentionPolicy(entryLimit: 200, byteLimit: 20))
-    }
-
-    @Test func entryLargerThanTheByteLimitIsNotKept() {
-        let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 4))
-        history.record(text: "too long", sourceApp: nil, at: start)
-        #expect(history.entries.isEmpty)
-        #expect(history.currentEntryID == nil)
-    }
-}

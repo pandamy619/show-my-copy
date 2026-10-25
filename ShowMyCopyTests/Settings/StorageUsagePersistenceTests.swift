@@ -9,19 +9,6 @@ private struct NoMemoryReader: MemoryUsageReading {
     func residentBytes() -> UInt64? { nil }
 }
 
-/// Set from an observation callback, which may run on any thread.
-private final class ChangeFlag: Sendable {
-    private let isSet = Mutex(false)
-
-    var value: Bool {
-        isSet.withLock { $0 }
-    }
-
-    func set() {
-        isSet.withLock { $0 = true }
-    }
-}
-
 /// What the Storage settings show about the history saved on disk.
 @MainActor
 struct StorageUsagePersistenceTests {
