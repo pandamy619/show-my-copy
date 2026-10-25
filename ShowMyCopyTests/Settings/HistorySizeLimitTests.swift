@@ -18,7 +18,7 @@ struct HistorySizeLimitTests {
     /// Settings as the app sets them up when it starts: the saved limits are applied to the history.
     private func makeSettings(history: ClipboardHistory, defaults: UserDefaults) -> HistorySettings {
         let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
-        settings.applyStoredLimit()
+        settings.applyStoredLimits()
         return settings
     }
 
@@ -40,7 +40,7 @@ struct HistorySizeLimitTests {
         try withDefaults { defaults in
             let history = ClipboardHistory()
             let settings = makeSettings(history: history, defaults: defaults)
-            #expect(HistorySettings.storedSizeLimit(in: defaults) == .gigabyte1)
+            #expect(RetentionLimit.size.stored(in: defaults) == .gigabyte1)
             #expect(settings.sizeLimit == .gigabyte1)
             #expect(history.retention.byteLimit == 1_000_000_000)
         }
@@ -72,7 +72,7 @@ struct HistorySizeLimitTests {
     @Test func appliedSizeLimitPersistsAcrossInstances() throws {
         try withDefaults { defaults in
             let first = makeSettings(history: ClipboardHistory(), defaults: defaults)
-            first.applySizeLimit(.gigabyte1)
+            first.apply(.gigabyte1, for: .size)
             #expect(defaults.object(forKey: SettingsKey.historyByteLimit) as? Int == 1_000_000_000)
 
             let history = ClipboardHistory()
@@ -85,12 +85,12 @@ struct HistorySizeLimitTests {
     @Test func choosingNoLimitIsSavedExplicitly() throws {
         try withDefaults { defaults in
             let settings = makeSettings(history: ClipboardHistory(), defaults: defaults)
-            settings.applySizeLimit(.megabytes100)
-            settings.applySizeLimit(.noLimit)
+            settings.apply(.megabytes100, for: .size)
+            settings.apply(.noLimit, for: .size)
 
             // Saved, so a later change of the default does not override the user's choice.
             #expect(defaults.object(forKey: SettingsKey.historyByteLimit) as? Int == 0)
-            #expect(HistorySettings.storedSizeLimit(in: defaults) == .noLimit)
+            #expect(RetentionLimit.size.stored(in: defaults) == .noLimit)
             #expect(settings.history.retention.byteLimit == nil)
         }
     }
@@ -99,7 +99,7 @@ struct HistorySizeLimitTests {
         try withDefaults { defaults in
             for value: Any in ["lots", ["a": 1], -1, Int.min] {
                 defaults.set(value, forKey: SettingsKey.historyByteLimit)
-                #expect(HistorySettings.storedSizeLimit(in: defaults) == .default)
+                #expect(RetentionLimit.size.stored(in: defaults) == .default)
             }
         }
     }
@@ -117,7 +117,7 @@ struct HistorySizeLimitTests {
     func savedSizeIsMovedToAnOption(saved: Int, expected: HistorySizeLimit) throws {
         try withDefaults { defaults in
             defaults.set(saved, forKey: SettingsKey.historyByteLimit)
-            #expect(HistorySettings.storedSizeLimit(in: defaults) == expected)
+            #expect(RetentionLimit.size.stored(in: defaults) == expected)
             let history = ClipboardHistory()
             _ = makeSettings(history: history, defaults: defaults)
             #expect(history.retention.byteLimit == expected.byteLimit)
@@ -170,11 +170,11 @@ struct HistorySizeLimitTests {
             let history = ClipboardHistory()
             let settings = makeSettings(history: history, defaults: defaults)
 
-            settings.applySizeLimit(.megabytes100)
-            settings.applyLimit(300)
+            settings.apply(.megabytes100, for: .size)
+            settings.apply(300, for: .entries)
             #expect(history.retention == RetentionPolicy(entryLimit: 300, byteLimit: 100_000_000))
 
-            settings.applySizeLimit(.megabytes500)
+            settings.apply(.megabytes500, for: .size)
             #expect(history.retention == RetentionPolicy(entryLimit: 300, byteLimit: 500_000_000))
         }
     }
@@ -184,7 +184,7 @@ struct HistorySizeLimitTests {
             let history = makeHistory()
             let settings = makeSettings(history: history, defaults: defaults)
 
-            let change = settings.proposeSizeLimit(.megabytes100)
+            let change = settings.propose(.megabytes100, for: .size)
 
             #expect(change == LimitChange(limit: .megabytes100, removedCount: 0, freedBytes: 0))
             #expect(!change.needsConfirmation)
@@ -197,12 +197,12 @@ struct HistorySizeLimitTests {
     @Test func removingTheSizeLimitNeedsNoConfirmation() throws {
         try withDefaults { defaults in
             let settings = makeSettings(history: makeHistory(), defaults: defaults)
-            settings.applySizeLimit(.megabytes100)
-            #expect(!settings.proposeSizeLimit(.noLimit).needsConfirmation)
+            settings.apply(.megabytes100, for: .size)
+            #expect(!settings.propose(.noLimit, for: .size).needsConfirmation)
         }
     }
 
-    /// The options are far larger than a test history, so this checks the forecast that `proposeSizeLimit` uses
+    /// The options are far larger than a test history, so this checks the forecast that `propose` uses
     /// with a byte limit that removes entries.
     @Test func forecastCountsTheOldestEntriesAndTheirBytes() throws {
         try withDefaults { defaults in

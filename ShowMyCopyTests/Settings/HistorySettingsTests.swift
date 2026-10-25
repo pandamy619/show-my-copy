@@ -18,7 +18,7 @@ struct HistorySettingsTests {
     /// Settings as the app sets them up when it starts: the saved limit is applied to the history.
     private func makeSettings(history: ClipboardHistory, defaults: UserDefaults) -> HistorySettings {
         let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
-        settings.applyStoredLimit()
+        settings.applyStoredLimits()
         return settings
     }
 
@@ -58,7 +58,7 @@ struct HistorySettingsTests {
             let history = makeHistory(withEntries: 15)
             let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
 
-            settings.applyStoredLimit()
+            settings.applyStoredLimits()
 
             #expect(settings.limit == 10)
             #expect(history.limit == 10)
@@ -81,7 +81,7 @@ struct HistorySettingsTests {
     func savedLimitIsClamped(saved: Int, expected: Int) throws {
         try withDefaults { defaults in
             defaults.set(saved, forKey: SettingsKey.historyLimit)
-            #expect(HistorySettings.storedLimit(in: defaults) == expected)
+            #expect(RetentionLimit.entries.stored(in: defaults) == expected)
             #expect(makeSettings(history: ClipboardHistory(), defaults: defaults).limit == expected)
         }
     }
@@ -89,16 +89,16 @@ struct HistorySettingsTests {
     @Test func ignoresSavedValueOfWrongType() throws {
         try withDefaults { defaults in
             defaults.set("lots", forKey: SettingsKey.historyLimit)
-            #expect(HistorySettings.storedLimit(in: defaults) == ClipboardHistory.defaultLimit)
+            #expect(RetentionLimit.entries.stored(in: defaults) == ClipboardHistory.defaultLimit)
             defaults.set(["a": 1], forKey: SettingsKey.historyLimit)
-            #expect(HistorySettings.storedLimit(in: defaults) == ClipboardHistory.defaultLimit)
+            #expect(RetentionLimit.entries.stored(in: defaults) == ClipboardHistory.defaultLimit)
         }
     }
 
     @Test func appliedLimitPersistsAcrossInstances() throws {
         try withDefaults { defaults in
             let first = makeSettings(history: ClipboardHistory(), defaults: defaults)
-            first.applyLimit(300)
+            first.apply(300, for: .entries)
             #expect(defaults.object(forKey: SettingsKey.historyLimit) as? Int == 300)
 
             let history = ClipboardHistory()
@@ -111,16 +111,16 @@ struct HistorySettingsTests {
     @Test func applySavesClampedValue() throws {
         try withDefaults { defaults in
             let settings = makeSettings(history: ClipboardHistory(), defaults: defaults)
-            settings.applyLimit(5000)
+            settings.apply(5000, for: .entries)
             #expect(settings.limit == 1000)
-            #expect(HistorySettings.storedLimit(in: defaults) == 1000)
+            #expect(RetentionLimit.entries.stored(in: defaults) == 1000)
         }
     }
 
     @Test func raisingLimitNeedsNoConfirmation() throws {
         try withDefaults { defaults in
             let settings = makeSettings(history: makeHistory(withEntries: 30), defaults: defaults)
-            let change = settings.proposeLimit(500)
+            let change = settings.propose(500, for: .entries)
             #expect(change == LimitChange(limit: 500, removedCount: 0, freedBytes: 0))
             #expect(!change.needsConfirmation)
         }
@@ -129,8 +129,8 @@ struct HistorySettingsTests {
     @Test func loweringLimitAboveEntryCountNeedsNoConfirmation() throws {
         try withDefaults { defaults in
             let settings = makeSettings(history: makeHistory(withEntries: 15), defaults: defaults)
-            #expect(!settings.proposeLimit(20).needsConfirmation)
-            #expect(!settings.proposeLimit(15).needsConfirmation)
+            #expect(!settings.propose(20, for: .entries).needsConfirmation)
+            #expect(!settings.propose(15, for: .entries).needsConfirmation)
         }
     }
 
@@ -138,7 +138,7 @@ struct HistorySettingsTests {
         try withDefaults { defaults in
             let history = makeHistory(withEntries: 40)
             let settings = makeSettings(history: history, defaults: defaults)
-            let change = settings.proposeLimit(25)
+            let change = settings.propose(25, for: .entries)
             // Items 0 to 9 take 6 bytes each, items 10 to 14 take 7.
             #expect(change == LimitChange(limit: 25, removedCount: 15, freedBytes: 95))
             #expect(change.needsConfirmation)
@@ -152,7 +152,7 @@ struct HistorySettingsTests {
     @Test func proposalIsClamped() throws {
         try withDefaults { defaults in
             let settings = makeSettings(history: makeHistory(withEntries: 40), defaults: defaults)
-            #expect(settings.proposeLimit(1) == LimitChange(limit: 10, removedCount: 30, freedBytes: 200))
+            #expect(settings.propose(1, for: .entries) == LimitChange(limit: 10, removedCount: 30, freedBytes: 200))
         }
     }
 
@@ -160,7 +160,7 @@ struct HistorySettingsTests {
         try withDefaults { defaults in
             let history = makeHistory(withEntries: 40)
             let settings = makeSettings(history: history, defaults: defaults)
-            settings.applyLimit(25)
+            settings.apply(25, for: .entries)
             #expect(history.limit == 25)
             #expect(history.entries.count == 25)
             #expect(history.entries.first?.text == "item 39")

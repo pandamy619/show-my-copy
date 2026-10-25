@@ -27,7 +27,7 @@ struct SizeLimitDefaultTests {
 
     @Test func withNothingSavedTheLimitIsOneGigabyte() throws {
         try withDefaults { defaults in
-            #expect(HistorySettings.storedSizeLimit(in: defaults) == .gigabyte1)
+            #expect(RetentionLimit.size.stored(in: defaults) == .gigabyte1)
             #expect(HistorySettings.storedRetention(in: defaults).byteLimit == 1_000_000_000)
             // Reading the default does not save it, so a later default would apply to everyone who never chose.
             #expect(savedValue(in: defaults) == nil)
@@ -41,7 +41,7 @@ struct SizeLimitDefaultTests {
     func aSavedChoiceIsKept(saved: Int, limit: HistorySizeLimit) throws {
         try withDefaults { defaults in
             defaults.set(saved, forKey: SettingsKey.historyByteLimit)
-            #expect(HistorySettings.storedSizeLimit(in: defaults) == limit)
+            #expect(RetentionLimit.size.stored(in: defaults) == limit)
             #expect(savedValue(in: defaults) == saved)
         }
     }
@@ -49,8 +49,8 @@ struct SizeLimitDefaultTests {
     @Test func deliberateNoLimitIsKept() throws {
         try withDefaults { defaults in
             let settings = HistorySettings(history: ClipboardHistory(), defaults: defaults, now: { Date() })
-            settings.applySizeLimit(.noLimit)
-            #expect(HistorySettings.storedSizeLimit(in: defaults) == .noLimit)
+            settings.apply(.noLimit, for: .size)
+            #expect(RetentionLimit.size.stored(in: defaults) == .noLimit)
             #expect(HistorySettings.storedRetention(in: defaults).byteLimit == nil)
         }
     }
@@ -77,7 +77,7 @@ struct SizeLimitDefaultTests {
             let history = InMemoryHistoryStore(
                 restoring: [newest, oldest, pinned], at: start, retention: RetentionPolicy(), blobs: blobs)
 
-            HistorySettings(history: history, defaults: defaults, now: { Date() }).applyStoredLimit()
+            HistorySettings(history: history, defaults: defaults, now: { Date() }).applyStoredLimits()
 
             #expect(history.entries.map(\.id) == [newest.id, pinned.id])
             #expect(blobs.allIDs().isDisjoint(with: Set(oldest.imageBlobIDs)))
