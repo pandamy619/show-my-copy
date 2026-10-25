@@ -10,7 +10,9 @@ struct SystemMountedVolumes: MountedVolumesReading {
         guard count > 0 else {
             return nil
         }
-        var buffer = [statfs](repeating: statfs(), count: Int(count) + 8)
+        // `statfs` is also a function: in an expression `[statfs]` reads as an array of that function, so the
+        // element type is given in a type position.
+        var buffer: [statfs] = Array(repeating: statfs(), count: Int(count) + 8)
         let byteCount = Int32(clamping: buffer.count * MemoryLayout<statfs>.stride)
         let found = buffer.withUnsafeMutableBufferPointer { getfsstat($0.baseAddress, byteCount, MNT_NOWAIT) }
         guard found > 0 else {
