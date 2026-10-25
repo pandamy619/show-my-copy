@@ -122,30 +122,9 @@ struct HistoryStats: Equatable, Sendable {
 }
 
 extension HistoryStore {
-    /// The most entries kept.
-    var limit: Int {
-        retention.entryLimit
-    }
-
-    /// Records copied text. See `record(_:sourceApp:at:concealed:expiresAt:)`.
-    @discardableResult
-    func record(
-        text: String,
-        sourceApp: SourceApp?,
-        at date: Date,
-        concealed: Bool = false,
-        expiresAt: Date? = nil
-    ) -> ClipboardEntry.ID {
-        record(.text(text), sourceApp: sourceApp, at: date, concealed: concealed, expiresAt: expiresAt)
-    }
-
     /// Records a plain copy.
     @discardableResult
     func record(_ content: ClipboardContent, sourceApp: SourceApp?, at date: Date) -> ClipboardEntry.ID {
         record(content, sourceApp: sourceApp, at: date, concealed: false, expiresAt: nil)
-    }
-
-    func setLimit(_ newLimit: Int) {
-        setRetention(retention.withEntryLimit(newLimit))
     }
 }

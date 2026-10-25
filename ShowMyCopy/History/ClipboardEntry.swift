@@ -63,28 +63,6 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
         self.sourceAppSearchKey = SearchKey.appName(of: sourceApp)
     }
 
-    /// Makes a text entry, hashing the text with `hasher`.
-    init(
-        id: UUID = UUID(),
-        text: String,
-        date: Date,
-        sourceApp: SourceApp?,
-        isConcealed: Bool = false,
-        expiresAt: Date? = nil,
-        hasher: any ContentHasher = SHA256ContentHasher()
-    ) {
-        let content = ClipboardContent.text(text)
-        self.init(
-            id: id,
-            content: content,
-            contentHash: hasher.hash(content),
-            date: date,
-            sourceApp: sourceApp,
-            isConcealed: isConcealed,
-            expiresAt: expiresAt
-        )
-    }
-
     /// The same entry holding `content`, which must have the same hash, such as files that got thumbnails. The
     /// size and preview are made again from it; everything else stays.
     func replacingContent(_ content: ClipboardContent) -> ClipboardEntry {

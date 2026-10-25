@@ -2,17 +2,10 @@ import Foundation
 import Observation
 import os
 
-/// The name the history had before `HistoryStore`. Kept so existing call sites and tests read as before.
-typealias ClipboardHistory = InMemoryHistoryStore
-
 /// Keeps the history in memory only: it is gone when the app quits.
 @MainActor
 @Observable
 final class InMemoryHistoryStore: HistoryStore {
-    /// Kept for older call sites. `RetentionPolicy` owns the limits.
-    nonisolated static let defaultLimit = RetentionPolicy.defaultEntryLimit
-    nonisolated static let limitRange = RetentionPolicy.entryLimitRange
-
     private(set) var entries: [ClipboardEntry] = []
     private(set) var retention: RetentionPolicy
     private(set) var currentEntryID: ClipboardEntry.ID?
@@ -55,10 +48,6 @@ final class InMemoryHistoryStore: HistoryStore {
         self.now = now
         removeExpired(at: date)
         trim(at: date)
-    }
-
-    convenience init(limit: Int) {
-        self.init(retention: RetentionPolicy(entryLimit: limit))
     }
 
     @discardableResult
