@@ -22,3 +22,7 @@ ENABLE_APP_SANDBOX = YES
 ENABLE_HARDENED_RUNTIME = YES
 ENABLE_INCOMING_NETWORK_CONNECTIONS = NO
 ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO
+
+// Xcode signs a build it cannot sign with a team "to run locally" and then adds com.apple.security.get-task-allow,
+// which lets a debugger attach. A Release build must never carry it (`make security` rejects it).
+CODE_SIGN_INJECT_BASE_ENTITLEMENTS[config=Release] = NO
