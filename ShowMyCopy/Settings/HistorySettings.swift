@@ -52,12 +52,15 @@ enum HistorySizeLimit: Int, CaseIterable, Identifiable, Sendable {
 final class HistorySettings {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored let history: any HistoryStore
+    /// The time a forecast measures the age limit against: the history's clock.
+    @ObservationIgnored private let now: @MainActor () -> Date
 
     /// Leaves `history` as it is. Call `applyStoredLimit()` when the app starts, before the first entry is
     /// recorded. Creating the settings does not change the history, so the app decides when that happens.
-    init(history: any HistoryStore, defaults: UserDefaults = .standard) {
+    init(history: any HistoryStore, defaults: UserDefaults, now: @escaping @MainActor () -> Date) {
         self.history = history
         self.defaults = defaults
+        self.now = now
     }
 
     /// The limit in effect. The history is the single source of truth.
@@ -121,7 +124,7 @@ final class HistorySettings {
     /// What applying `policy` to the history would remove, reported as a change to `limit`.
     func forecast<Limit>(_ limit: Limit, under policy: RetentionPolicy) -> LimitChange<Limit> {
         let entries = history.entries
-        let kept = policy.kept(entries)
+        let kept = policy.kept(entries, at: now())
         let totalBytes = entries.reduce(0) { $0 + $1.byteSize }
         let keptBytes = kept.reduce(0) { $0 + $1.byteSize }
         return LimitChange(limit: limit, removedCount: entries.count - kept.count, freedBytes: totalBytes - keptBytes)

@@ -5,7 +5,8 @@ import Observation
 /// on disk can replace `InMemoryHistoryStore` without changes to the monitor, the windows or the settings.
 ///
 /// Conforming types are `@Observable` classes: SwiftUI views and models read `entries`, `currentEntryID` and
-/// `retention` and update when they change. `entries` is newest first. Every change keeps the `retention` limits.
+/// `retention` and update when they change. `entries` is newest first. Every change keeps the `retention` limits;
+/// the age limit is measured against the store's clock, and against the given time in `removeExpired(at:)`.
 @MainActor
 protocol HistoryStore: AnyObject, Observable, Sendable {
     /// Every entry, newest first.
@@ -86,7 +87,9 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// Moves every concealed entry's expiry to `date` at the latest, after the user picked a shorter lifetime.
     func limitExpiry(to date: Date)
 
-    /// Removes concealed entries whose time is up.
+    /// Removes concealed entries whose time is up at `date` and, with an age limit (`RetentionPolicy.maxAge`), the
+    /// entries past it, with their blobs. Pinned entries stay. The monitor calls it on every poll
+    /// (`HistoryExpiry`), so expired entries go while nothing is copied.
     func removeExpired(at date: Date)
 
     /// Removes every concealed entry, after the user turned off saving passwords.
@@ -144,10 +147,5 @@ extension HistoryStore {
 
     func setLimit(_ newLimit: Int) {
         setRetention(retention.withEntryLimit(newLimit))
-    }
-
-    /// How many entries a new limit would remove, for the confirmation shown before applying it.
-    func entriesRemoved(byLimit newLimit: Int) -> Int {
-        retention.withEntryLimit(newLimit).removedCount(from: entries)
     }
 }

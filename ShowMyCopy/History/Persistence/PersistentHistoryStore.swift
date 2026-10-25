@@ -60,9 +60,10 @@ final class PersistentHistoryStore: HistoryStore, HistoryStorage {
 
     /// Starts from the saved history as `loaded` found it (see `LoadedHistory` and `load`): the entries `retention`
     /// does not allow are removed, also from disk, and the records loading found unreadable or unwanted are deleted,
-    /// so load with the limits and the password choice the user saved, not the defaults. `openError` is what went
-    /// wrong opening the store on disk, if anything, to show in `storageError`. `leftovers` are the files of a saved
-    /// history this session does not use, such as a damaged copy.
+    /// so load with the limits and the password choice the user saved, not the defaults. `now` is the store's clock,
+    /// which the age limit is measured against. `openError` is what went wrong opening the store on disk, if
+    /// anything, to show in `storageError`. `leftovers` are the files of a saved history this session does not use,
+    /// such as a damaged copy.
     ///
     /// Image data lives in `blobs`. An entry whose data is gone is deleted, and blobs that no saved record
     /// references (written for an entry that was never saved, or left by a failed delete) are deleted too. Without
@@ -73,14 +74,14 @@ final class PersistentHistoryStore: HistoryStore, HistoryStorage {
         sealer: (any SecretSealing)?,
         retention: RetentionPolicy = .default,
         hasher: any ContentHasher = SHA256ContentHasher(),
-        now: Date = Date(),
+        now: @escaping @MainActor () -> Date,
         openError: HistoryPersistenceError? = nil,
         blobs: (any BlobStore)? = nil,
         leftovers: (any HistoryLeftovers)? = nil
     ) {
         let found = loaded.found
         let memory = InMemoryHistoryStore(
-            restoring: found.entries, at: now, retention: retention, hasher: hasher, blobs: blobs)
+            restoring: found.entries, at: now(), retention: retention, hasher: hasher, blobs: blobs, now: now)
 
         self.memory = memory
         self.persistence = persistence

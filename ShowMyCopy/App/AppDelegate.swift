@@ -113,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sealer: sealer,
             savesPasswords: PasswordSettings.storedSavesPasswords(in: .standard),
             retention: HistorySettings.storedRetention(in: .standard),
+            now: { Date() },
             openError: opened.error,
             blobs: blobs,
             leftovers: opened.leftovers

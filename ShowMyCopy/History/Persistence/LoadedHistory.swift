@@ -187,21 +187,21 @@ enum SavedRecords {
 extension PersistentHistoryStore {
     /// Loads the saved history as the app does at launch: the records are fetched here, on the main actor, and
     /// decoded and checked in the background (`LoadedHistory`), so a long history does not hold up the main actor.
-    /// The parameters are those of `init` and `LoadedHistory`.
+    /// The parameters are those of `init` and `LoadedHistory`; `now` is the store's clock.
     static func load(
         persistence: any HistoryPersistence,
         sealer: (any SecretSealing)?,
         savesPasswords: Bool,
-        retention: RetentionPolicy = .default,
+        retention: RetentionPolicy,
         hasher: any ContentHasher = SHA256ContentHasher(),
-        now: Date = Date(),
+        now: @escaping @MainActor () -> Date,
         openError: HistoryPersistenceError? = nil,
         blobs: (any BlobStore)? = nil,
         leftovers: (any HistoryLeftovers)? = nil
     ) async -> PersistentHistoryStore {
         let read = LoadedHistory.read(from: persistence, openError: openError, leftovers: leftovers)
         let loaded = await LoadedHistory.sortedInBackground(
-            read, coder: StoredEntryCoder(sealer: sealer, hasher: hasher), savesPasswords: savesPasswords, at: now,
+            read, coder: StoredEntryCoder(sealer: sealer, hasher: hasher), savesPasswords: savesPasswords, at: now(),
             blobs: blobs)
         return PersistentHistoryStore(
             persistence: persistence, loaded: loaded, sealer: sealer, retention: retention, hasher: hasher, now: now,

@@ -67,7 +67,7 @@ final class AppContainer {
         makeSettingsWindow: SettingsWindowFactory
     ) {
         let store = history.store
-        let historySettings = HistorySettings(history: store, defaults: defaults)
+        let historySettings = HistorySettings(history: store, defaults: defaults, now: now)
         let passwordSettings = PasswordSettings(history: history, defaults: defaults, now: now)
         let settingsWindow = makeSettingsWindow(history, historySettings, passwordSettings)
 
@@ -78,7 +78,7 @@ final class AppContainer {
             pasteboard: pasteboard,
             history: store,
             schedule: PollingSchedule(sleep: sleep, activity: pollingActivity),
-            expiry: PasswordExpiry(history: store, now: now),
+            expiry: HistoryExpiry(history: store, now: now),
             clearedClipboard: ClearedClipboardCheck(history: store),
             capture: capture,
             frontmostApp: frontmostApp,

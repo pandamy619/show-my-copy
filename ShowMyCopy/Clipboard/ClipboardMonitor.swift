@@ -8,15 +8,15 @@ import AppKit
 ///   allow, and records text and rich text itself.
 /// - `capture` records images and files at once and fills in their data, sizes and thumbnails in the background. The
 ///   monitor goes on reading meanwhile, so no copy is missed while an image is saved.
-/// - `expiry` removes expired passwords on every look, and `clearedClipboard` may take the entry copied just before
-///   an emptied clipboard for a password.
+/// - `expiry` removes expired passwords and entries past the age limit on every look, and `clearedClipboard` may
+///   take the entry copied just before an emptied clipboard for a password.
 @MainActor
 final class ClipboardMonitor: PasteboardChangeTracking {
     private let pasteboard: any PasteboardReading
     private let reader: PasteboardSnapshotReader
     private let history: any HistoryStore
     private let schedule: PollingSchedule
-    private let expiry: PasswordExpiry
+    private let expiry: HistoryExpiry
     private let clearedClipboard: ClearedClipboardCheck
     /// Records images and files and fills them in. Without it images are not read and files keep their icons.
     private let capture: CaptureEnrichment?
@@ -32,7 +32,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         pasteboard: any PasteboardReading,
         history: any HistoryStore,
         schedule: PollingSchedule,
-        expiry: PasswordExpiry,
+        expiry: HistoryExpiry,
         clearedClipboard: ClearedClipboardCheck,
         capture: CaptureEnrichment?,
         frontmostApp: @escaping @MainActor () -> SourceApp?,

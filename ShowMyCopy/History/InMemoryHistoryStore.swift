@@ -21,34 +21,40 @@ final class InMemoryHistoryStore: HistoryStore {
     /// Where image data is kept. Every entry removed from the history takes its blobs with it. Nil when the
     /// history holds no content with blobs.
     private let blobs: (any BlobStore)?
+    /// The time the age limit is measured against when the history changes. `removeExpired(at:)` is given its time.
+    private let now: @MainActor () -> Date
 
     init(
         retention: RetentionPolicy = .default,
         hasher: any ContentHasher = SHA256ContentHasher(),
-        blobs: (any BlobStore)? = nil
+        blobs: (any BlobStore)? = nil,
+        now: @escaping @MainActor () -> Date = { Date() }
     ) {
         self.retention = retention
         self.hasher = hasher
         self.blobs = blobs
+        self.now = now
     }
 
     /// Starts with `entries`, newest first, such as a history saved before the app quit. Removes the concealed
-    /// entries whose time is up at `date` first, then the entries `retention` does not allow, so an expired
-    /// password does not push out an entry that fits once it is gone. No entry is current: nothing says yet what is
-    /// on the pasteboard.
+    /// entries whose time is up at `date` and the entries past the age limit first, then the entries the other
+    /// limits do not allow, so an expired entry does not push out one that fits once it is gone. No entry is
+    /// current: nothing says yet what is on the pasteboard.
     init(
         restoring entries: [ClipboardEntry],
         at date: Date,
         retention: RetentionPolicy = .default,
         hasher: any ContentHasher = SHA256ContentHasher(),
-        blobs: (any BlobStore)? = nil
+        blobs: (any BlobStore)? = nil,
+        now: @escaping @MainActor () -> Date = { Date() }
     ) {
         self.entries = entries
         self.retention = retention
         self.hasher = hasher
         self.blobs = blobs
+        self.now = now
         removeExpired(at: date)
-        trim()
+        trim(at: date)
     }
 
     convenience init(limit: Int) {
@@ -172,12 +178,16 @@ final class InMemoryHistoryStore: HistoryStore {
         entriesChanged()
     }
 
+    /// Runs on every poll, so it changes nothing, and walks the entries without copying them, while nothing expired.
     func removeExpired(at date: Date) {
         removeEntries { entry in
             guard entry.isConcealed, let expiresAt = entry.expiresAt else {
                 return false
             }
             return expiresAt <= date
+        }
+        if entries.contains(where: { retention.isPastMaxAge($0, at: date) }) {
+            trim(at: date)
         }
     }
 
@@ -238,8 +248,9 @@ final class InMemoryHistoryStore: HistoryStore {
         deleteBlobs(of: removed)
     }
 
-    private func trim() {
-        let kept = retention.kept(entries)
+    /// Removes the entries `retention` does not allow at `date`, by default now.
+    private func trim(at date: Date? = nil) {
+        let kept = retention.kept(entries, at: date ?? now())
         // Avoid a change notification to observers when nothing is removed, which is the case on almost every copy.
         if kept.count != entries.count {
             let keptIDs = Set(kept.map(\.id))
