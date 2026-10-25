@@ -24,7 +24,7 @@ struct AppContainerImageTests {
         sleep: @escaping @Sendable (Duration) async throws -> Void = MonitorFactory.sleepUntilCancelled
     ) -> AppContainer {
         AppContainer(
-            store: store,
+            history: .unsaved(store),
             pasteboard: pasteboard,
             defaults: defaults,
             frontmostApp: { nil },

@@ -57,7 +57,7 @@ protocol HistoryPersistence: AnyObject, Sendable {
     func apply(_ change: StoredChange) throws(HistoryPersistenceError)
 
     /// How many bytes the saved history takes on disk, or nil when it is not saved in files or their size is not
-    /// known. Reads the file system, so it is called off the main actor (`ReportsDiskUsage`).
+    /// known. Reads the file system, so it is called off the main actor (`HistoryStorage`).
     nonisolated func storedBytes() -> Int64?
 }
 
@@ -65,24 +65,6 @@ extension HistoryPersistence {
     nonisolated func storedBytes() -> Int64? {
         nil
     }
-}
-
-/// A history store that can say how much space the saved history takes on disk.
-@MainActor
-protocol ReportsDiskUsage: AnyObject {
-    /// Bytes on disk, or nil when nothing is saved in files, measured off the main actor. Saved images are counted
-    /// from a running total; `recountingBlobs` counts them again from the disk. Call it only when the number is shown.
-    func storedBytes(recountingBlobs: Bool) async -> Int64?
-}
-
-/// A history store that may keep a copy of a history that could not be opened (see `HistoryLeftovers`).
-@MainActor
-protocol KeepsDamagedHistory: AnyObject {
-    /// The copy's size, or nil when there is none. Views that read it are updated when it changes.
-    var damagedHistoryBytes: Int64? { get }
-
-    /// Deletes the copy.
-    func deleteDamagedHistory()
 }
 
 /// Keeps records in memory only. Used when the store on disk cannot be opened: the app keeps working with the same

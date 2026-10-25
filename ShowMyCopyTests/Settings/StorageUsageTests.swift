@@ -29,7 +29,7 @@ struct StorageUsageTests {
         history: ClipboardHistory,
         memory: FakeMemoryReader = FakeMemoryReader(nil)
     ) -> StorageUsage {
-        StorageUsage(history: history, memoryReader: memory)
+        StorageUsage(history: .unsaved(history), memoryReader: memory)
     }
 
     @Test func emptyHistoryHasNoParts() {

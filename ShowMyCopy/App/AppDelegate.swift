@@ -29,9 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func finishLaunching(store: any HistoryStore, blobs: InFlightBlobStore?, firstLaunch: FirstLaunch) {
+    private func finishLaunching(store: PersistentHistoryStore, blobs: InFlightBlobStore?, firstLaunch: FirstLaunch) {
         let container = AppContainer(
-            store: store,
+            history: AppHistory(store),
             blobs: blobs,
             thumbnails: ImageIOThumbnailMaker(),
             fileThumbnails: QuickLookFileThumbnailMaker(),
@@ -94,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// memory only, saved ones stay on disk for the next try, and everything else is still saved. When the store on
     /// disk cannot be opened, the history is kept in memory only and `storageError` tells why. Image data is in
     /// `blobs`; the store deletes it with its entries and sweeps what no entry uses at launch.
-    private static func loadHistoryStore(blobs: (any BlobStore)?) async -> any HistoryStore {
+    private static func loadHistoryStore(blobs: (any BlobStore)?) async -> PersistentHistoryStore {
         let sealer = LazySecretSealer { () throws(SecretSealingError) -> any SecretSealing in
             do throws(SecretSealingError) {
                 return try KeychainSecretSealer()
@@ -122,7 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The settings window shows the shortcut recorder, a SwiftUI view from KeyboardShortcuts, and the app's
     /// memory, read with Mach calls. Both are made here, so `AppContainer` depends on neither.
     private static func makeSettingsWindow(
-        history: any HistoryStore,
+        history: AppHistory,
         settings: HistorySettings,
         passwords: PasswordSettings
     ) -> any SettingsWindowShowing {

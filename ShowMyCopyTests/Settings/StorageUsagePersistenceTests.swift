@@ -15,14 +15,14 @@ struct StorageUsagePersistenceTests {
     private let disk = FakeHistoryPersistence()
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
-    private func makeUsage(_ history: any HistoryStore) -> StorageUsage {
-        StorageUsage(history: history, memoryReader: NoMemoryReader())
+    private func makeUsage(_ store: PersistentHistoryStore) -> StorageUsage {
+        StorageUsage(history: AppHistory(store), memoryReader: NoMemoryReader())
     }
 
     // MARK: - Warnings
 
     @Test func historyInMemoryHasNoWarningAndNoDiskSize() {
-        let usage = makeUsage(ClipboardHistory())
+        let usage = StorageUsage(history: .unsaved(), memoryReader: NoMemoryReader())
         #expect(usage.storageWarning == nil)
         #expect(usage.diskBytes == nil)
     }

@@ -19,12 +19,13 @@ final class AppContainer {
     /// the shortcut recorder, so `AppDelegate` passes this in.
     typealias SettingsWindowFactory =
         @MainActor (
-            _ history: any HistoryStore,
+            _ history: AppHistory,
             _ settings: HistorySettings,
             _ passwords: PasswordSettings
         ) -> any SettingsWindowShowing
 
     let store: any HistoryStore
+    let storage: any HistoryStorage
     let historySettings: HistorySettings
     let passwordSettings: PasswordSettings
     let pasteboard: any PasteboardReading & PasteboardWriting
@@ -45,7 +46,7 @@ final class AppContainer {
 
     /// The defaults are the real system services. Tests pass fakes.
     init(
-        store: any HistoryStore = InMemoryHistoryStore(),
+        history: AppHistory,
         pasteboard: any PasteboardReading & PasteboardWriting = SystemPasteboard(),
         defaults: UserDefaults = .standard,
         now: @escaping @MainActor () -> Date = { Date() },
@@ -65,9 +66,10 @@ final class AppContainer {
         previewRichText: (any RichTextRendering)? = nil,
         makeSettingsWindow: SettingsWindowFactory
     ) {
+        let store = history.store
         let historySettings = HistorySettings(history: store, defaults: defaults)
-        let passwordSettings = PasswordSettings(history: store, defaults: defaults, now: now)
-        let settingsWindow = makeSettingsWindow(store, historySettings, passwordSettings)
+        let passwordSettings = PasswordSettings(history: history, defaults: defaults, now: now)
+        let settingsWindow = makeSettingsWindow(history, historySettings, passwordSettings)
 
         let capture = Self.makeCapture(
             store: store, blobs: blobs, thumbnails: thumbnails, fileThumbnails: fileThumbnails)
@@ -103,9 +105,10 @@ final class AppContainer {
             isScreenLocked: isScreenLocked,
             isSessionActive: isSessionActive
         )
-        Self.connect(activityObserver, to: historyWindow, store: store)
+        Self.connect(activityObserver, to: historyWindow, storage: history.storage)
 
         self.store = store
+        self.storage = history.storage
         self.historySettings = historySettings
         self.passwordSettings = passwordSettings
         self.pasteboard = pasteboard
@@ -121,7 +124,7 @@ final class AppContainer {
     private static func connect(
         _ activityObserver: SystemActivityObserver,
         to historyWindow: HistoryWindowController,
-        store: any HistoryStore
+        storage: any HistoryStorage
     ) {
         // Close the history when the Mac sleeps, locks or switches users, so it is not on screen for whoever
         // wakes or unlocks it next.
@@ -129,8 +132,8 @@ final class AppContainer {
             historyWindow?.hide()
         }
         // Saved passwords wait while the Keychain is locked: try the key again when the user is back.
-        activityObserver.onUserBack = { [weak store] in
-            loadPasswordKey(of: store)
+        activityObserver.onUserBack = { [weak storage] in
+            loadPasswordKey(of: storage)
         }
     }
 
@@ -163,16 +166,16 @@ final class AppContainer {
         monitor.start()
         // Saved passwords are opened once their key is loaded, off the main actor: reading the Keychain can wait
         // for the user to answer a prompt, and the launch does not wait for it.
-        Self.loadPasswordKey(of: store)
+        Self.loadPasswordKey(of: storage)
     }
 
-    /// Loads the key of saved passwords in the background, when the store keeps passwords that wait for it.
-    private static func loadPasswordKey(of store: (any HistoryStore)?) {
-        guard let store = store as? any LoadsPasswordKey else {
+    /// Loads the key of saved passwords in the background, when passwords wait for it.
+    private static func loadPasswordKey(of storage: (any HistoryStorage)?) {
+        guard let storage else {
             return
         }
         Task {
-            await store.loadPasswordKey()
+            await storage.loadPasswordKey()
         }
     }
 

@@ -219,7 +219,7 @@ protocol HistoryLeftovers: AnyObject, Sendable {
     /// The size of the damaged copy with its SQLite side files, or nil when there is none.
     func damagedCopyBytes() -> Int64?
 
-    /// The size of every file, or nil when there is none. Called off the main actor (`ReportsDiskUsage`).
+    /// The size of every file, or nil when there is none. Called off the main actor (`HistoryStorage`).
     nonisolated func totalBytes() -> Int64?
 
     /// Deletes the damaged copy. Returns whether none is left.

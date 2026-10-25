@@ -89,7 +89,7 @@ struct HistoryLeftoversTests {
         try TemporaryFolder.withDefaults { defaults in
             let leftovers = FakeHistoryLeftovers()
             let store = makeStore(leftovers: leftovers)
-            let settings = PasswordSettings(history: store, defaults: defaults)
+            let settings = PasswordSettings(history: AppHistory(store), defaults: defaults, now: { Date() })
             settings.savesPasswords = true
             #expect(leftovers.hasDamagedCopy)
 
@@ -103,7 +103,7 @@ struct HistoryLeftoversTests {
         try TemporaryFolder.withDefaults { defaults in
             let leftovers = FakeHistoryLeftovers()
             let store = makeStore(leftovers: leftovers)
-            _ = PasswordSettings(history: store, defaults: defaults)
+            _ = PasswordSettings(history: AppHistory(store), defaults: defaults, now: { Date() })
             store.removeConcealed()
             #expect(leftovers.hasDamagedCopy)
         }
@@ -126,14 +126,14 @@ struct HistoryLeftoversTests {
     @Test func storageSettingsShowTheDamagedCopy() {
         let leftovers = FakeHistoryLeftovers()
         let store = makeStore(leftovers: leftovers)
-        let usage = StorageUsage(history: store, memoryReader: NoMemory())
+        let usage = StorageUsage(history: AppHistory(store), memoryReader: NoMemory())
         #expect(usage.damagedHistoryBytes == 3000)
         #expect(usage.hasSomethingToClear)
 
         store.deleteDamagedHistory()
         #expect(usage.damagedHistoryBytes == nil)
         #expect(!usage.hasSomethingToClear)
-        #expect(StorageUsage(history: ClipboardHistory(), memoryReader: NoMemory()).damagedHistoryBytes == nil)
+        #expect(StorageUsage(history: .unsaved(), memoryReader: NoMemory()).damagedHistoryBytes == nil)
     }
 }
 

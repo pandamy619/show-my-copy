@@ -1,13 +1,5 @@
 import Foundation
 
-/// A history store that keeps saved passwords until the key to open them is loaded.
-@MainActor
-protocol LoadsPasswordKey: AnyObject {
-    /// Loads the key off the main actor when a password waits for it, then opens the saved passwords and saves
-    /// those copied meanwhile. Does nothing, and never asks the Keychain, when no password waits.
-    func loadPasswordKey() async
-}
-
 /// Saved passwords that wait on disk, unopened, until the key can be used: it is not loaded yet, the Mac is locked
 /// or access was denied. Each record says in plain when it expires, so they expire and are deleted without the key.
 struct WaitingPasswords: Sendable {

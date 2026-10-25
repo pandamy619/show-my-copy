@@ -8,7 +8,7 @@ import Testing
 @MainActor
 final class SettingsWindowSpy: SettingsWindowShowing {
     private(set) var showCount = 0
-    var history: (any HistoryStore)?
+    var history: AppHistory?
     var settings: HistorySettings?
     var passwords: PasswordSettings?
 
@@ -49,7 +49,7 @@ struct AppContainerTests {
             defaults.set(savesPasswords, forKey: SettingsKey.savePasswords)
         }
         let container = AppContainer(
-            store: store,
+            history: .unsaved(store),
             pasteboard: pasteboard,
             defaults: defaults,
             now: { [start] in start },
@@ -201,7 +201,7 @@ struct AppContainerTests {
 
     @Test func settingsWindowIsBuiltFromTheContainersObjects() throws {
         try withContainer { container in
-            #expect(settingsWindow.history === store)
+            #expect(settingsWindow.history?.store === store)
             #expect(settingsWindow.settings === container.historySettings)
             #expect(settingsWindow.passwords === container.passwordSettings)
 

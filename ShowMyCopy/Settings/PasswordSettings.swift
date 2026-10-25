@@ -30,6 +30,7 @@ struct PasswordPolicy: Equatable, Sendable {
 final class PasswordSettings {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let history: any HistoryStore
+    @ObservationIgnored private let storage: any HistoryStorage
     @ObservationIgnored private let now: @MainActor () -> Date
 
     /// Off by default. Turning it off removes every saved password from the history at once, and a damaged copy of
@@ -42,7 +43,7 @@ final class PasswordSettings {
             defaults.set(savesPasswords, forKey: SettingsKey.savePasswords)
             if !savesPasswords {
                 history.removeConcealed()
-                (history as? any KeepsDamagedHistory)?.deleteDamagedHistory()
+                storage.deleteDamagedHistory()
             }
         }
     }
@@ -59,11 +60,12 @@ final class PasswordSettings {
     }
 
     init(
-        history: any HistoryStore,
-        defaults: UserDefaults = .standard,
-        now: @escaping @MainActor () -> Date = { Date() }
+        history: AppHistory,
+        defaults: UserDefaults,
+        now: @escaping @MainActor () -> Date
     ) {
-        self.history = history
+        self.history = history.store
+        self.storage = history.storage
         self.defaults = defaults
         self.now = now
         savesPasswords = Self.storedSavesPasswords(in: defaults)

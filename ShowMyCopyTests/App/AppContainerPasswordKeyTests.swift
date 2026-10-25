@@ -21,7 +21,7 @@ struct AppContainerPasswordKeyTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(true, forKey: SettingsKey.savePasswords)
         let container = AppContainer(
-            store: store,
+            history: AppHistory(store),
             pasteboard: FakePasteboard(),
             defaults: defaults,
             now: { [start] in start },

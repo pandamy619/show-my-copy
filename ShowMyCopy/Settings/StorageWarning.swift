@@ -1,11 +1,3 @@
-/// A history store that can say why the history is not, or not fully, saved. Only the store that saves to disk
-/// conforms; a history kept in memory has nothing to report.
-@MainActor
-protocol ReportsStorageErrors: AnyObject {
-    /// Nil while saving works. Views that read it are updated when it changes.
-    var storageError: HistoryPersistenceError? { get }
-}
-
 /// What Settings → Storage tells the user about a storage problem: a plain message without technical details. The
 /// app keeps working in every case.
 enum StorageWarning: Equatable, Sendable {

@@ -25,7 +25,7 @@ import os
 /// without a blob store, or the whole saved history when it could not be read. Only Clear History deletes those.
 @MainActor
 @Observable
-final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsDiskUsage, KeepsDamagedHistory {
+final class PersistentHistoryStore: HistoryStore, HistoryStorage {
     /// Why the history is not, or not fully, saved. Nil while saving works. A failed write is cleared by the next
     /// successful one; a failure to open or read the saved history stays for the session.
     private(set) var storageError: HistoryPersistenceError?
@@ -329,7 +329,7 @@ final class PersistentHistoryStore: HistoryStore, ReportsStorageErrors, ReportsD
 
 // MARK: - Passwords waiting for the key
 
-extension PersistentHistoryStore: LoadsPasswordKey {
+extension PersistentHistoryStore {
     /// Loads the key when a saved password waits to be opened, or a password copied in this session waits to be
     /// saved. Called at launch, when the user is back at the unlocked Mac, and after a password could not be sealed.
     /// The sealer decides whether a key that failed before is asked for again (`LazySecretSealer`).

@@ -76,11 +76,9 @@ struct StorageBreakdown: Equatable, Sendable {
 @Observable
 final class StorageUsage {
     @ObservationIgnored let history: any HistoryStore
+    /// Where the history is saved: problems saving it, its size on disk and a damaged copy.
+    @ObservationIgnored private let storage: any HistoryStorage
     @ObservationIgnored private let memoryReader: any MemoryUsageReading
-    /// The history as a store that reports storage problems and its size on disk; nil for a history in memory.
-    @ObservationIgnored private let errorReporter: (any ReportsStorageErrors)?
-    @ObservationIgnored private let diskUsage: (any ReportsDiskUsage)?
-    @ObservationIgnored private let damagedHistory: (any KeepsDamagedHistory)?
     @ObservationIgnored private var cachedBreakdown: (revision: Int, breakdown: StorageBreakdown)?
     /// Whether the size on disk is being measured. One measurement runs at a time.
     @ObservationIgnored private var isMeasuringDisk = false
@@ -96,18 +94,16 @@ final class StorageUsage {
     /// Changes when the history is cleared or the clear is forgotten, so views update `recentClear`.
     private var clearToken = 0
 
-    init(history: any HistoryStore, memoryReader: any MemoryUsageReading) {
-        self.history = history
+    init(history: AppHistory, memoryReader: any MemoryUsageReading) {
+        self.history = history.store
+        self.storage = history.storage
         self.memoryReader = memoryReader
-        errorReporter = history as? any ReportsStorageErrors
-        diskUsage = history as? any ReportsDiskUsage
-        damagedHistory = history as? any KeepsDamagedHistory
     }
 
     /// The size of a copy of a history that could not be opened, or nil when there is none. Reading it observes
     /// the store.
     var damagedHistoryBytes: Int64? {
-        damagedHistory?.damagedHistoryBytes
+        storage.damagedHistoryBytes
     }
 
     /// Whether Clear History would remove anything: entries, or a damaged copy of a history.
@@ -117,7 +113,7 @@ final class StorageUsage {
 
     /// Why the history is not, or not fully, saved, or nil while saving works. Reading it observes the store.
     var storageWarning: StorageWarning? {
-        errorReporter?.storageError.map(StorageWarning.init)
+        storage.storageError.map(StorageWarning.init)
     }
 
     /// How many bytes the saved history takes on disk, as last measured by `refreshDiskBytes`, or nil before that
@@ -132,9 +128,6 @@ final class StorageUsage {
     ///
     /// One measurement runs at a time: one asked for meanwhile runs right after it, and returns at once.
     func refreshDiskBytes(recountingImages: Bool = false) async {
-        guard let diskUsage else {
-            return
-        }
         guard !isMeasuringDisk else {
             pendingMeasurement = pendingMeasurement == true || recountingImages
             return
@@ -142,7 +135,7 @@ final class StorageUsage {
         isMeasuringDisk = true
         var recounts = recountingImages
         while true {
-            let bytes = await diskUsage.storedBytes(recountingBlobs: recounts)
+            let bytes = await storage.storedBytes(recountingBlobs: recounts)
             if bytes != diskBytes {
                 diskBytes = bytes
             }

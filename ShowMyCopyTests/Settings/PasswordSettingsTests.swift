@@ -16,7 +16,8 @@ struct PasswordSettingsTests {
     }
 
     private func makeSettings(history: ClipboardHistory? = nil, defaults: UserDefaults) -> PasswordSettings {
-        PasswordSettings(history: history ?? ClipboardHistory(), defaults: defaults, now: { [start] in start })
+        PasswordSettings(
+            history: .unsaved(history ?? ClipboardHistory()), defaults: defaults, now: { [start] in start })
     }
 
     @Test func passwordsAreNotSavedByDefault() throws {
@@ -26,6 +27,20 @@ struct PasswordSettingsTests {
             #expect(settings.lifetime == .tenMinutes)
             #expect(settings.policy == PasswordPolicy(savesPasswords: false, lifetime: 600))
             #expect(PasswordPolicy.default == settings.policy)
+        }
+    }
+
+    /// A damaged copy of the history may hold passwords; the storage the app was given deletes it.
+    @Test func turningSavingOffDeletesTheDamagedCopyThroughTheStorage() throws {
+        try withDefaults { defaults in
+            let storage = UnsavedHistoryStorage()
+            let settings = PasswordSettings(
+                history: AppHistory(store: InMemoryHistoryStore(), storage: storage), defaults: defaults,
+                now: { [start] in start })
+            settings.savesPasswords = true
+            #expect(storage.damagedHistoryDeletions == 0)
+            settings.savesPasswords = false
+            #expect(storage.damagedHistoryDeletions == 1)
         }
     }
 
@@ -93,7 +108,7 @@ struct PasswordSettingsTests {
 
             settings.savesPasswords = false
             #expect(history.entries.map(\.text) == ["plain"])
-            #expect(!PasswordSettings(history: history, defaults: defaults).savesPasswords)
+            #expect(!makeSettings(history: history, defaults: defaults).savesPasswords)
         }
     }
 

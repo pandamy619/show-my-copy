@@ -13,13 +13,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
 
     init<ShortcutRecorder: View>(
-        history: any HistoryStore,
+        history: AppHistory,
         settings: HistorySettings,
         passwords: PasswordSettings,
         memoryReader: any MemoryUsageReading,
         @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
     ) {
-        self.history = history
+        self.history = history.store
         self.settings = settings
         self.passwords = passwords
         self.usage = StorageUsage(history: history, memoryReader: memoryReader)
