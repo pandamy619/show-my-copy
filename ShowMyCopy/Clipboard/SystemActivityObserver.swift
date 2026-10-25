@@ -24,12 +24,10 @@ final class SystemActivityObserver {
 
     init(
         monitor: ClipboardMonitor,
-        workspace: any NotificationObserving = NotificationCenterObserver(
-            center: NSWorkspace.shared.notificationCenter
-        ),
-        distributed: any NotificationObserving = DistributedNotificationObserver(),
-        isScreenLocked: @escaping @MainActor () -> Bool = { ConsoleSession.isScreenLocked() },
-        isSessionActive: @escaping @MainActor () -> Bool = { ConsoleSession.isActive() }
+        workspace: any NotificationObserving,
+        distributed: any NotificationObserving,
+        isScreenLocked: @escaping @MainActor () -> Bool,
+        isSessionActive: @escaping @MainActor () -> Bool
     ) {
         self.monitor = monitor
         self.workspace = workspace

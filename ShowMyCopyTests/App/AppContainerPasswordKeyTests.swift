@@ -20,20 +20,8 @@ struct AppContainerPasswordKeyTests {
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(true, forKey: SettingsKey.savePasswords)
-        let container = AppContainer(
-            history: AppHistory(store),
-            pasteboard: FakePasteboard(),
-            defaults: defaults,
-            now: { [start] in start },
-            frontmostApp: { nil },
-            sleep: MonitorFactory.sleepUntilCancelled,
-            pollingActivity: CountingActivity(),
-            workspaceNotifications: FakeNotifications(),
-            distributedNotifications: distributed,
-            isScreenLocked: { false },
-            isSessionActive: { true },
-            makeSettingsWindow: { _, _, _ in SettingsWindowSpy() }
-        )
+        let services = ContainerFactory.services(now: { [start] in start }, distributed: distributed)
+        let container = AppContainer(history: AppHistory(store), services: services, defaults: defaults)
         defer { container.monitor.stop() }
         try await body(container)
     }

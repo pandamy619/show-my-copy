@@ -2,11 +2,12 @@ import AppKit
 import Foundation
 import Synchronization
 
-/// Builds the app's objects, connects them and owns them for as long as the app runs.
+/// Builds the app's objects, connects them and owns them for as long as the app runs: the one place that wires
+/// objects together.
 ///
-/// This is the one place that picks the concrete types: where the history lives, which pasteboard is read and
-/// which notification centers are observed. Everything else takes protocols. The initializer has no side effects:
-/// nothing reads the pasteboard, changes the history or observes notifications until `start()`.
+/// It is given the loaded history and the services that depend on the system or on macOS-only frameworks
+/// (`AppServices`); everything else it makes itself, and everything it makes takes protocols. The initializer has no
+/// side effects: nothing reads the pasteboard, changes the history or observes notifications until `start()`.
 ///
 /// The operations below are what the app offers to the outside: the global shortcut, reopening the app and, once
 /// they are added, App Intents. An intent reaches the container through App Intents dependencies, without a global:
@@ -15,23 +16,11 @@ import Synchronization
 /// The intent must run in the app's process, not in a widget extension, because the container lives here.
 @MainActor
 final class AppContainer {
-    /// Makes the settings window from the objects it shows. The real window is built with SwiftUI and includes
-    /// the shortcut recorder, so `AppDelegate` passes this in.
-    typealias SettingsWindowFactory =
-        @MainActor (
-            _ history: AppHistory,
-            _ settings: HistorySettings,
-            _ passwords: PasswordSettings
-        ) -> any SettingsWindowShowing
-
     let store: any HistoryStore
     let storage: any HistoryStorage
-    let historySettings: HistorySettings
-    let passwordSettings: PasswordSettings
+    let settings: AppSettings
     let pasteboard: any PasteboardReading & PasteboardWriting
-    /// Where image data and thumbnails are kept, or nil when images are not recorded. History rows read thumbnails
-    /// from it; the full image is read only when it is opened or copied. The history store must delete blobs in
-    /// this same store, so it never deletes those that background work is about to hand to it.
+    /// Where image data and thumbnails are kept, or nil when images are not recorded.
     let blobs: InFlightBlobStore?
     let monitor: ClipboardMonitor
     let activityObserver: SystemActivityObserver
@@ -44,52 +33,35 @@ final class AppContainer {
     /// the app too, so this stays short.
     nonisolated static let quitBudget: Duration = .seconds(2)
 
-    /// The defaults are the real system services. Tests pass fakes.
-    init(
-        history: AppHistory,
-        pasteboard: any PasteboardReading & PasteboardWriting = SystemPasteboard(),
-        defaults: UserDefaults = .standard,
-        now: @escaping @MainActor () -> Date = { Date() },
-        frontmostApp: @escaping @MainActor () -> SourceApp? = { SourceApp.frontmost() },
-        sleep: @escaping @Sendable (Duration) async throws -> Void = PollingSchedule.sleepWithTolerance,
-        pollingActivity: any PollingActivity = ProcessPollingActivity(),
-        workspaceNotifications: any NotificationObserving = NotificationCenterObserver(
-            center: NSWorkspace.shared.notificationCenter
-        ),
-        distributedNotifications: any NotificationObserving = DistributedNotificationObserver(),
-        isScreenLocked: @escaping @MainActor () -> Bool = { ConsoleSession.isScreenLocked() },
-        isSessionActive: @escaping @MainActor () -> Bool = { ConsoleSession.isActive() },
-        blobs: InFlightBlobStore? = nil,
-        thumbnails: (any ThumbnailMaking)? = nil,
-        fileThumbnails: (any FileThumbnailMaking)? = nil,
-        previewImages: (any PreviewImageDecoding)? = nil,
-        previewRichText: (any RichTextRendering)? = nil,
-        makeSettingsWindow: SettingsWindowFactory
-    ) {
-        let store = history.store
-        let historySettings = HistorySettings(history: store, defaults: defaults, now: now)
-        let passwordSettings = PasswordSettings(history: history, defaults: defaults, now: now)
-        let settingsWindow = makeSettingsWindow(history, historySettings, passwordSettings)
+    var historySettings: HistorySettings { settings.history }
+    var passwordSettings: PasswordSettings { settings.passwords }
 
-        let capture = Self.makeCapture(
-            store: store, blobs: blobs, thumbnails: thumbnails, fileThumbnails: fileThumbnails)
+    /// `history` is the saved history, loaded with the limits and password choice saved in `defaults`
+    /// (`HistorySettings.storedRetention(in:)`, `PasswordSettings.storedSavesPasswords(in:)`).
+    init(history: AppHistory, services: AppServices, defaults: UserDefaults) {
+        let store = history.store
+        let system = services.system
+        let media = services.media
+        let settings = Self.makeSettings(history: history, services: services, defaults: defaults)
+        let settingsWindow = services.makeSettingsWindow(settings)
+
         // The monitor reads the password setting on every change, so a new choice applies to the next copy.
         let monitor = ClipboardMonitor(
-            pasteboard: pasteboard,
+            pasteboard: services.pasteboard,
             history: store,
-            schedule: PollingSchedule(sleep: sleep, activity: pollingActivity),
-            expiry: HistoryExpiry(history: store, now: now),
+            schedule: PollingSchedule(sleep: system.sleep, activity: system.pollingActivity),
+            expiry: HistoryExpiry(history: store, now: system.now),
             clearedClipboard: ClearedClipboardCheck(history: store),
-            capture: capture,
-            frontmostApp: frontmostApp,
-            now: now,
-            passwordPolicy: { [passwordSettings] in passwordSettings.policy }
+            capture: Self.makeCapture(store: store, media: media),
+            frontmostApp: system.frontmostApp,
+            now: system.now,
+            passwordPolicy: { [passwords = settings.passwords] in passwords.policy }
         )
-        let copier = EntryCopier(history: store, pasteboard: pasteboard, monitor: monitor, blobs: blobs, now: now)
+        let copier = EntryCopier(
+            history: store, pasteboard: services.pasteboard, monitor: monitor, blobs: media.blobs, now: system.now)
         // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.
-        let previews = PreviewServices(blobs: blobs, images: previewImages, richText: previewRichText)
+        let previews = PreviewServices(blobs: media.blobs, images: media.previewImages, richText: media.previewRichText)
         let historyWindow = HistoryWindowController(
-            history: store,
             model: HistoryWindowModel(history: store, previews: previews),
             copier: copier,
             monitor: monitor,
@@ -100,25 +72,38 @@ final class AppContainer {
 
         let activityObserver = SystemActivityObserver(
             monitor: monitor,
-            workspace: workspaceNotifications,
-            distributed: distributedNotifications,
-            isScreenLocked: isScreenLocked,
-            isSessionActive: isSessionActive
+            workspace: system.workspaceNotifications,
+            distributed: system.distributedNotifications,
+            isScreenLocked: system.isScreenLocked,
+            isSessionActive: system.isSessionActive
         )
         Self.connect(activityObserver, to: historyWindow, storage: history.storage)
 
         self.store = store
         self.storage = history.storage
-        self.historySettings = historySettings
-        self.passwordSettings = passwordSettings
-        self.pasteboard = pasteboard
-        self.blobs = blobs
+        self.settings = settings
+        self.pasteboard = services.pasteboard
+        self.blobs = media.blobs
         self.monitor = monitor
         self.activityObserver = activityObserver
         self.copier = copier
         self.historyWindow = historyWindow
         self.settingsWindow = settingsWindow
-        self.sleep = sleep
+        self.sleep = system.sleep
+    }
+
+    /// Every setting, read from `defaults` and applied to `history`.
+    private static func makeSettings(
+        history: AppHistory,
+        services: AppServices,
+        defaults: UserDefaults
+    ) -> AppSettings {
+        AppSettings(
+            store: history.store,
+            history: HistorySettings(history: history.store, defaults: defaults, now: services.system.now),
+            passwords: PasswordSettings(history: history, defaults: defaults, now: services.system.now),
+            storage: StorageUsage(history: history, memoryReader: services.memoryReader)
+        )
     }
 
     private static func connect(
@@ -139,16 +124,11 @@ final class AppContainer {
 
     /// Images are recorded only with a way to make thumbnails, and copied photo and video files get thumbnails only
     /// with a way to make them; both also need somewhere to keep them.
-    private static func makeCapture(
-        store: any HistoryStore,
-        blobs: InFlightBlobStore?,
-        thumbnails: (any ThumbnailMaking)?,
-        fileThumbnails: (any FileThumbnailMaking)?
-    ) -> CaptureEnrichment? {
-        blobs.map { blobs in
+    private static func makeCapture(store: any HistoryStore, media: AppServices.Media) -> CaptureEnrichment? {
+        media.blobs.map { blobs in
             CaptureEnrichment(
-                history: store, blobs: blobs, images: thumbnails.map { ImageIngestor(thumbnails: $0) },
-                fileThumbnails: fileThumbnails.map { FileThumbnailIngestor(maker: $0) })
+                history: store, blobs: blobs, images: media.thumbnails.map { ImageIngestor(thumbnails: $0) },
+                fileThumbnails: media.fileThumbnails.map { FileThumbnailIngestor(maker: $0) })
         }
     }
 
@@ -184,10 +164,6 @@ final class AppContainer {
     /// the pasteboard.
     func toggleHistory() {
         historyWindow.shortcutPressed()
-    }
-
-    func hideHistory() {
-        historyWindow.hide()
     }
 
     func showSettings() {

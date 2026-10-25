@@ -15,13 +15,12 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     private(set) var pendingResize: Task<Void, Never>?
 
     init(
-        history: any HistoryStore,
-        model: HistoryWindowModel? = nil,
+        model: HistoryWindowModel,
         copier: any EntryCopying,
         monitor: any PasteboardChangeTracking,
         onOpenSettings: @escaping @MainActor () -> Void
     ) {
-        self.model = model ?? HistoryWindowModel(history: history)
+        self.model = model
         self.copier = copier
         self.monitor = monitor
         self.onOpenSettings = onOpenSettings

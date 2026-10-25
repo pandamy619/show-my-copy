@@ -4,25 +4,15 @@ import SwiftUI
 /// Shows the settings in a regular window. The app has no Dock or menu bar icon, so it opens the window itself.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
-    private let history: any HistoryStore
-    private let settings: HistorySettings
-    private let passwords: PasswordSettings
-    /// Kept across closes, so the breakdown cache and the last memory reading survive a fresh form.
-    private let usage: StorageUsage
+    private let settings: AppSettings
     private let shortcutRecorder: AnyView
     private var window: NSWindow?
 
     init<ShortcutRecorder: View>(
-        history: AppHistory,
-        settings: HistorySettings,
-        passwords: PasswordSettings,
-        memoryReader: any MemoryUsageReading,
+        settings: AppSettings,
         @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
     ) {
-        self.history = history.store
         self.settings = settings
-        self.passwords = passwords
-        self.usage = StorageUsage(history: history, memoryReader: memoryReader)
         self.shortcutRecorder = AnyView(shortcutRecorder())
         super.init()
     }
@@ -31,7 +21,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func show() {
         // The store files can change size without a change to the history. Show their size as it is now, and count
         // the saved images again, in the background.
-        Task { [usage] in
+        Task { [usage = settings.storage] in
             await usage.refreshDiskBytes(recountingImages: true)
         }
         let window = self.window ?? makeWindow()
@@ -60,7 +50,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private func makeContent() -> NSViewController {
         NSHostingController(
-            rootView: SettingsView(history: history, settings: settings, passwords: passwords, usage: usage) {
+            rootView: SettingsView(settings: settings) {
                 shortcutRecorder
             }
         )

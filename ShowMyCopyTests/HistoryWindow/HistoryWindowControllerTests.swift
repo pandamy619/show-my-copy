@@ -24,7 +24,7 @@ struct HistoryWindowControllerTests {
 
     private func makeController(monitor: any PasteboardChangeTracking) -> HistoryWindowController {
         HistoryWindowController(
-            history: history,
+            model: HistoryWindowModel(history: history),
             copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
             monitor: monitor,
             onOpenSettings: {}
@@ -85,7 +85,8 @@ struct HistoryWindowControllerTests {
     @Test func choosingUsesTheGivenCopier() throws {
         let copier = EntryCopierSpy()
         let controller = HistoryWindowController(
-            history: history, copier: copier, monitor: ChangeTrackerSpy(), onOpenSettings: {})
+            model: HistoryWindowModel(history: history), copier: copier, monitor: ChangeTrackerSpy(),
+            onOpenSettings: {})
         history.record(text: "older", sourceApp: nil, at: start)
         let older = try #require(history.entries.first)
 

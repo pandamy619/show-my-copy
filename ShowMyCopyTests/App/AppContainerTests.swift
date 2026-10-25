@@ -4,19 +4,6 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// Stands in for the SwiftUI settings window and remembers what the container built it from.
-@MainActor
-final class SettingsWindowSpy: SettingsWindowShowing {
-    private(set) var showCount = 0
-    var history: AppHistory?
-    var settings: HistorySettings?
-    var passwords: PasswordSettings?
-
-    func show() {
-        showCount += 1
-    }
-}
-
 /// The history limit in effect when the monitor first read the pasteboard.
 @MainActor
 final class LimitAtFirstRead {
@@ -48,25 +35,15 @@ struct AppContainerTests {
         if let savesPasswords {
             defaults.set(savesPasswords, forKey: SettingsKey.savePasswords)
         }
-        let container = AppContainer(
-            history: .unsaved(store),
+        let services = ContainerFactory.services(
             pasteboard: pasteboard,
-            defaults: defaults,
             now: { [start] in start },
-            frontmostApp: { nil },
             sleep: { [sleeper] duration in await sleeper.sleep(for: duration) },
-            pollingActivity: CountingActivity(),
-            workspaceNotifications: workspace,
-            distributedNotifications: distributed,
-            isScreenLocked: { false },
-            isSessionActive: { true },
-            makeSettingsWindow: { [settingsWindow] history, settings, passwords in
-                settingsWindow.history = history
-                settingsWindow.settings = settings
-                settingsWindow.passwords = passwords
-                return settingsWindow
-            }
+            workspace: workspace,
+            distributed: distributed,
+            settingsWindow: settingsWindow
         )
+        let container = AppContainer(history: .unsaved(store), services: services, defaults: defaults)
         defer {
             container.monitor.stop()
             sleeper.wakeAll()
@@ -177,7 +154,7 @@ struct AppContainerTests {
             container.toggleHistory()
             #expect(container.historyWindow.isVisible)
 
-            container.hideHistory()
+            container.historyWindow.hide()
             #expect(!container.historyWindow.isVisible)
         }
     }
@@ -201,9 +178,11 @@ struct AppContainerTests {
 
     @Test func settingsWindowIsBuiltFromTheContainersObjects() throws {
         try withContainer { container in
-            #expect(settingsWindow.history?.store === store)
-            #expect(settingsWindow.settings === container.historySettings)
-            #expect(settingsWindow.passwords === container.passwordSettings)
+            let settings = try #require(settingsWindow.settings)
+            #expect(settings.store === store)
+            #expect(settings.history === container.historySettings)
+            #expect(settings.passwords === container.passwordSettings)
+            #expect(settings.storage === container.settings.storage)
 
             container.showSettings()
             #expect(settingsWindow.showCount == 1)

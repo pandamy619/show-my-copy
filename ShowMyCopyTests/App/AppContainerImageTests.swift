@@ -23,23 +23,12 @@ struct AppContainerImageTests {
         fileThumbnails: (any FileThumbnailMaking)? = nil,
         sleep: @escaping @Sendable (Duration) async throws -> Void = MonitorFactory.sleepUntilCancelled
     ) -> AppContainer {
-        AppContainer(
+        let media = AppServices.Media(
+            blobs: blobs, thumbnails: thumbnails, fileThumbnails: fileThumbnails, previewImages: decoder)
+        return AppContainer(
             history: .unsaved(store),
-            pasteboard: pasteboard,
-            defaults: defaults,
-            frontmostApp: { nil },
-            sleep: sleep,
-            pollingActivity: CountingActivity(),
-            workspaceNotifications: FakeNotifications(),
-            distributedNotifications: FakeNotifications(),
-            isScreenLocked: { false },
-            isSessionActive: { true },
-            blobs: blobs,
-            thumbnails: thumbnails,
-            fileThumbnails: fileThumbnails,
-            previewImages: decoder,
-            makeSettingsWindow: { _, _, _ in SettingsWindowSpy() }
-        )
+            services: ContainerFactory.services(pasteboard: pasteboard, sleep: sleep, media: media),
+            defaults: defaults)
     }
 
     private func withDefaults(_ body: @MainActor (UserDefaults) async throws -> Void) async throws {

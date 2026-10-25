@@ -13,19 +13,13 @@ struct SettingsView<ShortcutRecorder: View>: View {
     /// confirms it.
     @State private var entryLimit: LimitDraft<Int>
 
-    init(
-        history: any HistoryStore,
-        settings: HistorySettings,
-        passwords: PasswordSettings,
-        usage: StorageUsage,
-        @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
-    ) {
-        self.history = history
-        self.settings = settings
-        _passwords = Bindable(passwords)
-        self.usage = usage
+    init(settings: AppSettings, @ViewBuilder shortcutRecorder: () -> ShortcutRecorder) {
+        self.history = settings.store
+        self.settings = settings.history
+        _passwords = Bindable(settings.passwords)
+        self.usage = settings.storage
         self.shortcutRecorder = shortcutRecorder()
-        _entryLimit = State(initialValue: LimitDraft(settings: settings, limit: .entries))
+        _entryLimit = State(initialValue: LimitDraft(settings: settings.history, limit: .entries))
     }
 
     var body: some View {
