@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import plistlib
+import re
 import shutil
 import stat
 import subprocess
@@ -88,7 +89,8 @@ class Fixture:
         os.makedirs(os.path.join(self.root, check_security.PROJECT))
         os.makedirs(os.path.join(self.root, "ShowMyCopy"))
         with open(PBXPROJ, encoding="utf-8") as handle:
-            self.pbxproj = handle.read()
+            # Tests that need an entitlements file add their own CODE_SIGN_ENTITLEMENTS line.
+            self.pbxproj = re.sub(r"\t+CODE_SIGN_ENTITLEMENTS = [^\n]*\n", "", handle.read())
         self.save()
         for name in (SHARED, TESTS):
             with open(os.path.join(REPO, name), encoding="utf-8") as handle:
