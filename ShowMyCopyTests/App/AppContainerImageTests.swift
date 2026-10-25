@@ -68,7 +68,6 @@ struct AppContainerImageTests {
         try await withDefaults { defaults in
             let store = InMemoryHistoryStore(blobs: blobs)
             let container = makeContainer(store: store, blobs: blobs, defaults: defaults)
-            #expect(container.blobs != nil)
             pasteboard.copy([.png: Data([0x89, 0x50])])
             container.monitor.poll()
             await container.monitor.finishEnriching()

@@ -19,9 +19,6 @@ final class AppContainer {
     let store: any HistoryStore
     let storage: any HistoryStorage
     let settings: AppSettings
-    let pasteboard: any PasteboardReading & PasteboardWriting
-    /// Where image data and thumbnails are kept, or nil when images are not recorded.
-    let blobs: InFlightBlobStore?
     let monitor: ClipboardMonitor
     let activityObserver: SystemActivityObserver
     let copier: EntryCopier
@@ -82,8 +79,6 @@ final class AppContainer {
         self.store = store
         self.storage = history.storage
         self.settings = settings
-        self.pasteboard = services.pasteboard
-        self.blobs = media.blobs
         self.monitor = monitor
         self.activityObserver = activityObserver
         self.copier = copier
