@@ -29,11 +29,11 @@ sys.dont_write_bytecode = True  # keep scripts/ free of __pycache__
 import check_security  # noqa: E402
 
 PBXPROJ = os.path.join(REPO, check_security.PROJECT, "project.pbxproj")
+SHARED = "Config/Shared.xcconfig"
+TESTS = "Config/Tests.xcconfig"
 CONFIG = "\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n"
 APP_DEBUG = "AA0000000000000000000016 /* Debug */ = {" + CONFIG
 APP_RELEASE = "AA0000000000000000000017 /* Release */ = {" + CONFIG
-TESTS_DEBUG = "AA0000000000000000000019 /* Debug */ = {" + CONFIG
-TESTS_RELEASE = "AA000000000000000000001A /* Release */ = {" + CONFIG
 
 FAKE_CODESIGN = r'''#!/usr/bin/env python3
 # Fake codesign for the self-test. Reads the answers from files next to the code it is asked about.
@@ -90,6 +90,18 @@ class Fixture:
         with open(PBXPROJ, encoding="utf-8") as handle:
             self.pbxproj = handle.read()
         self.save()
+        for name in (SHARED, TESTS):
+            with open(os.path.join(REPO, name), encoding="utf-8") as handle:
+                self.write(name, handle.read())
+
+    def read(self, relative: str) -> str:
+        with open(os.path.join(self.root, relative), encoding="utf-8") as handle:
+            return handle.read()
+
+    def edit(self, relative: str, old: str, new: str) -> None:
+        text = self.read(relative)
+        assert text.count(old) == 1, "fixture anchor %r found %d times in %s" % (old, text.count(old), relative)
+        self.write(relative, text.replace(old, new))
 
     def save(self) -> None:
         with open(os.path.join(self.root, check_security.PROJECT, "project.pbxproj"), "w", encoding="utf-8") as out:
@@ -134,37 +146,113 @@ class ProjectFixtureTests(CheckerTestCase):
         self.assertEqual(self.fixture.errors(), [])
 
     def test_app_without_sandbox_is_not_hidden_by_another_target(self) -> None:
-        self.fixture.replace("ENABLE_APP_SANDBOX = YES;", "ENABLE_APP_SANDBOX = NO;", count=2)
-        for anchor in (TESTS_DEBUG, TESTS_RELEASE):
-            self.fixture.replace(anchor, anchor + "\t\t\t\tENABLE_APP_SANDBOX = YES;\n")
-        self.assertEqual(self.fixture.pbxproj.count("ENABLE_APP_SANDBOX = YES;"), 2)
+        self.fixture.edit(SHARED, "ENABLE_APP_SANDBOX = YES", "ENABLE_APP_SANDBOX = NO")
+        self.fixture.edit(TESTS, "ENABLE_APP_SANDBOX = NO", "ENABLE_APP_SANDBOX = YES")
         self.assertFailsWith(self.fixture.errors(), "target ShowMyCopy (Release): ENABLE_APP_SANDBOX must be YES")
 
     def test_sandbox_only_in_one_configuration(self) -> None:
-        # The first occurrence is the app's Debug configuration; Release stays YES.
-        self.fixture.pbxproj = self.fixture.pbxproj.replace(
-            "ENABLE_APP_SANDBOX = YES;", "ENABLE_APP_SANDBOX = NO;", 1
-        )
-        self.fixture.save()
-        self.assertFailsWith(self.fixture.errors(), "target ShowMyCopy (Debug): ENABLE_APP_SANDBOX must be YES")
+        # The target's own setting overrides the shared file; Release stays YES.
+        self.fixture.replace(APP_DEBUG, APP_DEBUG + "\t\t\t\tENABLE_APP_SANDBOX = NO;\n")
+        errors = self.fixture.errors()
+        self.assertFailsWith(errors, "target ShowMyCopy (Debug): ENABLE_APP_SANDBOX must be YES")
+        self.assertFalse(any("(Release)" in error for error in errors), errors)
 
     def test_conditional_setting_cannot_override_sandbox(self) -> None:
         self.fixture.add_app_setting('"ENABLE_APP_SANDBOX[sdk=macosx*]" = NO;')
         self.assertFailsWith(self.fixture.errors(), "ENABLE_APP_SANDBOX must be YES")
 
     def test_missing_hardened_runtime(self) -> None:
-        self.fixture.replace("ENABLE_HARDENED_RUNTIME = YES;", "ENABLE_HARDENED_RUNTIME = NO;", count=2)
+        self.fixture.edit(SHARED, "ENABLE_HARDENED_RUNTIME = YES", "ENABLE_HARDENED_RUNTIME = NO")
         self.assertFailsWith(self.fixture.errors(), "ENABLE_HARDENED_RUNTIME must be YES")
 
     def test_outgoing_network(self) -> None:
-        self.fixture.replace(
-            "ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;", "ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;", count=2
+        self.fixture.edit(
+            SHARED, "ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO", "ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES"
         )
         self.assertFailsWith(self.fixture.errors(), "ENABLE_OUTGOING_NETWORK_CONNECTIONS must not be YES")
 
     def test_network_setting_must_be_explicit_for_app(self) -> None:
-        self.fixture.replace("\t\t\t\tENABLE_INCOMING_NETWORK_CONNECTIONS = NO;\n", "", count=2)
+        self.fixture.edit(SHARED, "ENABLE_INCOMING_NETWORK_CONNECTIONS = NO\n", "")
         self.assertFailsWith(self.fixture.errors(), "ENABLE_INCOMING_NETWORK_CONNECTIONS must be explicitly NO")
+
+    def test_network_setting_through_a_variable_is_not_trusted(self) -> None:
+        # An extension need not say NO, but a value the checker cannot resolve might be YES.
+        self.fixture.replace(
+            'productType = "com.apple.product-type.bundle.unit-test";',
+            'productType = "com.apple.product-type.app-extension";',
+        )
+        self.fixture.edit(TESTS, "ENABLE_APP_SANDBOX = NO", "ENABLE_APP_SANDBOX = YES")
+        self.fixture.edit(TESTS, "ENABLE_HARDENED_RUNTIME = NO", "ENABLE_HARDENED_RUNTIME = YES")
+        self.assertEqual(self.fixture.errors(), [])
+        self.fixture.edit(TESTS, "ENABLE_HARDENED_RUNTIME = YES", "ENABLE_HARDENED_RUNTIME = YES\n"
+                          "ENABLE_OUTGOING_NETWORK_CONNECTIONS = $(NETWORK)")
+        self.assertFailsWith(
+            self.fixture.errors(),
+            "target ShowMyCopyTests (Debug): ENABLE_OUTGOING_NETWORK_CONNECTIONS uses a build setting variable",
+        )
+
+    # .xcconfig files
+
+    def test_shared_settings_apply_to_every_target(self) -> None:
+        targets, _ = check_security.project_targets(self.fixture.root)
+        for name, _, configs in targets:
+            for config, settings in configs.items():
+                with self.subTest(target=name, config=config):
+                    self.assertEqual(settings.get("SWIFT_VERSION"), "6.0")
+                    self.assertEqual(settings.get("SWIFT_STRICT_CONCURRENCY"), "complete")
+                    self.assertEqual(settings.get("SWIFT_TREAT_WARNINGS_AS_ERRORS"), "YES")
+                    self.assertEqual(settings.get("MACOSX_DEPLOYMENT_TARGET"), "15.0")
+                    self.assertEqual(settings.get("ENABLE_OUTGOING_NETWORK_CONNECTIONS"), "NO")
+                    self.assertEqual(settings.get("ENABLE_APP_SANDBOX"), "YES" if name == "ShowMyCopy" else "NO")
+
+    def test_target_xcconfig_overrides_the_project_xcconfig(self) -> None:
+        # The tests' file turns the sandbox off; the same line in the app's settings is caught.
+        self.fixture.replace(APP_RELEASE, APP_RELEASE.replace(
+            "isa = XCBuildConfiguration;",
+            "isa = XCBuildConfiguration;\n\t\t\tbaseConfigurationReference = AA000000000000000000001C;",
+        ))
+        self.assertFailsWith(self.fixture.errors(), "target ShowMyCopy (Release): ENABLE_APP_SANDBOX must be YES")
+
+    def test_included_xcconfig_is_read(self) -> None:
+        self.fixture.write("Config/Network.xcconfig", "ENABLE_INCOMING_NETWORK_CONNECTIONS = YES // inbound\n")
+        self.fixture.edit(
+            SHARED, "ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO",
+            'ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO\n#include "Network.xcconfig"',
+        )
+        self.assertFailsWith(self.fixture.errors(), "ENABLE_INCOMING_NETWORK_CONNECTIONS must not be YES")
+
+    def test_conditional_setting_in_xcconfig_cannot_override_sandbox(self) -> None:
+        self.fixture.edit(
+            SHARED, "ENABLE_APP_SANDBOX = YES", "ENABLE_APP_SANDBOX = YES\nENABLE_APP_SANDBOX[sdk=macosx*] = NO;"
+        )
+        self.assertFailsWith(self.fixture.errors(), "target ShowMyCopy (Debug): ENABLE_APP_SANDBOX must be YES")
+
+    def test_missing_include_fails(self) -> None:
+        self.fixture.edit(SHARED, "MACOSX_DEPLOYMENT_TARGET", '#include "Missing.xcconfig"\nMACOSX_DEPLOYMENT_TARGET')
+        self.assertFailsWith(self.fixture.errors(), "cannot read Config/Missing.xcconfig")
+
+    def test_optional_missing_include_is_skipped(self) -> None:
+        self.fixture.edit(SHARED, "MACOSX_DEPLOYMENT_TARGET", '#include? "Local.xcconfig"\nMACOSX_DEPLOYMENT_TARGET')
+        self.assertEqual(self.fixture.errors(), [])
+
+    def test_include_from_outside_the_repository_fails(self) -> None:
+        for target in ("../../outside.xcconfig", "/etc/outside.xcconfig", "<DEVELOPER_DIR>/x.xcconfig", "$(X).xcconfig"):
+            with self.subTest(target):
+                self.fixture.write(SHARED, '#include "%s"\n' % target)
+                self.assertFailsWith(self.fixture.errors(), "cannot follow the include")
+
+    def test_include_cycle_fails(self) -> None:
+        self.fixture.write("Config/Loop.xcconfig", '#include "Shared.xcconfig"\n')
+        self.fixture.edit(SHARED, "MACOSX_DEPLOYMENT_TARGET", '#include "Loop.xcconfig"\nMACOSX_DEPLOYMENT_TARGET')
+        self.assertFailsWith(self.fixture.errors(), "includes itself")
+
+    def test_unparseable_xcconfig_line_fails(self) -> None:
+        self.fixture.edit(SHARED, "MACOSX_DEPLOYMENT_TARGET = 15.0", "MACOSX_DEPLOYMENT_TARGET 15.0")
+        self.assertFailsWith(self.fixture.errors(), "Config/Shared.xcconfig:")
+
+    def test_missing_xcconfig_file_fails(self) -> None:
+        os.remove(os.path.join(self.fixture.root, SHARED))
+        self.assertFailsWith(self.fixture.errors(), "cannot read Config/Shared.xcconfig")
 
     def test_runtime_exception(self) -> None:
         self.fixture.add_app_setting("RUNTIME_EXCEPTION_ALLOW_JIT = YES;")
@@ -229,14 +317,20 @@ class ProjectFixtureTests(CheckerTestCase):
         self.assertIn("kind = exactVersion;", self.fixture.pbxproj)
         self.assertFailsWith(self.fixture.errors(), "https://example.com/other must use an exact version")
 
-    def test_xcconfig_is_rejected(self) -> None:
+    def test_unknown_xcconfig_reference_fails(self) -> None:
         self.fixture.replace(APP_RELEASE, APP_RELEASE.replace(
             "isa = XCBuildConfiguration;", "isa = XCBuildConfiguration;\n\t\t\tbaseConfigurationReference = CC01;"
         ))
-        self.assertFailsWith(self.fixture.errors(), "uses an .xcconfig file")
+        self.assertFailsWith(self.fixture.errors(), "'CC01' is missing or not a PBXFileReference")
+
+    def test_xcconfig_relative_to_an_unknown_place_fails(self) -> None:
+        self.fixture.replace(
+            'path = Shared.xcconfig; sourceTree = "<group>";', "path = Shared.xcconfig; sourceTree = SDKROOT;"
+        )
+        self.assertFailsWith(self.fixture.errors(), "which this checker does not resolve")
 
     def test_unparseable_project(self) -> None:
-        self.fixture.pbxproj = self.fixture.pbxproj.replace("ENABLE_APP_SANDBOX = YES;", "ENABLE_APP_SANDBOX = YES", 1)
+        self.fixture.pbxproj = self.fixture.pbxproj.replace("ENABLE_PREVIEWS = YES;", "ENABLE_PREVIEWS = YES", 1)
         self.fixture.save()
         self.assertFailsWith(self.fixture.errors(), "cannot check")
 
@@ -362,11 +456,8 @@ class XcodebuildTests(CheckerTestCase):
         )
 
     def test_project_file_debug_hardened_runtime_no_still_fails(self) -> None:
-        # The project file must still declare YES everywhere; only Xcode's own resolution may say NO.
-        self.fixture.pbxproj = self.fixture.pbxproj.replace(
-            "ENABLE_HARDENED_RUNTIME = YES;", "ENABLE_HARDENED_RUNTIME = NO;", 1
-        )
-        self.fixture.save()
+        # The project must still declare YES everywhere; only Xcode's own resolution may say NO.
+        self.fixture.replace(APP_DEBUG, APP_DEBUG + "\t\t\t\tENABLE_HARDENED_RUNTIME = NO;\n")
         errors = self.errors()
         self.assertIn("target ShowMyCopy (Debug): ENABLE_HARDENED_RUNTIME must be YES", errors)
 

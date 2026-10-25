@@ -23,6 +23,8 @@
 /* Begin PBXFileReference section */
 		AA0000000000000000000004 /* ShowMyCopy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShowMyCopy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000005 /* ShowMyCopyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShowMyCopyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA000000000000000000001B /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		AA000000000000000000001C /* Tests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Tests.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -60,10 +62,20 @@
 		AA0000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
+				AA000000000000000000001D /* Config */,
 				AA0000000000000000000006 /* ShowMyCopy */,
 				AA0000000000000000000007 /* ShowMyCopyTests */,
 				AA0000000000000000000003 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		AA000000000000000000001D /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000001B /* Shared.xcconfig */,
+				AA000000000000000000001C /* Tests.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		AA0000000000000000000003 /* Products */ = {
@@ -212,6 +224,7 @@
 /* Begin XCBuildConfiguration section */
 		AA0000000000000000000013 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA000000000000000000001B /* Shared.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -233,19 +246,16 @@
 					"$(inherited)",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_STRICT_CONCURRENCY = complete;
-				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
-				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
 		AA0000000000000000000014 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA000000000000000000001B /* Shared.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -261,12 +271,8 @@
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_STRICT_CONCURRENCY = complete;
-				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
-				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};
@@ -278,10 +284,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show My Copy";
@@ -306,10 +308,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show My Copy";
@@ -328,6 +326,7 @@
 		};
 		AA0000000000000000000019 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA000000000000000000001C /* Tests.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -343,6 +342,7 @@
 		};
 		AA000000000000000000001A /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA000000000000000000001C /* Tests.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;

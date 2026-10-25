@@ -1,0 +1,6 @@
+// The unit tests: Shared.xcconfig through the project, with these overrides.
+
+// The test bundle is never shipped. It runs inside the app, which is sandboxed and hardened, and is not signed with
+// a sandbox or the hardened runtime of its own, as before the settings were shared.
+ENABLE_APP_SANDBOX = NO
+ENABLE_HARDENED_RUNTIME = NO

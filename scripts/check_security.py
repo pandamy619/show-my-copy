@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Security checks for Show My Copy.
 
-    scripts/check_security.py            project settings, entitlements files and sources
+    scripts/check_security.py            project settings (with their .xcconfig files), entitlements files and
+                                         sources
     scripts/check_security.py path/App   also everything that was actually signed into a built app
 
 Runs with the python3 that ships with the Xcode command line tools (3.9), so no newer syntax.
@@ -205,7 +206,8 @@ def _object(objects: dict, ref: object, isa: Optional[str], what: str) -> dict:
     return obj
 
 
-def _configurations(objects: dict, list_ref: object, what: str) -> Dict[str, dict]:
+def _configurations(objects: dict, list_ref: object, what: str, root: str) -> Dict[str, Tuple[dict, dict]]:
+    """Return {configuration: (settings of its .xcconfig file or {}, settings in the project file)}."""
     config_list = _object(objects, list_ref, "XCConfigurationList", what + " configuration list")
     result = {}
     for ref in config_list.get("buildConfigurations", []):
@@ -214,15 +216,90 @@ def _configurations(objects: dict, list_ref: object, what: str) -> Dict[str, dic
         settings = config.get("buildSettings", {})
         if not isinstance(name, str) or not isinstance(settings, dict):
             raise PbxprojError("%s configuration %r is malformed" % (what, ref))
+        base = {}
         if "baseConfigurationReference" in config:
-            # Settings in an .xcconfig file are invisible here; fail closed rather than miss them.
-            raise PbxprojError(
-                "%s configuration %s uses an .xcconfig file, which this checker does not read" % (what, name)
-            )
-        result[name] = settings
+            where = "%s configuration %s" % (what, name)
+            path = _file_reference_path(objects, config["baseConfigurationReference"], root, where)
+            base = read_xcconfig(path, root)
+        result[name] = (base, settings)
     if not result:
         raise PbxprojError("%s has no build configurations" % what)
     return result
+
+
+def _file_reference_path(objects: dict, ref: object, root: str, where: str) -> str:
+    """The path of a file the project refers to, through the groups that hold it. Fails on anything unusual."""
+    _object(objects, ref, "PBXFileReference", where + " base configuration")
+    parents = {}
+    for key, obj in objects.items():
+        if isinstance(obj, dict) and obj.get("isa") == "PBXGroup":
+            for child in obj.get("children", []):
+                if child in parents:
+                    raise PbxprojError("%r is in more than one group" % (child,))
+                parents[child] = key
+    chain = []
+    current = ref
+    while True:
+        obj = objects.get(current)
+        if not isinstance(obj, dict) or current in chain:
+            raise PbxprojError("%s: cannot follow the groups of %r" % (where, ref))
+        chain.append(current)
+        tree = obj.get("sourceTree")
+        if tree == "SOURCE_ROOT" or (tree == "<group>" and current not in parents):
+            # The main group, or a path from the project folder.
+            break
+        if tree != "<group>":
+            raise PbxprojError("%s: file %r is relative to %r, which this checker does not resolve" % (where, ref, tree))
+        current = parents[current]
+    parts = [objects[item].get("path", "") for item in reversed(chain)]
+    for part in parts:
+        if not isinstance(part, str) or "$" in part or os.path.isabs(part):
+            raise PbxprojError("%s: cannot resolve the path %r" % (where, part))
+    return os.path.join(root, *[part for part in parts if part])
+
+
+_XCCONFIG_SETTING = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])*)\s*=\s*(.*?)\s*;?$")
+_XCCONFIG_INCLUDE = re.compile(r'^#include(\??)\s*"([^"]*)"$')
+
+
+def read_xcconfig(path: str, root: str, including: Tuple[str, ...] = ()) -> Dict[str, str]:
+    """Read the settings of an .xcconfig file and the files it includes, later lines winning, as Xcode does.
+
+    Fails on anything it does not understand: an unreadable file, a line that is not a setting, an include
+    that is missing or cycles, and includes outside the repository or through build settings.
+    """
+    real = os.path.realpath(path)
+    shown = os.path.relpath(path, root)
+    if real in including:
+        raise PbxprojError("%s includes itself" % shown)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except (OSError, UnicodeDecodeError) as error:
+        raise PbxprojError("cannot read %s: %s" % (shown, error))
+    settings: Dict[str, str] = {}
+    for number, raw in enumerate(lines, 1):
+        # Xcode ends every line at //, also inside a value.
+        line = raw.split("//", 1)[0].strip()
+        if not line:
+            continue
+        include = _XCCONFIG_INCLUDE.match(line)
+        if include:
+            target = include.group(2)
+            target_path = os.path.normpath(os.path.join(os.path.dirname(path), target))
+            if "$" in target or target.startswith("<") or os.path.isabs(target) or not os.path.realpath(
+                target_path
+            ).startswith(os.path.realpath(root) + os.sep):
+                raise PbxprojError("%s:%d: cannot follow the include of %r" % (shown, number, target))
+            if include.group(1) and not os.path.exists(target_path):
+                continue
+            settings.update(read_xcconfig(target_path, root, including + (real,)))
+            continue
+        setting = _XCCONFIG_SETTING.match(line)
+        if setting is None:
+            raise PbxprojError("%s:%d: cannot parse %r" % (shown, number, line))
+        settings[setting.group(1)] = setting.group(2)
+    return settings
 
 
 def _flatten(value: object) -> str:
@@ -240,18 +317,20 @@ def project_targets(root: str) -> Tuple[List[Tuple[str, str, Dict[str, Dict[str,
     if not isinstance(objects, dict):
         raise PbxprojError("no objects")
     project = _object(objects, data.get("rootObject"), "PBXProject", "root object")
-    project_configs = _configurations(objects, project.get("buildConfigurationList"), "project")
+    project_configs = _configurations(objects, project.get("buildConfigurationList"), "project", root)
     targets = []
     for ref in project.get("targets", []):
         target = _object(objects, ref, None, "target")
         name = target.get("name", ref)
         product_type = target.get("productType", "")
-        configs = _configurations(objects, target.get("buildConfigurationList"), "target %s" % name)
+        configs = _configurations(objects, target.get("buildConfigurationList"), "target %s" % name, root)
         merged = {}
-        for config_name, settings in configs.items():
-            # Target settings override project settings of the same configuration.
-            combined = dict(project_configs.get(config_name, {}))
-            combined.update(settings)
+        for config_name, (target_base, target_settings) in configs.items():
+            # Xcode's order, lowest first: the project's .xcconfig, the project, the target's .xcconfig, the target.
+            project_base, project_settings = project_configs.get(config_name, ({}, {}))
+            combined: Dict[str, object] = {}
+            for layer in (project_base, project_settings, target_base, target_settings):
+                combined.update(layer)
             merged[config_name] = {key: _flatten(value) for key, value in combined.items()}
         targets.append((name, product_type, merged))
     # Targets that are not listed in the project are still built by nothing, but flag them anyway.
@@ -295,6 +374,8 @@ def check_target_settings(
             if not values(key) or any(value != "YES" for value in values(key)):
                 errors.append("%s: %s must be YES" % (where, key))
     for key in ("ENABLE_INCOMING_NETWORK_CONNECTIONS", "ENABLE_OUTGOING_NETWORK_CONNECTIONS"):
+        if any("$" in value for value in values(key)):
+            errors.append("%s: %s uses a build setting variable, which this checker does not resolve" % (where, key))
         if any(value == "YES" for value in values(key)):
             errors.append("%s: %s must not be YES" % (where, key))
         if product_type == APPLICATION_PRODUCT_TYPE and (

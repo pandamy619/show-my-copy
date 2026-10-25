@@ -1,0 +1,24 @@
+// Build settings every target shares: the app, its tests and the Control Center widget to come. The project's
+// Debug and Release configurations are based on this file, so a new target inherits it. Settings a target writes
+// into the project file override these: a new target from an Xcode template comes with its own Swift version,
+// concurrency settings, deployment target and sandbox settings, so delete those from it, and override only with a
+// reason (see Tests.xcconfig).
+
+// Swift 6 with complete concurrency checking. Warnings fail the build.
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+
+// Pinned to what this project was written for. Templates of Xcode 26 turn approachable concurrency on and make
+// code main-actor isolated by default; code shared with a target made from one must not change meaning there.
+SWIFT_APPROACHABLE_CONCURRENCY = NO
+SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated
+
+MACOSX_DEPLOYMENT_TARGET = 15.0
+
+// Sandboxed and hardened, with no network access in either direction (SECURITY.md). Do not change these.
+// scripts/check_security.py checks the values every shipped target ends up with.
+ENABLE_APP_SANDBOX = YES
+ENABLE_HARDENED_RUNTIME = YES
+ENABLE_INCOMING_NETWORK_CONNECTIONS = NO
+ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO

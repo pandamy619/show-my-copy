@@ -2,6 +2,7 @@
 /scripts/ @pandamy619
 /.github/ @pandamy619
 *.pbxproj @pandamy619
+/Config/ @pandamy619
 Package.resolved @pandamy619
 /.swiftlint.yml @pandamy619
 /Makefile @pandamy619
