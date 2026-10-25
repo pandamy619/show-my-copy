@@ -193,6 +193,20 @@ struct PersistentHistoryStoreTests {
         #expect(!savedTexts().contains("item 4"))
     }
 
+    @Test func entriesPastTheAgeLimitAreDeletedFromDisk() {
+        let first = makeStore(retention: RetentionPolicy(maxAge: .seconds(3600)))
+        let oldID = first.record(text: "old", sourceApp: nil, at: start)
+        let newID = first.record(text: "new", sourceApp: nil, at: start + 1800)
+
+        first.removeExpired(at: start + 3600)
+        #expect(disk.record(oldID) == nil)
+        #expect(disk.record(newID) != nil)
+
+        // At launch too.
+        _ = makeStore(retention: RetentionPolicy(maxAge: .seconds(3600)), now: start + 5400)
+        #expect(disk.records.isEmpty)
+    }
+
     @Test func nothingIsWrittenOnLoadWhenNothingIsRemoved() {
         let first = makeStore()
         first.record(text: "a", sourceApp: nil, at: start)

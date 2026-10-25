@@ -48,7 +48,7 @@ struct SizeLimitDefaultTests {
 
     @Test func deliberateNoLimitIsKept() throws {
         try withDefaults { defaults in
-            let settings = HistorySettings(history: ClipboardHistory(), defaults: defaults)
+            let settings = HistorySettings(history: ClipboardHistory(), defaults: defaults, now: { Date() })
             settings.applySizeLimit(.noLimit)
             #expect(HistorySettings.storedSizeLimit(in: defaults) == .noLimit)
             #expect(HistorySettings.storedRetention(in: defaults).byteLimit == nil)
@@ -77,7 +77,7 @@ struct SizeLimitDefaultTests {
             let history = InMemoryHistoryStore(
                 restoring: [newest, oldest, pinned], at: start, retention: RetentionPolicy(), blobs: blobs)
 
-            HistorySettings(history: history, defaults: defaults).applyStoredLimit()
+            HistorySettings(history: history, defaults: defaults, now: { Date() }).applyStoredLimit()
 
             #expect(history.entries.map(\.id) == [newest.id, pinned.id])
             #expect(blobs.allIDs().isDisjoint(with: Set(oldest.imageBlobIDs)))

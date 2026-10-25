@@ -94,7 +94,7 @@ struct PersistentHistoryStoreLaunchTests {
         let store = await PersistentHistoryStore.load(
             persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true,
             retention: RetentionPolicy(entryLimit: 1000),
-            hasher: ThreadSpyingHasher(spy: hashes), now: start + 2000, openError: nil, blobs: blobs,
+            hasher: ThreadSpyingHasher(spy: hashes), now: { [start] in start + 2000 }, openError: nil, blobs: blobs,
             leftovers: nil)
 
         #expect(store.entries.count == 1000)
@@ -115,8 +115,8 @@ struct PersistentHistoryStoreLaunchTests {
         earlier.record(text: "hunter2", sourceApp: nil, at: start + 3, concealed: true, expiresAt: start + 600)
 
         let loaded = await PersistentHistoryStore.load(
-            persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true, retention: .default, now: start + 10,
-            openError: nil, blobs: nil, leftovers: nil)
+            persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true, retention: .default,
+            now: { [start] in start + 10 }, openError: nil, blobs: nil, leftovers: nil)
 
         #expect(loaded.entries.map(\.text) == ["hunter2", "plain"])
         #expect(disk.records.count == 2)
@@ -128,8 +128,8 @@ struct PersistentHistoryStoreLaunchTests {
         disk.failing = [.loadAll]
 
         let store = await PersistentHistoryStore.load(
-            persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true, retention: .default, now: start + 1,
-            openError: nil, blobs: nil, leftovers: nil)
+            persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true, retention: .default,
+            now: { [start] in start + 1 }, openError: nil, blobs: nil, leftovers: nil)
 
         #expect(store.entries.isEmpty)
         #expect(store.storageError == .loadFailed)

@@ -30,7 +30,7 @@ enum MonitorFactory {
             pasteboard: pasteboard,
             history: history,
             schedule: PollingSchedule(interval: interval, sleep: sleep, activity: activity, now: activityClock),
-            expiry: PasswordExpiry(history: history, now: now),
+            expiry: HistoryExpiry(history: history, now: now),
             clearedClipboard: ClearedClipboardCheck(history: history),
             capture: blobs.map { blobs in
                 CaptureEnrichment(

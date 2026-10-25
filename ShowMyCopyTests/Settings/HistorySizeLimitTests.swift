@@ -17,7 +17,7 @@ struct HistorySizeLimitTests {
 
     /// Settings as the app sets them up when it starts: the saved limits are applied to the history.
     private func makeSettings(history: ClipboardHistory, defaults: UserDefaults) -> HistorySettings {
-        let settings = HistorySettings(history: history, defaults: defaults)
+        let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
         settings.applyStoredLimit()
         return settings
     }
@@ -64,7 +64,7 @@ struct HistorySizeLimitTests {
         try withDefaults { defaults in
             defaults.set(100_000_000, forKey: SettingsKey.historyByteLimit)
             let history = ClipboardHistory()
-            _ = HistorySettings(history: history, defaults: defaults)
+            _ = HistorySettings(history: history, defaults: defaults, now: { Date() })
             #expect(history.retention.byteLimit == nil)
         }
     }
@@ -160,7 +160,7 @@ struct HistorySizeLimitTests {
     @Test func sizeLimitShowsTheOptionForTheHistorysByteLimit() throws {
         try withDefaults { defaults in
             let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 200_000_000))
-            let settings = HistorySettings(history: history, defaults: defaults)
+            let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
             #expect(settings.sizeLimit == .megabytes500)
         }
     }

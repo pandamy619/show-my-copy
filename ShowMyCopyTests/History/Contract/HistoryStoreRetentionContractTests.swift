@@ -29,8 +29,6 @@ struct HistoryStoreRetentionContractTests {
     func setRetentionRemovesTheOldestEntriesAndLimitFollowsIt(store kind: StoreKind) throws {
         let store = try harness.make(kind, retention: RetentionPolicy(entryLimit: 20))
         fill(store, count: 15)
-        #expect(store.entriesRemoved(byLimit: 10) == 5)
-        #expect(store.entriesRemoved(byLimit: 100) == 0)
 
         store.setRetention(RetentionPolicy(entryLimit: 10))
         #expect(store.limit == 10)

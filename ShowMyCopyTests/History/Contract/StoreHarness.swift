@@ -20,7 +20,8 @@ final class StoreHarness {
 
     let blobs: any BlobStore
     let disk = FakeHistoryPersistence()
-    /// The time a store is made at: what `restoring` entries are checked against.
+    /// The stores' clock, which moves only when a test sets it. Also the time a store is made at: what `restoring`
+    /// entries are checked against.
     var now = StoreHarness.start
 
     init(blobs: any BlobStore = InMemoryBlobStore()) {
@@ -36,13 +37,14 @@ final class StoreHarness {
     ) throws -> any HistoryStore {
         switch kind {
         case .inMemory:
-            return InMemoryHistoryStore(restoring: entries, at: now, retention: retention, blobs: blobs)
+            return InMemoryHistoryStore(
+                restoring: entries, at: now, retention: retention, blobs: blobs, now: { self.now })
         case .persistent:
             let coder = StoredEntryCoder(sealer: FakeSecretSealer(), hasher: SHA256ContentHasher())
             try disk.insert(try entries.compactMap { try coder.record(for: $0) })
             return PersistentHistoryStore.loadedNow(
                 persistence: disk, sealer: FakeSecretSealer(), savesPasswords: true, retention: retention, now: now,
-                blobs: blobs)
+                clock: { self.now }, blobs: blobs)
         }
     }
 

@@ -17,7 +17,7 @@ struct HistorySettingsTests {
 
     /// Settings as the app sets them up when it starts: the saved limit is applied to the history.
     private func makeSettings(history: ClipboardHistory, defaults: UserDefaults) -> HistorySettings {
-        let settings = HistorySettings(history: history, defaults: defaults)
+        let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
         settings.applyStoredLimit()
         return settings
     }
@@ -44,7 +44,7 @@ struct HistorySettingsTests {
             defaults.set(10, forKey: SettingsKey.historyLimit)
             let history = makeHistory(withEntries: 15)
 
-            let settings = HistorySettings(history: history, defaults: defaults)
+            let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
 
             #expect(history.limit == ClipboardHistory.limitRange.upperBound)
             #expect(history.entries.count == 15)
@@ -56,7 +56,7 @@ struct HistorySettingsTests {
         try withDefaults { defaults in
             defaults.set(10, forKey: SettingsKey.historyLimit)
             let history = makeHistory(withEntries: 15)
-            let settings = HistorySettings(history: history, defaults: defaults)
+            let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
 
             settings.applyStoredLimit()
 

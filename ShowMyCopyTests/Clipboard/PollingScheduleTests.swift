@@ -55,7 +55,7 @@ final class TickCounter {
 }
 
 @MainActor
-struct PasswordExpiryTests {
+struct HistoryExpiryTests {
     @Test func removesThePasswordsWhoseTimeIsUp() {
         let start = Date(timeIntervalSince1970: 1_790_000_000)
         let history = ClipboardHistory()
@@ -63,12 +63,28 @@ struct PasswordExpiryTests {
         history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
         let environment = MonitorEnvironment()
         environment.now = start + 59
-        let expiry = PasswordExpiry(history: history, now: { environment.now })
+        let expiry = HistoryExpiry(history: history, now: { environment.now })
 
         expiry.removeExpired()
         #expect(history.entries.count == 2)
         environment.now = start + 60
         expiry.removeExpired()
         #expect(history.entries.map(\.text) == ["kept"])
+    }
+
+    @Test func removesTheEntriesPastTheAgeLimit() {
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        let history = InMemoryHistoryStore(retention: RetentionPolicy(maxAge: .seconds(3600)), now: { start })
+        history.record(text: "old", sourceApp: nil, at: start - 3600)
+        history.record(text: "recent", sourceApp: nil, at: start)
+        let environment = MonitorEnvironment()
+        environment.now = start + 3599
+        let expiry = HistoryExpiry(history: history, now: { environment.now })
+
+        expiry.removeExpired()
+        #expect(history.entries.map(\.text) == ["recent"])
+        environment.now = start + 3600
+        expiry.removeExpired()
+        #expect(history.entries.isEmpty)
     }
 }
