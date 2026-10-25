@@ -56,3 +56,7 @@ docs/
 CONTRIBUTING.md
 CLAUDE.md
 
+
+# Python
+__pycache__/
+*.pyc
