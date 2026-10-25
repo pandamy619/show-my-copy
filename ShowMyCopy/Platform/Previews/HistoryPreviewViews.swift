@@ -35,7 +35,7 @@ struct EntryThumbnail: View {
                 drawn
                     .resizable()
                     .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
             } else {
                 Image(systemName: state.isFailed ? "photo.badge.exclamationmark" : "photo")
                     .foregroundStyle(.secondary)
@@ -66,7 +66,7 @@ struct FileIcon: View {
     var body: some View {
         Image(nsImage: icons.icon(forPath: path))
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .frame(width: size, height: size)
             .accessibilityHidden(true)
     }
@@ -230,7 +230,7 @@ struct EntryPreviewPane: View {
             drawn
                 .resizable()
                 .interpolation(.high)
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
                 // Never larger than the image: a small icon is not blown up into a blur.
                 .frame(maxWidth: CGFloat(decoded.pixelWidth), maxHeight: CGFloat(decoded.pixelHeight))
                 .padding(14)

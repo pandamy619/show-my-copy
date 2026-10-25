@@ -33,7 +33,7 @@ struct FileThumbnailIcon: View {
                 drawn
                     .resizable()
                     .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 if thumbnail?.kind == .movie {
                     PlayBadge(size: size)
