@@ -5,10 +5,6 @@ import Testing
 
 @testable import ShowMyCopy
 
-private struct NoMemoryReader: MemoryUsageReading {
-    func residentBytes() -> UInt64? { nil }
-}
-
 /// What the Storage settings show about the history saved on disk.
 @MainActor
 struct StorageUsagePersistenceTests {
@@ -16,13 +12,13 @@ struct StorageUsagePersistenceTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     private func makeUsage(_ store: PersistentHistoryStore) -> StorageUsage {
-        StorageUsage(history: AppHistory(store), memoryReader: NoMemoryReader())
+        StorageUsage(history: AppHistory(store), memoryReader: NoMemoryUsage())
     }
 
     // MARK: - Warnings
 
     @Test func historyInMemoryHasNoWarningAndNoDiskSize() {
-        let usage = StorageUsage(history: .unsaved(), memoryReader: NoMemoryReader())
+        let usage = StorageUsage(history: .unsaved(), memoryReader: NoMemoryUsage())
         #expect(usage.storageWarning == nil)
         #expect(usage.diskBytes == nil)
     }

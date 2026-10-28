@@ -126,19 +126,15 @@ struct HistoryLeftoversTests {
     @Test func storageSettingsShowTheDamagedCopy() {
         let leftovers = FakeHistoryLeftovers()
         let store = makeStore(leftovers: leftovers)
-        let usage = StorageUsage(history: AppHistory(store), memoryReader: NoMemory())
+        let usage = StorageUsage(history: AppHistory(store), memoryReader: NoMemoryUsage())
         #expect(usage.damagedHistoryBytes == 3000)
         #expect(usage.hasSomethingToClear)
 
         store.deleteDamagedHistory()
         #expect(usage.damagedHistoryBytes == nil)
         #expect(!usage.hasSomethingToClear)
-        #expect(StorageUsage(history: .unsaved(), memoryReader: NoMemory()).damagedHistoryBytes == nil)
+        #expect(StorageUsage(history: .unsaved(), memoryReader: NoMemoryUsage()).damagedHistoryBytes == nil)
     }
-}
-
-private struct NoMemory: MemoryUsageReading {
-    func residentBytes() -> UInt64? { nil }
 }
 
 /// The files on disk.
