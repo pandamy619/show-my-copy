@@ -6,6 +6,8 @@ import Testing
 @MainActor
 struct HistorySettingsTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
+    /// The clock of the history and the settings: shortly after the entries, so the age limit removes none of them.
+    private var now: Date { start + 60 }
 
     /// Runs `body` with an empty UserDefaults suite that is removed afterwards.
     private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
@@ -17,13 +19,14 @@ struct HistorySettingsTests {
 
     /// Settings as the app sets them up when it starts: the saved limit is applied to the history.
     private func makeSettings(history: ClipboardHistory, defaults: UserDefaults) -> HistorySettings {
-        let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
+        let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
         settings.applyStoredLimits()
         return settings
     }
 
     private func makeHistory(withEntries count: Int) -> ClipboardHistory {
-        let history = ClipboardHistory(limit: ClipboardHistory.limitRange.upperBound)
+        let history = ClipboardHistory(
+            retention: RetentionPolicy(entryLimit: ClipboardHistory.limitRange.upperBound), now: { [now] in now })
         for index in 0..<count {
             history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
         }
@@ -44,7 +47,7 @@ struct HistorySettingsTests {
             defaults.set(10, forKey: SettingsKey.historyLimit)
             let history = makeHistory(withEntries: 15)
 
-            let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
+            let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
 
             #expect(history.limit == ClipboardHistory.limitRange.upperBound)
             #expect(history.entries.count == 15)
@@ -56,7 +59,7 @@ struct HistorySettingsTests {
         try withDefaults { defaults in
             defaults.set(10, forKey: SettingsKey.historyLimit)
             let history = makeHistory(withEntries: 15)
-            let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
+            let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
 
             settings.applyStoredLimits()
 

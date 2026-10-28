@@ -3,7 +3,8 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// The age limit is saved, read back and applied like the other limits. It is off until Settings offers it.
+/// The age limit is saved, read back and applied like the other limits. Without a saved choice it is 8 hours; a
+/// saved choice, Off included, is kept.
 @MainActor
 struct HistoryAgeLimitTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
@@ -15,13 +16,45 @@ struct HistoryAgeLimitTests {
         return history
     }
 
-    @Test func offWhenNothingIsSaved() throws {
+    @Test func eightHoursWhenNothingIsSaved() throws {
         try TemporaryFolder.withDefaults { defaults in
-            #expect(HistoryAgeLimit.default == .off)
-            #expect(RetentionLimit.age.stored(in: defaults) == .off)
-            #expect(HistorySettings.storedRetention(in: defaults).maxAge == nil)
+            #expect(HistoryAgeLimit.default == .after(.seconds(8 * 3600)))
+            #expect(RetentionLimit.age.stored(in: defaults) == .after(.seconds(8 * 3600)))
+            #expect(HistorySettings.storedRetention(in: defaults).maxAge == .seconds(8 * 3600))
             // Reading the default does not save it, so a later default applies to everyone who never chose.
             #expect(defaults.object(forKey: SettingsKey.historyMaxAge) == nil)
+        }
+    }
+
+    @Test func aSavedOffIsKept() throws {
+        try TemporaryFolder.withDefaults { defaults in
+            let history = makeHistory(now: start + 30 * 86_400)
+            let settings = HistorySettings(history: history, defaults: defaults, now: { [start] in start })
+            settings.apply(.off, for: .age)
+            #expect(defaults.object(forKey: SettingsKey.historyMaxAge) as? Int == 0)
+            #expect(RetentionLimit.age.stored(in: defaults) == .off)
+            #expect(HistorySettings.storedRetention(in: defaults).maxAge == nil)
+
+            settings.applyStoredLimits()
+            #expect(history.entries.map(\.text) == ["recent", "old"])
+        }
+    }
+
+    /// With nothing saved, the saved limits applied at launch remove what was copied 8 hours ago or earlier.
+    /// Pinned entries stay.
+    @Test func theDefaultRemovesEntriesCopiedEightHoursAgoOrEarlierButNotPinnedOnes() throws {
+        try TemporaryFolder.withDefaults { defaults in
+            let now = start + 8 * 3600
+            let saved = [
+                StoreHarness.saved("just under", at: start + 1),
+                StoreHarness.saved("eight hours", at: start),
+                StoreHarness.saved("pinned", at: start - 86_400, pinned: true),
+            ]
+            let history = InMemoryHistoryStore(restoring: saved, at: now, retention: .default, now: { now })
+
+            HistorySettings(history: history, defaults: defaults, now: { now }).applyStoredLimits()
+
+            #expect(history.entries.map(\.text) == ["just under", "pinned"])
         }
     }
 

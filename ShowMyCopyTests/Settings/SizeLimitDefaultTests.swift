@@ -75,9 +75,10 @@ struct SizeLimitDefaultTests {
             let oldest = try bigImage(2)
             let newest = try bigImage(3)
             let history = InMemoryHistoryStore(
-                restoring: [newest, oldest, pinned], at: start, retention: RetentionPolicy(), blobs: blobs)
+                restoring: [newest, oldest, pinned], at: start, retention: RetentionPolicy(), blobs: blobs,
+                now: { [start] in start })
 
-            HistorySettings(history: history, defaults: defaults, now: { Date() }).applyStoredLimits()
+            HistorySettings(history: history, defaults: defaults, now: { [start] in start }).applyStoredLimits()
 
             #expect(history.entries.map(\.id) == [newest.id, pinned.id])
             #expect(blobs.allIDs().isDisjoint(with: Set(oldest.imageBlobIDs)))

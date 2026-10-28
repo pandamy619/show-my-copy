@@ -6,6 +6,9 @@ import Testing
 @MainActor
 struct HistorySizeLimitTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
+    /// The clock of the history and the settings: shortly after the entries, so the age limit removes none of them.
+    private var now: Date { start + 60 }
+    private let eightHours = HistoryAgeLimit.default.maxAge
 
     /// Runs `body` with an empty UserDefaults suite that is removed afterwards.
     private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
@@ -17,14 +20,15 @@ struct HistorySizeLimitTests {
 
     /// Settings as the app sets them up when it starts: the saved limits are applied to the history.
     private func makeSettings(history: ClipboardHistory, defaults: UserDefaults) -> HistorySettings {
-        let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
+        let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
         settings.applyStoredLimits()
         return settings
     }
 
     /// Entries "item 0" (oldest) to "item 9", 6 bytes each.
     private func makeHistory() -> ClipboardHistory {
-        let history = ClipboardHistory(limit: ClipboardHistory.limitRange.upperBound)
+        let history = ClipboardHistory(
+            retention: RetentionPolicy(entryLimit: ClipboardHistory.limitRange.upperBound), now: { [now] in now })
         for index in 0..<10 {
             history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
         }
@@ -54,7 +58,7 @@ struct HistorySizeLimitTests {
 
             let settings = makeSettings(history: history, defaults: defaults)
 
-            #expect(history.retention == RetentionPolicy(entryLimit: 120, byteLimit: 500_000_000))
+            #expect(history.retention == RetentionPolicy(entryLimit: 120, byteLimit: 500_000_000, maxAge: eightHours))
             #expect(settings.sizeLimit == .megabytes500)
             #expect(settings.limit == 120)
         }
@@ -64,7 +68,7 @@ struct HistorySizeLimitTests {
         try withDefaults { defaults in
             defaults.set(100_000_000, forKey: SettingsKey.historyByteLimit)
             let history = ClipboardHistory()
-            _ = HistorySettings(history: history, defaults: defaults, now: { Date() })
+            _ = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
             #expect(history.retention.byteLimit == nil)
         }
     }
@@ -126,19 +130,23 @@ struct HistorySizeLimitTests {
 
     @Test func storedRetentionHoldsBothSavedLimits() throws {
         try withDefaults { defaults in
-            #expect(HistorySettings.storedRetention(in: defaults) == RetentionPolicy(byteLimit: 1_000_000_000))
+            #expect(
+                HistorySettings.storedRetention(in: defaults)
+                    == RetentionPolicy(byteLimit: 1_000_000_000, maxAge: eightHours))
 
             defaults.set(120, forKey: SettingsKey.historyLimit)
             defaults.set(500_000_000, forKey: SettingsKey.historyByteLimit)
             #expect(
                 HistorySettings.storedRetention(in: defaults)
-                    == RetentionPolicy(entryLimit: 120, byteLimit: 500_000_000))
+                    == RetentionPolicy(entryLimit: 120, byteLimit: 500_000_000, maxAge: eightHours))
 
             defaults.set(5, forKey: SettingsKey.historyLimit)
             defaults.set(300_000_000, forKey: SettingsKey.historyByteLimit)
             #expect(
                 HistorySettings.storedRetention(in: defaults)
-                    == RetentionPolicy(entryLimit: RetentionPolicy.entryLimitRange.lowerBound, byteLimit: 500_000_000))
+                    == RetentionPolicy(
+                        entryLimit: RetentionPolicy.entryLimitRange.lowerBound, byteLimit: 500_000_000,
+                        maxAge: eightHours))
         }
     }
 
@@ -160,7 +168,7 @@ struct HistorySizeLimitTests {
     @Test func sizeLimitShowsTheOptionForTheHistorysByteLimit() throws {
         try withDefaults { defaults in
             let history = ClipboardHistory(retention: RetentionPolicy(byteLimit: 200_000_000))
-            let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
+            let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
             #expect(settings.sizeLimit == .megabytes500)
         }
     }
@@ -172,10 +180,10 @@ struct HistorySizeLimitTests {
 
             settings.apply(.megabytes100, for: .size)
             settings.apply(300, for: .entries)
-            #expect(history.retention == RetentionPolicy(entryLimit: 300, byteLimit: 100_000_000))
+            #expect(history.retention == RetentionPolicy(entryLimit: 300, byteLimit: 100_000_000, maxAge: eightHours))
 
             settings.apply(.megabytes500, for: .size)
-            #expect(history.retention == RetentionPolicy(entryLimit: 300, byteLimit: 500_000_000))
+            #expect(history.retention == RetentionPolicy(entryLimit: 300, byteLimit: 500_000_000, maxAge: eightHours))
         }
     }
 

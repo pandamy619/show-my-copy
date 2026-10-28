@@ -12,13 +12,16 @@ final class LimitAtFirstRead {
 
 @MainActor
 struct AppContainerTests {
-    private let store = ClipboardHistory(limit: ClipboardHistory.limitRange.upperBound)
+    /// On the container's clock, so the age limit measures entries against the same time as the monitor.
+    private let store = ClipboardHistory(
+        retention: RetentionPolicy(entryLimit: ClipboardHistory.limitRange.upperBound),
+        now: { ContainerFactory.date })
     private let pasteboard = FakePasteboard()
     private let sleeper = ManualSleeper()
     private let workspace = FakeNotifications()
     private let distributed = FakeNotifications()
     private let settingsWindow = SettingsWindowSpy()
-    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+    private let start = ContainerFactory.date
 
     /// Runs `body` with a container built from fakes and an empty UserDefaults suite that is removed afterwards.
     private func withContainer(
