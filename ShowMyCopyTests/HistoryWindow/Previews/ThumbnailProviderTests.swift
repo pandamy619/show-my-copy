@@ -32,7 +32,6 @@ struct ThumbnailProviderTests {
 
         // A row that appears again gets the cached thumbnail without reading the blob again.
         _ = await provider.thumbnail(for: image)
-        #expect(provider.loadCount == 1)
         #expect(blobs.totalReads == 1)
         #expect(decoder.decodeCount == 1)
     }
@@ -44,7 +43,7 @@ struct ThumbnailProviderTests {
         async let second = provider.thumbnail(for: image)
         let results = await [first, second]
         #expect(results.allSatisfy { $0 != nil })
-        #expect(provider.loadCount == 1)
+        #expect(blobs.totalReads == 1)
         #expect(decoder.decodeCount == 1)
     }
 

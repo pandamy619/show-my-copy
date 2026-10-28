@@ -27,9 +27,6 @@ final class ThumbnailProvider {
     private var failures: BoundedCache<BlobID, Bool>
     private var loads: [BlobID: Task<(any PreviewImage)?, Never>] = [:]
 
-    /// How many thumbnails were read from the blob store. Tests read it to check that the cache is used.
-    private(set) var loadCount = 0
-
     init(blobs: (any BlobStore)?, decoder: (any PreviewImageDecoding)?, limits: Limits = .standard) {
         self.blobs = blobs
         self.decoder = decoder
@@ -109,7 +106,6 @@ final class ThumbnailProvider {
         if let running = loads[id] {
             return await running.value
         }
-        loadCount += 1
         let task = Task { @MainActor [weak self] () -> (any PreviewImage)? in
             let loaded = await PreviewImageLoader.load(
                 id, from: blobs, decoder: decoder, maximumPixelSize: ThumbnailReference.maximumPixelSize)
