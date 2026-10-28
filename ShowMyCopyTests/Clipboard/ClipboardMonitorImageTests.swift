@@ -34,13 +34,6 @@ struct ClipboardMonitorImageTests {
         )
     }
 
-    /// Every blob an entry names is stored, and every stored blob belongs to an entry.
-    private func expectEveryBlobBelongsToAnEntry() {
-        let used = Set(history.entries.flatMap(\.content.blobIDs))
-        #expect(used.allSatisfy { blobs.contains($0) })
-        #expect(blobs.allIDs() == used)
-    }
-
     @Test func recordsACopiedImageAtOnceAndFillsItInWhenItIsSaved() async throws {
         let monitor = makeMonitor()
         monitor.poll()
@@ -107,7 +100,7 @@ struct ClipboardMonitorImageTests {
         #expect(history.entries.map(\.kind) == [.image, .text])
         #expect(history.currentEntryID == history.entries.first?.id)
         #expect(blobs.writeCount == 2)
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: history, in: blobs)
     }
 
     @Test func sameImageCopiedTwiceBeforeItIsSavedIsOneEntry() async {
@@ -127,7 +120,7 @@ struct ClipboardMonitorImageTests {
         await monitor.finishEnriching()
         #expect(history.entries.map(\.kind) == [.image, .text])
         #expect(history.currentEntryID == history.entries.first?.id)
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: history, in: blobs)
     }
 
     @Test func dataThatIsNotAnImageLeavesNoEntry() async {
@@ -188,7 +181,7 @@ struct ClipboardMonitorImageTests {
         #expect(history.entries.map(\.kind) == [.text, .image])
         #expect(history.currentEntryID == picked)
         #expect(history.entries.last?.content.image?.isSaved == true)
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: history, in: blobs)
     }
 
     @Test func copyingAnEntryBackWhileAnImageIsSavedLosesNoCopy() async throws {
@@ -212,7 +205,7 @@ struct ClipboardMonitorImageTests {
         let image = try #require(history.entries.last?.content.image)
         #expect(try blobs.read(image.blobID) == png)
         #expect(history.currentEntryID == older.id)
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: history, in: blobs)
     }
 
     @Test func imageCopiedBackBeforeItIsSavedIsWrittenFromTheCopiedBytes() async throws {
@@ -241,7 +234,7 @@ struct ClipboardMonitorImageTests {
         // The monitor does not record the app's own write again.
         monitor.poll()
         #expect(history.entries.map(\.kind) == [.image, .text])
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: history, in: blobs)
     }
 
     @Test func imageRemovedBeforeItIsSavedLeavesNoBlobs() async throws {

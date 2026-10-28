@@ -45,13 +45,6 @@ struct EntryDeleterUndoTests {
         return try #require(store.entries.first)
     }
 
-    /// Every blob an entry names is stored, and every stored blob belongs to an entry.
-    private func expectEveryBlobBelongsToAnEntry(sourceLocation: SourceLocation = #_sourceLocation) {
-        let used = Set(store.entries.flatMap(\.content.blobIDs))
-        #expect(used.allSatisfy { base.contains($0) }, sourceLocation: sourceLocation)
-        #expect(base.allIDs() == used, sourceLocation: sourceLocation)
-    }
-
     // MARK: - Undo
 
     @Test func undoBringsBackTheEntryWithItsFilesAndRecord() async throws {
@@ -70,7 +63,7 @@ struct EntryDeleterUndoTests {
         #expect(store.entries.last == image)
         #expect(disk.record(image.id) != nil)
         #expect(!deleter.canUndoDelete)
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
     }
 
     @Test func finishingDeletesTheFiles() async throws {
@@ -83,7 +76,7 @@ struct EntryDeleterUndoTests {
         #expect(store.entries.isEmpty)
         #expect(!deleter.canUndoDelete)
         #expect(deleter.undoDelete() == nil)
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
     }
 
     @Test func onlyTheLastDeletedEntryComesBack() async throws {
@@ -94,7 +87,7 @@ struct EntryDeleterUndoTests {
         deleter.delete(image.id)
         deleter.delete(text.id)
         // The image's files went with the second deletion.
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
 
         #expect(deleter.undoDelete() == text.id)
         #expect(store.entries.map(\.id) == [text.id])
@@ -125,7 +118,7 @@ struct EntryDeleterUndoTests {
         deleter.undoDelete()
 
         #expect(store.entries.map(\.id) == [image.id])
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
     }
 
     @Test func contentCopiedAgainMeanwhileIsNotAddedTwice() throws {
@@ -146,7 +139,7 @@ struct EntryDeleterUndoTests {
 
         #expect(deleter.undoDelete() == copiedAgain.id)
         #expect(store.entries.map(\.id) == [copiedAgain.id])
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
     }
 
     @Test func aPasswordWhoseTimeIsUpDoesNotComeBack() throws {
@@ -201,7 +194,7 @@ struct EntryDeleterUndoTests {
         await monitor.finishEnriching()
         #expect(store.entries.isEmpty)
         #expect(disk.records.isEmpty)
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
     }
 
     @Test func anImageStillBeingSavedThatRepeatsAnEarlierOneKeepsTheEarlierFiles() async throws {
@@ -221,7 +214,7 @@ struct EntryDeleterUndoTests {
         // The copy being saved turned out to be the earlier image, whose files stay with it.
         #expect(store.entries.map(\.id) == [between.id, earlier.id])
         #expect(try blobs.read(try #require(earlier.content.image).blobID) == png)
-        expectEveryBlobBelongsToAnEntry()
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
     }
 }
 

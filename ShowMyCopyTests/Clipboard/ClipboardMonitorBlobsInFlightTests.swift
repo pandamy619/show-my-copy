@@ -34,13 +34,6 @@ struct ClipboardMonitorBlobsInFlightTests {
                 maker: FakeFileThumbnailMaker(gate: fileGate), sleep: ManualTimers().sleep))
     }
 
-    /// Every blob an entry names is stored, and every stored blob belongs to an entry.
-    private func expectEveryBlobBelongsToAnEntry(_ history: any HistoryStore) {
-        let used = Set(history.entries.flatMap(\.content.blobIDs))
-        #expect(used.allSatisfy { base.contains($0) })
-        #expect(base.allIDs() == used)
-    }
-
     @Test func clearHistoryWhileAnImageIsSavedLeavesNoBrokenEntryAndNoBlobs() async {
         let store = makeStore()
         let monitor = makeMonitor(history: store)
@@ -54,7 +47,7 @@ struct ClipboardMonitorBlobsInFlightTests {
         imageGate.open()
         await monitor.finishEnriching()
         #expect(store.entries.isEmpty)
-        expectEveryBlobBelongsToAnEntry(store)
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
     }
 
     @Test func clearHistoryKeepsWhatWorkInFlightHasWrittenUntilItIsHandedOn() throws {
@@ -97,7 +90,7 @@ struct ClipboardMonitorBlobsInFlightTests {
         #expect(image.isSaved)
         #expect(try blobs.read(image.blobID) == png)
         #expect(store.entries.filter { $0.kind == .image }.count == 1)
-        expectEveryBlobBelongsToAnEntry(store)
+        expectEveryBlobBelongsToAnEntry(of: store, in: base)
     }
 
     @Test func sweepAtLaunchKeepsTheBlobsOfWorkInFlight() throws {
