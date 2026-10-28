@@ -10,6 +10,12 @@ import Foundation
 /// - Only within `window` of the copy.
 /// - Only when the clipboard is still empty at the next poll, with no new change. Many apps empty the clipboard and
 ///   write to it a moment later, some without a new change count; a poll can land in between.
+///
+/// While the monitor is paused (the Mac sleeps or the screen is locked) a password manager can still empty the
+/// clipboard, and the monitor sees it only after the pause. When it was emptied is not known then, only that it was
+/// after the pause began, so the window is measured to the beginning of the pause, and only when emptying the
+/// clipboard was the only change since: otherwise something else was copied meanwhile, and what was emptied is not
+/// known to be the entry.
 @MainActor
 final class ClearedClipboardCheck {
     /// How soon after a copy an emptied clipboard counts as a password manager clearing the password it copied.
@@ -23,26 +29,50 @@ final class ClearedClipboardCheck {
         let date: Date
     }
 
+    /// When the monitor stopped watching, and the change it had seen last then.
+    private struct Pause {
+        let changeCount: Int
+        let date: Date
+    }
+
     private let history: any HistoryStore
     private var suspect: Suspect?
+    /// The last pause, until a look after it finds no change or an emptied clipboard. When the first change after it
+    /// is something else, it stays, but then no later change can be the only one since it began.
+    private var pause: Pause?
 
     init(history: any HistoryStore) {
         self.history = history
     }
 
-    /// The clipboard was found empty at `changeCount`. Nothing is current any more. When the entry that was current
-    /// may be a password, the next poll looks again (`isWaiting(at:)`).
+    /// The monitor stops watching at `date`, for example because the screen is locked; it had seen the pasteboard at
+    /// `changeCount` last. Called only when it was watching until then, so the pause began at `date`.
+    func monitorPaused(changeCount: Int?, at date: Date) {
+        pause = changeCount.map { Pause(changeCount: $0, date: date) }
+    }
+
+    /// The monitor looked at the pasteboard while watching and found no change: nothing was emptied during a pause.
+    func monitorFoundNoChange() {
+        pause = nil
+    }
+
+    /// The clipboard was found empty at `changeCount`, at `date`. Nothing is current any more. When the entry that was
+    /// current may be a password, the next poll looks again (`isWaiting(at:)`).
     func clipboardWasEmptied(changeCount: Int, at date: Date) {
         defer { history.markCurrentSkipped() }
         suspect = nil
+        // Emptied while the monitor was paused, as the only change since: it may have been emptied right after the
+        // pause began.
+        let emptiedAt = pause.flatMap { $0.changeCount + 1 == changeCount ? $0.date : nil } ?? date
+        pause = nil
         guard let currentID = history.currentEntryID,
             let current = history.entries.first(where: { $0.id == currentID }),
             current.content.canBeConcealed,
-            date.timeIntervalSince(current.date) <= Self.window
+            emptiedAt.timeIntervalSince(current.date) <= Self.window
         else {
             return
         }
-        suspect = Suspect(entryID: currentID, changeCount: changeCount, date: date)
+        suspect = Suspect(entryID: currentID, changeCount: changeCount, date: emptiedAt)
     }
 
     /// Whether the clipboard was found empty at `changeCount` and the next look decides what that meant.

@@ -8,8 +8,9 @@ import AppKit
 ///   allow, and records text and rich text itself.
 /// - `capture` records images and files at once and fills in their data, sizes and thumbnails in the background. The
 ///   monitor goes on reading meanwhile, so no copy is missed while an image is saved.
-/// - `expiry` removes expired passwords and entries past the age limit on every look, and `clearedClipboard` may
-///   take the entry copied just before an emptied clipboard for a password.
+/// - `expiry` removes expired passwords and entries past the age limit on every look, and when the Mac wakes or the
+///   screen is unlocked while polling stays paused for another reason. `clearedClipboard` may take the entry copied
+///   just before an emptied clipboard for a password, also when the clipboard was emptied during a pause.
 @MainActor
 final class ClipboardMonitor: PasteboardChangeTracking {
     private let pasteboard: any PasteboardReading
@@ -75,12 +76,21 @@ final class ClipboardMonitor: PasteboardChangeTracking {
 
     /// Stops polling while the Mac sleeps or the screen is locked. Polling resumes when every reason is cleared.
     func pause(for reason: PollingSchedule.PauseReason) {
+        if schedule.isWatching {
+            clearedClipboard.monitorPaused(changeCount: lastChangeCount, at: now())
+        }
         sourceOfNextChangeIsUnknown = true
         schedule.pause(for: reason)
     }
 
+    /// Clears one pause reason. Polling resumes, with a look at the pasteboard right away, when it was the last one.
+    /// Otherwise, for example when the Mac wakes with the screen still locked, what expired meanwhile goes all the
+    /// same: passwords are not kept longer because another reason still pauses polling.
     func resume(for reason: PollingSchedule.PauseReason) {
         schedule.resume(for: reason)
+        if schedule.isStarted, !schedule.isWatching {
+            expiry.removeExpired()
+        }
     }
 
     /// Clears every pause reason. Call it when the user does something only a person at the unlocked Mac can do,
@@ -119,6 +129,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
             if schedule.isWatching {
                 // Nothing changed while the monitor was away, so the next change happens while it is watching.
                 sourceOfNextChangeIsUnknown = false
+                clearedClipboard.monitorFoundNoChange()
             }
             // An app that empties the clipboard may fill it a moment later without a new change count, so an
             // emptied clipboard is looked at once more.
