@@ -48,6 +48,32 @@ final class ThumbnailProvider {
         state(of: file.reference)
     }
 
+    /// What a row shows for `image` once its thumbnail is loaded: the thumbnail, `failed`, or `loading` while the
+    /// image's data is still being saved. A row calls it each time its entry hands it another reference
+    /// (`.task(id:)`), and never decides from what it showed for the reference before: an image recorded before its
+    /// data was saved gets its thumbnail a moment later, in the same row.
+    func loadedState(for image: ImageReference) async -> PreviewLoadState<any PreviewImage> {
+        let shown = state(for: image)
+        guard shown.isLoading, image.isSaved else {
+            return shown
+        }
+        return await thumbnail(for: image).map { .loaded($0) } ?? .failed
+    }
+
+    /// What a copied file shows once its thumbnail is loaded: the thumbnail, or `failed` for its icon, also while it
+    /// has none. Like `loadedState(for:)` of an image: files get their thumbnails after they are recorded
+    /// (`HistoryStore.addFileDetails`), so a row or preview item asks again for each thumbnail it is given.
+    func loadedState(for file: FileThumbnail?) async -> PreviewLoadState<any PreviewImage> {
+        guard let file else {
+            return .failed
+        }
+        let shown = state(for: file)
+        guard shown.isLoading else {
+            return shown
+        }
+        return await thumbnail(for: file).map { .loaded($0) } ?? .failed
+    }
+
     /// Loads the thumbnail of `image`, or gives the cached one. Nil when the image has no thumbnail or it could not
     /// be read or decoded. Cancelling the caller (a row that scrolled away) does not cancel the shared load: its
     /// result is still cached for the next time the row appears.

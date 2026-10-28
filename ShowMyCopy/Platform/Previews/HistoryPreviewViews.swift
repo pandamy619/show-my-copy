@@ -48,11 +48,7 @@ struct EntryThumbnail: View {
         // later, in the same row.
         .task(id: image) {
             state = provider.state(for: image)
-            guard state.isLoading, image.isSaved else {
-                return
-            }
-            let loaded = await provider.thumbnail(for: image)
-            state = loaded.map { .loaded($0) } ?? .failed
+            state = await provider.loadedState(for: image)
         }
     }
 }

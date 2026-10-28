@@ -44,12 +44,11 @@ struct FileThumbnailIcon: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+        // Worked out again for every thumbnail the file is given: SwiftUI keeps `state` when the row is updated, and
+        // a file recorded without a thumbnail (`failed`, its icon) gets one a moment later, in the same row.
         .task(id: thumbnail?.blobID) {
-            guard let thumbnail, state.isLoading else {
-                return
-            }
-            let loaded = await provider.thumbnail(for: thumbnail)
-            state = loaded.map { .loaded($0) } ?? .failed
+            state = thumbnail.map { provider.state(for: $0) } ?? .failed
+            state = await provider.loadedState(for: thumbnail)
         }
     }
 }

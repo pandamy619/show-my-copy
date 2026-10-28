@@ -77,6 +77,21 @@ struct ThumbnailProviderTests {
         #expect(blobs.totalReads == 1)
     }
 
+    /// What a row shows, asked each time its entry gives it another reference: an image still being saved is
+    /// loading without a read, then its thumbnail; a file without a thumbnail shows its icon, then its thumbnail.
+    @Test func loadedStateFollowsTheReferenceItIsGiven() async throws {
+        let unsaved = ImageReference.unsaved(blobID: BlobID(), typeIdentifier: "public.png", byteSize: 4)
+        let provider = ThumbnailProvider(blobs: blobs, decoder: decoder)
+        #expect(await provider.loadedState(for: unsaved).isLoading)
+        #expect(blobs.totalReads == 0)
+        #expect(await provider.loadedState(for: try storedImage()).value != nil)
+
+        #expect(await provider.loadedState(for: nil).isFailed)
+        let file = try ContentFixtures.fileWithThumbnail("/Users/me/a.jpg", in: blobs)
+        #expect(await provider.loadedState(for: file.thumbnail).value != nil)
+        #expect(await provider.loadedState(for: ContentFixtures.imageReference()).isFailed)
+    }
+
     @Test func dataThatIsNotAnImageFails() async throws {
         let image = try storedImage(thumbnail: FakeImageDecoder.notAnImage)
         let provider = ThumbnailProvider(blobs: blobs, decoder: decoder)

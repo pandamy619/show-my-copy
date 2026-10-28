@@ -81,7 +81,8 @@ struct ThumbnailAfterCopyTests {
             let row = try #require(app.model.items.first)
             let recorded = try #require(row.content.image)
             #expect(!recorded.isSaved)
-            #expect(app.model.thumbnails.state(for: recorded).isLoading)
+            // What the row shows while the image is being saved.
+            #expect(await app.model.thumbnails.loadedState(for: recorded).isLoading)
 
             #expect(await listChanges(of: app.model) { await app.monitor.finishEnriching() })
             let completed = try #require(app.model.items.first)
@@ -91,7 +92,8 @@ struct ThumbnailAfterCopyTests {
             #expect(saved.isSaved)
             #expect(blobExists(thumbnail.blobID, in: app))
 
-            let loaded = try #require(await app.model.thumbnails.thumbnail(for: saved) as? FakePreviewImage)
+            // The same row, given the saved image.
+            let loaded = try #require(await app.model.thumbnails.loadedState(for: saved).value as? FakePreviewImage)
             #expect(loaded.data == imageThumbnail)
             #expect(app.model.thumbnails.state(for: saved).value != nil)
         }
@@ -104,11 +106,11 @@ struct ThumbnailAfterCopyTests {
             app.monitor.poll()
             app.model.prepareForPresentation()
             let recorded = try #require(app.model.selectedEntry?.content.image)
-            #expect(app.model.thumbnails.state(for: recorded).isLoading)
+            #expect(await app.model.thumbnails.loadedState(for: recorded).isLoading)
 
             await app.monitor.finishEnriching()
             let saved = try #require(app.model.selectedEntry?.content.image)
-            #expect(await app.model.thumbnails.thumbnail(for: saved) != nil)
+            #expect(await app.model.thumbnails.loadedState(for: saved).value != nil)
             #expect(app.model.thumbnails.state(for: saved).value != nil)
         }
     }
@@ -150,6 +152,8 @@ struct ThumbnailAfterCopyTests {
                 return
             }
             #expect(recorded.first?.thumbnail == nil)
+            // The row shows the file's icon: there is no thumbnail yet.
+            #expect(await app.model.thumbnails.loadedState(for: recorded.first?.thumbnail).isFailed)
 
             #expect(await listChanges(of: app.model) { await app.monitor.finishEnriching() })
             let completed = try #require(app.model.items.first)
@@ -160,8 +164,9 @@ struct ThumbnailAfterCopyTests {
             }
             let thumbnail = try #require(files.first?.thumbnail)
             #expect(blobExists(thumbnail.blobID, in: app))
+            // The same row, given the thumbnail: what it showed for the file without one does not stick.
             #expect(app.model.thumbnails.state(for: thumbnail).isLoading)
-            #expect(await app.model.thumbnails.thumbnail(for: thumbnail) != nil)
+            #expect(await app.model.thumbnails.loadedState(for: thumbnail).value != nil)
             #expect(app.model.thumbnails.state(for: thumbnail).value != nil)
         }
     }
