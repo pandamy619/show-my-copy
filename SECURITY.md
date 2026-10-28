@@ -10,7 +10,7 @@ There are no releases yet. Security fixes go to the `main` branch; once releases
 
 ## Security model
 
-### Today (0.1)
+### Today (0.1.0)
 
 - **No network.** The app itself makes no connections: it is sandboxed without network entitlements, so macOS blocks any connection it tries to make. This covers the app's own process only. Work macOS does for it in system processes, such as QuickLook drawing file thumbnails, runs outside the app's sandbox (see below). CI builds the Release configuration with ad-hoc signing and checks its signed entitlements (`make security`).
 - **Stored on this Mac only.** The history is saved in the app's sandbox container (`~/Library/Containers/…/Data/Library/Application Support/ShowMyCopy/History/History.store`, a SwiftData/SQLite store) so it survives quitting the app. It is never synced (no CloudKit) or sent anywhere, and the folder is excluded from Time Machine and other backups. Clear History in Settings deletes it from disk as well, together with a damaged copy (see below) and, when the history could not be opened at this launch, the store that could not be opened; removed and expired entries are deleted from disk right away, or with the next change when writing failed. The first launch of this build deletes, without reading it, the history that development builds saved in an earlier format directly in `Application Support/ShowMyCopy` (database, side files, damaged copy and `Blobs/`).
@@ -35,7 +35,7 @@ There are no releases yet. Security fixes go to the `main` branch; once releases
 
 - **Some unmarked passwords are kept.** A password copied without a marker from an app that is not a known password manager — for example from a browser extension or a text file — is kept like any other text, unless a password manager empties the clipboard within 3 minutes. The same rule can remove an ordinary text entry when an app empties the clipboard soon after you copy it and leaves it empty.
 - **The first copy after launch, sleep or unlock** has no known source app, so only markers tell whether it is a password.
-- **Very large copies are read before their size is known.** macOS has no way to tell the size of copied text, styled text or an image before reading it, and the app reads the clipboard on its main thread, since AppKit does not document reading it from another thread as safe. So copying hundreds of megabytes can make the app pause and use that much memory for a moment before it skips the item as too large. The app reads as little as it can: one image type, and for styled text the plain text first, skipping the item without reading its larger RTF when the plain text is already too large.
+- **Very large copies are read before their size is known.** macOS has no way to tell the size of copied text, styled text or an image before reading it, and the app reads the clipboard on its main thread, since AppKit does not document reading it from another thread as safe. So copying hundreds of megabytes can make the app pause and use that much memory for a moment before it skips the item as too large (text over 1 MB, image data over 20 MB). The app reads as little as it can: one image type, and for styled text the plain text first, skipping the item without reading its larger RTF when the plain text is already too large.
 - **Images are decoded in the app's process.** The format allowlist and the pixel limit narrow what reaches ImageIO, but a flaw in one of the allowed decoders (for example WebP) would still run in the process that holds the history.
 - **Saved passwords are plain text in memory** while they are kept; the mask only hides them on screen.
 - **Where the encryption key is kept.** The app has no keychain entitlement, so macOS does not let it use the keychain that keeps an item on one Mac only and readable only while the Mac is unlocked. The key is kept in your login keychain instead: Time Machine backs it up, and Migration Assistant can move it to a new Mac together with the history. When the app's code signature changes, for example in a copy you built yourself, macOS asks whether Show My Copy may use the key the next time a password is saved or loaded.
@@ -48,4 +48,4 @@ There are no releases yet. Security fixes go to the `main` branch; once releases
 ### Planned
 
 - Paste into the active app. Accessibility will be requested only if you turn this on.
-- Releases, with CI checking the signed entitlements of every release build.
+- Releases. CI already builds the Release configuration with ad-hoc signing and checks its signed entitlements for every pull request and every push to main.
