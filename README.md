@@ -32,7 +32,7 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Storage at a glance.** Settings show how much the history takes, split into text, rich text, images, files and passwords, its size on disk, how much memory the app uses, and a warning if the history cannot be saved. A size limit of 100 MB, 500 MB or 1 GB (1 GB by default; it can be turned off) asks before removing old entries.
 - **Pauses while the Mac sleeps or the screen is locked.**
 - **Passwords are not kept** by default: items that password managers mark as concealed and anything copied from a known password manager are skipped, as are items marked as transient or auto-generated. When a password manager clears a password it copied without a marker, the entry leaves the history too: text copied shortly before the clipboard is emptied, if it stays empty.
-- **Save passwords, if you want.** Turn it on in Settings to keep passwords hidden in the history: an eye button reveals one, search skips them, and they are removed after 1 minute, 10 minutes or 1 hour.
+- **Save passwords, if you want.** Turn it on in Settings to keep passwords hidden in the history: an eye button reveals one, search skips them, and they are removed after 1 minute, 10 minutes or 1 hour. If the clipboard still holds a password when it is removed, the clipboard is emptied too. Settings show their size only rounded up to whole kilobytes, so it never tells a password's length.
 - **No menu bar icon, no Dock icon.**
 - **English and Russian** interface.
 - **Private by design.** No analytics. Sandboxed without network access, so the app itself makes no connections; file thumbnails are drawn by macOS QuickLook outside the sandbox, for local files only (see [SECURITY.md](SECURITY.md)).
