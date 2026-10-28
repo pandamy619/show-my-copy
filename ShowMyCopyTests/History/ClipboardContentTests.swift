@@ -62,7 +62,7 @@ private struct ConstantHasher: ContentHasher {
 }
 
 @MainActor
-struct ClipboardHistoryContentHashTests {
+struct InMemoryHistoryStoreContentHashTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     @Test func canonicallyEqualTextIsOneEntry() {
