@@ -11,9 +11,6 @@ final class KeychainSecretSealer: SecretSealing {
     static let service = "com.pandamy619.ShowMyCopy.history-key"
     static let account = "history-encryption-key"
 
-    private static let logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "com.pandamy619.ShowMyCopy", category: "security")
-
     private let sealer: VersionedSecretSealer<AESGCMCipher>
 
     /// Loads the history key from the Keychain, or creates and stores one on first use.
@@ -31,7 +28,8 @@ final class KeychainSecretSealer: SecretSealing {
             keyData = try SealingKey.loadOrCreate(in: keyStores, generate: Self.newKeyData)
         } catch {
             // The error holds only status codes and lengths, never key material.
-            Self.logger.error("History encryption key unavailable: \(String(describing: error), privacy: .public)")
+            AppLogger.security.error(
+                "History encryption key unavailable: \(String(describing: error), privacy: .public)")
             throw error
         }
         sealer = VersionedSecretSealer(cipher: AESGCMCipher(key: SymmetricKey(data: keyData)))

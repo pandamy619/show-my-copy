@@ -9,4 +9,7 @@ enum AppLogger {
 
     /// Saving and loading the history. Log what failed and how many entries, never what they hold.
     static let history = Logger(subsystem: subsystem, category: "history")
+
+    /// The encryption key of saved passwords. Log why it is unavailable, never the key or what it seals.
+    static let security = Logger(subsystem: subsystem, category: "security")
 }
