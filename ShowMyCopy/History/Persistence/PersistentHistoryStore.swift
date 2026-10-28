@@ -167,6 +167,12 @@ final class PersistentHistoryStore: HistoryStore, HistoryStorage {
         change { $0.remove(id: id) }
     }
 
+    /// Writes the entries it puts back, like any other change: in one transaction, and with the next change when
+    /// that fails.
+    func restore(_ entries: [ClipboardEntry]) {
+        change { $0.restore(entries) }
+    }
+
     /// Removes every entry from memory and every record from disk, also records that were not loaded, any copy
     /// of a history that could not be opened, or the store itself while it cannot be opened (`HistoryLeftovers`),
     /// and with them every saved image. When deleting the records fails, the next write tries again.

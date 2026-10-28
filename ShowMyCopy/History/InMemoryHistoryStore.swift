@@ -299,9 +299,9 @@ final class InMemoryHistoryStore: HistoryStore {
 
 extension InMemoryHistoryStore {
     /// Adds entries saved before that could not be loaded with the others, such as saved passwords that waited for
-    /// their key, each at its place by date. An entry whose ID or content is in the history already is not added:
-    /// the one in the history was recorded in this session and may be current. Nothing becomes current, and the
-    /// limits apply afterwards.
+    /// their key, or entries removed earlier in this session (see `HistoryStore.restore(_:)`), each at its place by
+    /// date. An entry whose ID or content is in the history already is not added: the one in the history was recorded
+    /// in this session and may be current. Nothing becomes current, and the limits apply afterwards.
     func restore(_ restored: [ClipboardEntry]) {
         var ids = Set(entries.map(\.id))
         var hashes = Set(entries.map(\.contentHash))

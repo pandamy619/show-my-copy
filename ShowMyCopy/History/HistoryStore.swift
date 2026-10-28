@@ -95,7 +95,18 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// Removes every concealed entry, after the user turned off saving passwords.
     func removeConcealed()
 
+    /// Removes one entry with its blobs, for example after the user deleted it in the history window.
     func remove(id: ClipboardEntry.ID)
+
+    /// Puts back entries removed earlier in this session, such as one the user deleted and then brought back with
+    /// Undo: each at its place by date, with its ID, content, blobs, source app, concealment and expiry. An entry
+    /// whose ID or content the history holds already (it was copied again meanwhile) is not added, and none becomes
+    /// current: what is on the pasteboard now is not known to be it. The limits apply afterwards.
+    ///
+    /// The store owns the blobs of the entries it adds from this call on. Those of entries it does not add stay with
+    /// the caller, who must keep them from being deleted while the entry is out of the history (see
+    /// `InFlightBlobStore`).
+    func restore(_ entries: [ClipboardEntry])
 
     /// Removes every entry.
     @discardableResult
