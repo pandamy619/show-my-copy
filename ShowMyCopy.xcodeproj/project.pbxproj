@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		AA00000000000000000000A3 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = AA00000000000000000000A2 /* KeyboardShortcuts */; };
+		E35B7A853091D33A00B290BD /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E35B7A843091D33900B290BD /* WidgetKit.framework */; };
+		E35B7A873091D33A00B290BD /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E35B7A863091D33A00B290BD /* SwiftUI.framework */; };
+		E35B7A963091D33B00B290BD /* ShowMyCopyControlExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E35B7A823091D33900B290BD /* ShowMyCopyControlExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -18,15 +21,50 @@
 			remoteGlobalIDString = AA0000000000000000000008;
 			remoteInfo = ShowMyCopy;
 		};
+		E35B7A943091D33B00B290BD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E35B7A813091D33900B290BD;
+			remoteInfo = ShowMyCopyControlExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E35B7A973091D33B00B290BD /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E35B7A963091D33B00B290BD /* ShowMyCopyControlExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		AA0000000000000000000004 /* ShowMyCopy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShowMyCopy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000005 /* ShowMyCopyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShowMyCopyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000000000000000000001B /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
-		AA000000000000000000001E /* ShowMyCopy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShowMyCopy.entitlements; sourceTree = "<group>"; };
 		AA000000000000000000001C /* Tests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Tests.xcconfig; sourceTree = "<group>"; };
+		AA000000000000000000001E /* ShowMyCopy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShowMyCopy.entitlements; sourceTree = "<group>"; };
+		E35B7A823091D33900B290BD /* ShowMyCopyControlExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShowMyCopyControlExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E35B7A843091D33900B290BD /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		E35B7A863091D33A00B290BD /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		E35B7AC03091D33B00B290BD /* Widget.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Widget.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E35B7A9A3091D33B00B290BD /* Exceptions for "ShowMyCopyControl" folder in "ShowMyCopyControlExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E35B7A813091D33900B290BD /* ShowMyCopyControlExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA0000000000000000000006 /* ShowMyCopy */ = {
@@ -37,6 +75,14 @@
 		AA0000000000000000000007 /* ShowMyCopyTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ShowMyCopyTests;
+			sourceTree = "<group>";
+		};
+		E35B7A883091D33A00B290BD /* ShowMyCopyControl */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E35B7A9A3091D33B00B290BD /* Exceptions for "ShowMyCopyControl" folder in "ShowMyCopyControlExtension" target */,
+			);
+			path = ShowMyCopyControl;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -57,6 +103,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E35B7A7F3091D33900B290BD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E35B7A873091D33A00B290BD /* SwiftUI.framework in Frameworks */,
+				E35B7A853091D33A00B290BD /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -66,18 +121,10 @@
 				AA000000000000000000001D /* Config */,
 				AA0000000000000000000006 /* ShowMyCopy */,
 				AA0000000000000000000007 /* ShowMyCopyTests */,
+				E35B7A883091D33A00B290BD /* ShowMyCopyControl */,
+				E35B7A833091D33900B290BD /* Frameworks */,
 				AA0000000000000000000003 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		AA000000000000000000001D /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				AA000000000000000000001B /* Shared.xcconfig */,
-				AA000000000000000000001C /* Tests.xcconfig */,
-				AA000000000000000000001E /* ShowMyCopy.entitlements */,
-			);
-			path = Config;
 			sourceTree = "<group>";
 		};
 		AA0000000000000000000003 /* Products */ = {
@@ -85,8 +132,29 @@
 			children = (
 				AA0000000000000000000004 /* ShowMyCopy.app */,
 				AA0000000000000000000005 /* ShowMyCopyTests.xctest */,
+				E35B7A823091D33900B290BD /* ShowMyCopyControlExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000001D /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000001B /* Shared.xcconfig */,
+				AA000000000000000000001C /* Tests.xcconfig */,
+				E35B7AC03091D33B00B290BD /* Widget.xcconfig */,
+				AA000000000000000000001E /* ShowMyCopy.entitlements */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		E35B7A833091D33900B290BD /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E35B7A843091D33900B290BD /* WidgetKit.framework */,
+				E35B7A863091D33A00B290BD /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -99,10 +167,12 @@
 				AA000000000000000000000A /* Sources */,
 				AA000000000000000000000B /* Frameworks */,
 				AA000000000000000000000C /* Resources */,
+				E35B7A973091D33B00B290BD /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				E35B7A953091D33B00B290BD /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AA0000000000000000000006 /* ShowMyCopy */,
@@ -138,6 +208,28 @@
 			productReference = AA0000000000000000000005 /* ShowMyCopyTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		E35B7A813091D33900B290BD /* ShowMyCopyControlExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E35B7A9B3091D33B00B290BD /* Build configuration list for PBXNativeTarget "ShowMyCopyControlExtension" */;
+			buildPhases = (
+				E35B7A7E3091D33900B290BD /* Sources */,
+				E35B7A7F3091D33900B290BD /* Frameworks */,
+				E35B7A803091D33900B290BD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E35B7A883091D33A00B290BD /* ShowMyCopyControl */,
+			);
+			name = ShowMyCopyControlExtension;
+			packageProductDependencies = (
+			);
+			productName = ShowMyCopyControlExtension;
+			productReference = E35B7A823091D33900B290BD /* ShowMyCopyControlExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -145,7 +237,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2600;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					AA0000000000000000000008 = {
@@ -154,6 +246,9 @@
 					AA0000000000000000000009 = {
 						CreatedOnToolsVersion = 26.0;
 						TestTargetID = AA0000000000000000000008;
+					};
+					E35B7A813091D33900B290BD = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -177,6 +272,7 @@
 			targets = (
 				AA0000000000000000000008 /* ShowMyCopy */,
 				AA0000000000000000000009 /* ShowMyCopyTests */,
+				E35B7A813091D33900B290BD /* ShowMyCopyControlExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -190,6 +286,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA000000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E35B7A803091D33900B290BD /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -213,6 +316,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E35B7A7E3091D33900B290BD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -220,6 +330,11 @@
 			isa = PBXTargetDependency;
 			target = AA0000000000000000000008 /* ShowMyCopy */;
 			targetProxy = AA0000000000000000000011 /* PBXContainerItemProxy */;
+		};
+		E35B7A953091D33B00B290BD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E35B7A813091D33900B290BD /* ShowMyCopyControlExtension */;
+			targetProxy = E35B7A943091D33B00B290BD /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -286,7 +401,6 @@
 				CODE_SIGN_ENTITLEMENTS = Config/ShowMyCopy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show My Copy";
@@ -296,7 +410,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pandamy619.ShowMyCopy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -311,7 +424,6 @@
 				CODE_SIGN_ENTITLEMENTS = Config/ShowMyCopy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Show My Copy";
@@ -321,7 +433,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pandamy619.ShowMyCopy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -334,9 +445,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pandamy619.ShowMyCopyTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -350,13 +459,129 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pandamy619.ShowMyCopyTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShowMyCopy.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShowMyCopy";
+			};
+			name = Release;
+		};
+		E35B7A983091D33B00B290BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E35B7AC03091D33B00B290BD /* Widget.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/ShowMyCopyControl.entitlements;
+				INFOPLIST_FILE = ShowMyCopyControl/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShowMyCopyControl;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pandamy619.ShowMyCopy.ShowMyCopyControl;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+			};
+			name = Debug;
+		};
+		E35B7A993091D33B00B290BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E35B7AC03091D33B00B290BD /* Widget.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/ShowMyCopyControl.entitlements;
+				INFOPLIST_FILE = ShowMyCopyControl/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShowMyCopyControl;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pandamy619.ShowMyCopy.ShowMyCopyControl;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 			};
 			name = Release;
 		};
@@ -386,6 +611,15 @@
 			buildConfigurations = (
 				AA0000000000000000000019 /* Debug */,
 				AA000000000000000000001A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E35B7A9B3091D33B00B290BD /* Build configuration list for PBXNativeTarget "ShowMyCopyControlExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E35B7A983091D33B00B290BD /* Debug */,
+				E35B7A993091D33B00B290BD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -92,9 +92,11 @@ class Fixture:
             # Tests that need an entitlements file add their own CODE_SIGN_ENTITLEMENTS line.
             self.pbxproj = re.sub(r"\t+CODE_SIGN_ENTITLEMENTS = [^\n]*\n", "", handle.read())
         self.save()
-        for name in (SHARED, TESTS):
-            with open(os.path.join(REPO, name), encoding="utf-8") as handle:
-                self.write(name, handle.read())
+        # Every xcconfig the project uses, such as one per target, so the fixture project reads like the real one.
+        for name in sorted(os.listdir(os.path.join(REPO, "Config"))):
+            if name.endswith(".xcconfig"):
+                with open(os.path.join(REPO, "Config", name), encoding="utf-8") as handle:
+                    self.write("Config/" + name, handle.read())
 
     def read(self, relative: str) -> str:
         with open(os.path.join(self.root, relative), encoding="utf-8") as handle:
@@ -203,9 +205,12 @@ class ProjectFixtureTests(CheckerTestCase):
                     self.assertEqual(settings.get("SWIFT_VERSION"), "6.0")
                     self.assertEqual(settings.get("SWIFT_STRICT_CONCURRENCY"), "complete")
                     self.assertEqual(settings.get("SWIFT_TREAT_WARNINGS_AS_ERRORS"), "YES")
-                    self.assertEqual(settings.get("MACOSX_DEPLOYMENT_TARGET"), "15.0")
+                    # The Control Center widget needs macOS 26 (Config/Widget.xcconfig); everything else runs on 15.
+                    widget = name == "ShowMyCopyControlExtension"
+                    self.assertEqual(settings.get("MACOSX_DEPLOYMENT_TARGET"), "26.0" if widget else "15.0")
                     self.assertEqual(settings.get("ENABLE_OUTGOING_NETWORK_CONNECTIONS"), "NO")
-                    self.assertEqual(settings.get("ENABLE_APP_SANDBOX"), "YES" if name == "ShowMyCopy" else "NO")
+                    # Only the test bundle runs outside the sandbox (Config/Tests.xcconfig).
+                    self.assertEqual(settings.get("ENABLE_APP_SANDBOX"), "NO" if name == "ShowMyCopyTests" else "YES")
 
     def test_target_xcconfig_overrides_the_project_xcconfig(self) -> None:
         # The tests' file turns the sandbox off; the same line in the app's settings is caught.
