@@ -41,6 +41,24 @@ struct HistoryStoreAgeContractTests {
         #expect(store.entries.map(\.id) == [pinned.id])
     }
 
+    /// A password has its own expiry as well as the age limit: whichever comes first removes it.
+    @Test(arguments: StoreKind.allCases)
+    func aPasswordGoesAtItsExpiryOrAtTheAgeLimitWhicheverComesFirst(store kind: StoreKind) throws {
+        let store = try harness.make(kind, retention: eightHours)
+        store.record(text: "expires first", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        store.record(
+            text: "age limit first", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 16 * 3600)
+
+        store.removeExpired(at: start + 600)
+        #expect(store.entries.map(\.text) == ["age limit first"])
+
+        store.removeExpired(at: start + 8 * 3600)
+        #expect(store.entries.map(\.text) == ["age limit first"])
+
+        store.removeExpired(at: start + 8 * 3600 + 1)
+        #expect(store.entries.isEmpty)
+    }
+
     @Test(arguments: StoreKind.allCases)
     func removeExpiredChangesNothingWhileNothingIsTooOld(store kind: StoreKind) throws {
         let store = try harness.make(kind, retention: eightHours)
