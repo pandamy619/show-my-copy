@@ -23,9 +23,10 @@ struct StorageBreakdownKindTests {
                 StorageBreakdown.Part(category: .richText, count: 1, bytes: 55),
                 StorageBreakdown.Part(category: .images, count: 1, bytes: 1100),
                 StorageBreakdown.Part(category: .files, count: 1, bytes: "/Users/me/a.txt".utf8.count + 5),
-                StorageBreakdown.Part(category: .passwords, count: 1, bytes: 6),
+                StorageBreakdown.Part(category: .passwords, count: 1, bytes: 1000),
             ])
-        #expect(breakdown.totalBytes == history.stats().totalBytes)
+        // The password is shown as a whole kilobyte (`PasswordSizeTests`), everything else as it is.
+        #expect(breakdown.totalBytes == history.stats().totalBytes - 6 + 1000)
     }
 
     @Test func concealedRichTextCountsAsAPassword() {

@@ -48,15 +48,14 @@ struct StorageUsageTests {
 
         let breakdown = makeUsage(history: history).breakdown
 
-        // "пароль" is 6 Cyrillic letters, 2 bytes each in UTF-8.
+        // "пароль" is 6 Cyrillic letters, 2 bytes each in UTF-8, shown as a whole kilobyte (`PasswordSizeTests`).
         #expect(
             breakdown.parts == [
                 StorageBreakdown.Part(category: .text, count: 2, bytes: 8),
-                StorageBreakdown.Part(category: .passwords, count: 1, bytes: 12),
+                StorageBreakdown.Part(category: .passwords, count: 1, bytes: 1000),
             ])
         #expect(breakdown.totalCount == 3)
-        #expect(breakdown.totalBytes == 20)
-        #expect(breakdown.totalBytes == history.stats().totalBytes)
+        #expect(breakdown.totalBytes == 1008)
     }
 
     @Test func leavesOutCategoriesWithoutEntries() {
@@ -76,7 +75,7 @@ struct StorageUsageTests {
 
     @Test func fractionsShareTheTotalSize() {
         let history = InMemoryHistoryStore()
-        history.record(text: String(repeating: "a", count: 30), sourceApp: nil, at: start)
+        history.record(text: String(repeating: "a", count: 3000), sourceApp: nil, at: start)
         history.record(
             text: String(repeating: "b", count: 10), sourceApp: nil, at: start + 1, concealed: true,
             expiresAt: start + 60)
@@ -93,7 +92,7 @@ struct StorageUsageTests {
 
         history.conceal(id: id, expiresAt: start + 60)
 
-        #expect(usage.breakdown.parts == [StorageBreakdown.Part(category: .passwords, count: 1, bytes: 7)])
+        #expect(usage.breakdown.parts == [StorageBreakdown.Part(category: .passwords, count: 1, bytes: 1000)])
     }
 
     @Test func computesOncePerRevision() {
@@ -145,7 +144,7 @@ struct StorageUsageTests {
         let usage = makeUsage(history: history)
 
         let forecast = usage.clearForecast
-        #expect(forecast == HistoryStats(count: 2, totalBytes: 11))
+        #expect(forecast == HistoryStats(count: 2, totalBytes: 1005))
 
         let result = usage.clearHistory()
         #expect(result == ClearResult(removedCount: forecast.count, freedBytes: forecast.totalBytes))
