@@ -45,6 +45,16 @@ final class FakePasteboardBackend: PasteboardBackend {
         return count
     }
 
+    func clearContents() -> Int {
+        changeCount += 1
+        strings = [:]
+        datas = [:]
+        writtenObjects = []
+        types = []
+        ownedChangeCount = changeCount
+        return changeCount
+    }
+
     func setString(_ string: String, forType dataType: NSPasteboard.PasteboardType) -> Bool {
         guard !failingTypes.contains(dataType), ownedChangeCount == changeCount else {
             return false
@@ -176,6 +186,26 @@ struct SystemPasteboardTests {
         // Without the marker other clipboard managers would keep the password, so the text is not written.
         #expect(pasteboard.write("hunter2", concealed: true) == nil)
         #expect(pasteboard.string() == nil)
+    }
+
+    @Test func clearEmptiesThePasteboardItStillHolds() throws {
+        backend.otherAppCopies("hunter2")
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: nil)
+
+        let changeCount = try #require(pasteboard.clearContents(ifChangeCountIs: 1))
+        #expect(changeCount == 2)
+        #expect(pasteboard.string() == nil)
+        #expect(pasteboard.types.isEmpty)
+    }
+
+    @Test func clearLeavesANewerCopyAlone() {
+        backend.otherAppCopies("deleted entry")
+        backend.otherAppCopies("copied since")
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: nil)
+
+        #expect(pasteboard.clearContents(ifChangeCountIs: 1) == nil)
+        #expect(backend.changeCount == 2)
+        #expect(pasteboard.string() == "copied since")
     }
 
     @Test func readsPassThrough() {

@@ -11,6 +11,8 @@ final class ChangeTrackerSpy: PasteboardChangeTracking {
     }
 
     private(set) var calls: [Call] = []
+    /// What the monitor says it saw last; an acknowledged change sets it, as in the monitor.
+    var handledChangeCount: Int?
 
     func poll() {
         calls.append(.poll)
@@ -18,6 +20,7 @@ final class ChangeTrackerSpy: PasteboardChangeTracking {
 
     func acknowledge(changeCount: Int) {
         calls.append(.acknowledge(changeCount: changeCount))
+        handledChangeCount = changeCount
     }
 
     func userIsActive() {
