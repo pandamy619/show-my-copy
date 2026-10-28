@@ -52,6 +52,32 @@ struct AppContainerImageTests {
         }
     }
 
+    /// The window deletes in the blob store the history and the background work share, so Undo brings an image back
+    /// with its data and closing the window deletes it.
+    @Test func deletedImageComesBackWithUndoAndItsDataGoesWhenTheWindowCloses() async throws {
+        try await withDefaults { defaults in
+            let store = InMemoryHistoryStore(blobs: blobs)
+            let container = makeContainer(store: store, blobs: blobs, defaults: defaults)
+            pasteboard.copy([.png: Data([0x89, 0x50])])
+            container.monitor.poll()
+            await container.monitor.finishEnriching()
+            let image = try #require(store.entries.first)
+            let window = container.historyWindow
+            window.show()
+
+            #expect(window.handleCommandKey(.delete))
+            #expect(store.entries.isEmpty)
+            #expect(pasteboard.text == nil && pasteboard.types.isEmpty)
+            #expect(window.handleCommandKey(.undo))
+            #expect(store.entries == [image])
+            #expect(base.allIDs() == Set(image.content.blobIDs))
+
+            #expect(window.handleCommandKey(.delete))
+            window.hide()
+            #expect(base.allIDs().isEmpty)
+        }
+    }
+
     @Test func withoutABlobStoreFilesGetNoThumbnails() async throws {
         try await withDefaults { defaults in
             let store = InMemoryHistoryStore()

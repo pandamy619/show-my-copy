@@ -253,6 +253,78 @@ struct HistoryWindowControllerTests {
         return frame
     }
 
+    // MARK: - Deleting
+
+    private func makeDeletingController() -> (HistoryWindowController, EntryDeleter) {
+        let deleter = EntryDeleter(
+            history: history, pasteboard: pasteboard, monitor: monitor, blobs: nil, now: { [start] in start })
+        let controller = HistoryWindowController(
+            model: HistoryWindowModel(history: history, deleter: deleter),
+            copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
+            monitor: monitor,
+            onOpenSettings: {}
+        )
+        return (controller, deleter)
+    }
+
+    @Test func commandDeleteDeletesTheSelectedEntryAndKeepsTheWindowOpen() {
+        pasteboard.copy("older")
+        monitor.poll()
+        pasteboard.copy("on the clipboard")
+        let (controller, _) = makeDeletingController()
+        controller.show()
+
+        #expect(controller.handleCommandKey(.delete))
+
+        #expect(controller.isVisible)
+        #expect(controller.model.items.map(\.text) == ["older"])
+        #expect(controller.model.selectedEntry?.text == "older")
+        #expect(pasteboard.text == nil)
+    }
+
+    @Test func commandKeysGoOnWhileTheWindowIsClosedOrHasNothingToDo() {
+        pasteboard.copy("older")
+        monitor.poll()
+        let (controller, _) = makeDeletingController()
+
+        #expect(!controller.handleCommandKey(.delete))
+        #expect(history.entries.count == 1)
+
+        controller.show()
+        // Nothing to bring back: ⌘Z undoes typing in the search field.
+        #expect(!controller.handleCommandKey(.undo))
+    }
+
+    @Test func closingTheWindowEndsUndo() {
+        pasteboard.copy("older")
+        monitor.poll()
+        let (controller, deleter) = makeDeletingController()
+        controller.show()
+        #expect(controller.handleCommandKey(.delete))
+        #expect(deleter.canUndoDelete)
+
+        controller.hide()
+        #expect(!deleter.canUndoDelete)
+
+        controller.show()
+        #expect(!controller.handleCommandKey(.undo))
+        #expect(controller.model.items.isEmpty)
+    }
+
+    @Test func commandZInTheOpenWindowBringsTheEntryBack() {
+        history.record(text: "older", sourceApp: nil, at: start)
+        history.record(text: "newer", sourceApp: nil, at: start + 1)
+        let (controller, _) = makeDeletingController()
+        controller.show()
+        #expect(controller.handleCommandKey(.delete))
+
+        #expect(controller.handleCommandKey(.undo))
+
+        #expect(controller.isVisible)
+        #expect(controller.model.items.map(\.text) == ["newer", "older"])
+        #expect(controller.model.selectedEntry?.text == "newer")
+    }
+
     @Test func showUnhidesTheApp() {
         // Closing Settings hides the app to give focus back to the previous app. A hidden app shows no windows.
         NSApplication.shared.hide(nil)
