@@ -123,8 +123,9 @@ enum HistoryAgeLimit: Hashable, Sendable {
     case off
     case after(Duration)
 
-    /// Off until Settings offers the age limit.
-    static let `default` = HistoryAgeLimit.off
+    /// 8 hours, for everyone who has not chosen: clipboard history is private, so it is kept no longer than a working
+    /// day unless the user asks for longer. A saved choice, Off included, stays.
+    static let `default` = HistoryAgeLimit.after(.seconds(8 * 3600))
 
     init(maxAge: Duration?) {
         guard let maxAge, maxAge > .zero else {
