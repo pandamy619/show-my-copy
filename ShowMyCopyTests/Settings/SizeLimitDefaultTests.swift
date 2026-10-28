@@ -9,13 +9,6 @@ struct SizeLimitDefaultTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     /// Runs `body` with an empty UserDefaults suite that is removed afterwards.
-    private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
-        let suiteName = "ShowMyCopyTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        try body(defaults)
-    }
-
     private func savedValue(in defaults: UserDefaults) -> Int? {
         defaults.object(forKey: SettingsKey.historyByteLimit) as? Int
     }
@@ -26,7 +19,7 @@ struct SizeLimitDefaultTests {
     }
 
     @Test func withNothingSavedTheLimitIsOneGigabyte() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             #expect(RetentionLimit.size.stored(in: defaults) == .gigabyte1)
             #expect(HistorySettings.storedRetention(in: defaults).byteLimit == 1_000_000_000)
             // Reading the default does not save it, so a later default would apply to everyone who never chose.
@@ -39,7 +32,7 @@ struct SizeLimitDefaultTests {
         (1_000_000_000, .gigabyte1),
     ])
     func aSavedChoiceIsKept(saved: Int, limit: HistorySizeLimit) throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(saved, forKey: SettingsKey.historyByteLimit)
             #expect(RetentionLimit.size.stored(in: defaults) == limit)
             #expect(savedValue(in: defaults) == saved)
@@ -47,7 +40,7 @@ struct SizeLimitDefaultTests {
     }
 
     @Test func deliberateNoLimitIsKept() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let settings = HistorySettings(history: InMemoryHistoryStore(), defaults: defaults, now: { Date() })
             settings.apply(.noLimit, for: .size)
             #expect(RetentionLimit.size.stored(in: defaults) == .noLimit)
@@ -58,7 +51,7 @@ struct SizeLimitDefaultTests {
     /// The default is applied through the history's retention: the oldest unpinned entries go with their image
     /// files, pinned entries stay.
     @Test func defaultTrimsTheOldestEntriesThroughRetention() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let blobs = InMemoryBlobStore()
             // Small blobs that say they are 600 MB, so two do not fit in 1 GB.
             func bigImage(_ byte: UInt8) throws -> ClipboardEntry {

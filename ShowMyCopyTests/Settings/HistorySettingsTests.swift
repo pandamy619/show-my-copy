@@ -10,13 +10,6 @@ struct HistorySettingsTests {
     private var now: Date { start + 60 }
 
     /// Runs `body` with an empty UserDefaults suite that is removed afterwards.
-    private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
-        let suiteName = "ShowMyCopyTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        try body(defaults)
-    }
-
     /// Settings as the app sets them up when it starts: the saved limit is applied to the history.
     private func makeSettings(history: InMemoryHistoryStore, defaults: UserDefaults) -> HistorySettings {
         let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
@@ -34,7 +27,7 @@ struct HistorySettingsTests {
     }
 
     @Test func usesDefaultLimitWhenNothingIsSaved() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = InMemoryHistoryStore(limit: 200)
             let settings = makeSettings(history: history, defaults: defaults)
             #expect(settings.limit == RetentionPolicy.defaultEntryLimit)
@@ -43,7 +36,7 @@ struct HistorySettingsTests {
     }
 
     @Test func creatingSettingsLeavesTheHistoryAlone() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(10, forKey: SettingsKey.historyLimit)
             let history = makeHistory(withEntries: 15)
 
@@ -56,7 +49,7 @@ struct HistorySettingsTests {
     }
 
     @Test func applyingTheStoredLimitTrimsTheHistory() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(10, forKey: SettingsKey.historyLimit)
             let history = makeHistory(withEntries: 15)
             let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
@@ -72,7 +65,7 @@ struct HistorySettingsTests {
     }
 
     @Test func appliesSavedLimitToHistory() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(120, forKey: SettingsKey.historyLimit)
             let history = InMemoryHistoryStore()
             _ = makeSettings(history: history, defaults: defaults)
@@ -82,7 +75,7 @@ struct HistorySettingsTests {
 
     @Test(arguments: [(0, 10), (-5, 10), (10, 10), (1000, 1000), (99_999, 1000)])
     func savedLimitIsClamped(saved: Int, expected: Int) throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(saved, forKey: SettingsKey.historyLimit)
             #expect(RetentionLimit.entries.stored(in: defaults) == expected)
             #expect(makeSettings(history: InMemoryHistoryStore(), defaults: defaults).limit == expected)
@@ -90,7 +83,7 @@ struct HistorySettingsTests {
     }
 
     @Test func ignoresSavedValueOfWrongType() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set("lots", forKey: SettingsKey.historyLimit)
             #expect(RetentionLimit.entries.stored(in: defaults) == RetentionPolicy.defaultEntryLimit)
             defaults.set(["a": 1], forKey: SettingsKey.historyLimit)
@@ -99,7 +92,7 @@ struct HistorySettingsTests {
     }
 
     @Test func appliedLimitPersistsAcrossInstances() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let first = makeSettings(history: InMemoryHistoryStore(), defaults: defaults)
             first.apply(300, for: .entries)
             #expect(defaults.object(forKey: SettingsKey.historyLimit) as? Int == 300)
@@ -112,7 +105,7 @@ struct HistorySettingsTests {
     }
 
     @Test func applySavesClampedValue() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let settings = makeSettings(history: InMemoryHistoryStore(), defaults: defaults)
             settings.apply(5000, for: .entries)
             #expect(settings.limit == 1000)
@@ -121,7 +114,7 @@ struct HistorySettingsTests {
     }
 
     @Test func raisingLimitNeedsNoConfirmation() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let settings = makeSettings(history: makeHistory(withEntries: 30), defaults: defaults)
             let change = settings.propose(500, for: .entries)
             #expect(change == LimitChange(limit: 500, removedCount: 0, freedBytes: 0))
@@ -130,7 +123,7 @@ struct HistorySettingsTests {
     }
 
     @Test func loweringLimitAboveEntryCountNeedsNoConfirmation() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let settings = makeSettings(history: makeHistory(withEntries: 15), defaults: defaults)
             #expect(!settings.propose(20, for: .entries).needsConfirmation)
             #expect(!settings.propose(15, for: .entries).needsConfirmation)
@@ -138,7 +131,7 @@ struct HistorySettingsTests {
     }
 
     @Test func loweringLimitBelowEntryCountNeedsConfirmation() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = makeHistory(withEntries: 40)
             let settings = makeSettings(history: history, defaults: defaults)
             let change = settings.propose(25, for: .entries)
@@ -153,14 +146,14 @@ struct HistorySettingsTests {
     }
 
     @Test func proposalIsClamped() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let settings = makeSettings(history: makeHistory(withEntries: 40), defaults: defaults)
             #expect(settings.propose(1, for: .entries) == LimitChange(limit: 10, removedCount: 30, freedBytes: 200))
         }
     }
 
     @Test func applyingLowerLimitTrimsOldestEntries() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = makeHistory(withEntries: 40)
             let settings = makeSettings(history: history, defaults: defaults)
             settings.apply(25, for: .entries)

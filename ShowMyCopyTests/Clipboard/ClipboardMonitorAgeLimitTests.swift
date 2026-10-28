@@ -15,7 +15,7 @@ struct ClipboardMonitorAgeLimitTests {
     /// A history with the limits of someone who never chose, on the environment's clock, starting with `saved`.
     private func makeDefaultHistory(restoring saved: [ClipboardEntry] = []) throws -> InMemoryHistoryStore {
         var retention = RetentionPolicy.default
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             retention = HistorySettings.storedRetention(in: defaults)
         }
         return InMemoryHistoryStore(
@@ -116,7 +116,7 @@ struct ClipboardMonitorAgeLimitTests {
     }
 
     @Test func aChangedLimitAppliesFromTheNextPoll() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = try makeDefaultHistory()
             let settings = HistorySettings(
                 history: history, defaults: defaults, now: { [environment] in environment.now })
@@ -145,7 +145,7 @@ struct ClipboardMonitorAgeLimitTests {
     }
 
     @Test func withTheAgeLimitOffNothingGoesForAge() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = try makeDefaultHistory()
             let settings = HistorySettings(
                 history: history, defaults: defaults, now: { [environment] in environment.now })

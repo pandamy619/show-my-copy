@@ -5,21 +5,14 @@ import Testing
 
 struct FirstLaunchTests {
     /// Runs `body` with an empty UserDefaults suite that is removed afterwards.
-    private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
-        let suiteName = "ShowMyCopyTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        try body(defaults)
-    }
-
     @Test func showsSettingsOnTheFirstLaunch() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             #expect(FirstLaunch(defaults: defaults).shouldShowSettings)
         }
     }
 
     @Test func showsSettingsOnlyOnce() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let firstLaunch = FirstLaunch(defaults: defaults)
             firstLaunch.settingsWereShown()
             #expect(!firstLaunch.shouldShowSettings)
@@ -29,7 +22,7 @@ struct FirstLaunchTests {
     }
 
     @Test func showsSettingsAgainWhenTheyWereNotShown() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             _ = FirstLaunch(defaults: defaults).shouldShowSettings
             #expect(FirstLaunch(defaults: defaults).shouldShowSettings)
         }

@@ -17,7 +17,7 @@ struct HistoryAgeLimitTests {
     }
 
     @Test func eightHoursWhenNothingIsSaved() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             #expect(HistoryAgeLimit.default == .after(.seconds(8 * 3600)))
             #expect(RetentionLimit.age.stored(in: defaults) == .after(.seconds(8 * 3600)))
             #expect(HistorySettings.storedRetention(in: defaults).maxAge == .seconds(8 * 3600))
@@ -27,7 +27,7 @@ struct HistoryAgeLimitTests {
     }
 
     @Test func aSavedOffIsKept() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = makeHistory(now: start + 30 * 86_400)
             let settings = HistorySettings(history: history, defaults: defaults, now: { [start] in start })
             settings.apply(.off, for: .age)
@@ -43,7 +43,7 @@ struct HistoryAgeLimitTests {
     /// With nothing saved, the saved limits applied at launch remove what was copied 8 hours ago or earlier.
     /// Pinned entries stay.
     @Test func theDefaultRemovesEntriesCopiedEightHoursAgoOrEarlierButNotPinnedOnes() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let now = start + 8 * 3600
             let saved = [
                 StoreHarness.saved("just under", at: start + 1),
@@ -59,7 +59,7 @@ struct HistoryAgeLimitTests {
     }
 
     @Test func aSavedAgeLimitIsReadInSecondsAndZeroIsOff() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(8 * 3600, forKey: SettingsKey.historyMaxAge)
             #expect(RetentionLimit.age.stored(in: defaults) == .after(.seconds(8 * 3600)))
             #expect(HistorySettings.storedRetention(in: defaults).maxAge == .seconds(8 * 3600))
@@ -70,7 +70,7 @@ struct HistoryAgeLimitTests {
     }
 
     @Test func ignoresSavedValuesOfWrongTypeOrSign() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             for value: Any in ["long", ["a": 1], -1, Int.min] {
                 defaults.set(value, forKey: SettingsKey.historyMaxAge)
                 #expect(RetentionLimit.age.stored(in: defaults) == .default)
@@ -79,7 +79,7 @@ struct HistoryAgeLimitTests {
     }
 
     @Test func applyingAnAgeLimitSavesItAndRemovesOlderEntries() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let now = start + 9 * 3600
             let history = makeHistory(now: now)
             let settings = HistorySettings(history: history, defaults: defaults, now: { now })
@@ -102,7 +102,7 @@ struct HistoryAgeLimitTests {
     }
 
     @Test func theAgeLimitKeepsTheOtherLimits() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = InMemoryHistoryStore()
             let settings = HistorySettings(history: history, defaults: defaults, now: { Date() })
             settings.apply(300, for: .entries)
@@ -116,7 +116,7 @@ struct HistoryAgeLimitTests {
     }
 
     @Test func storedLimitsAreAppliedTogether() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(3600, forKey: SettingsKey.historyMaxAge)
             let history = InMemoryHistoryStore()
             HistorySettings(history: history, defaults: defaults, now: { Date() }).applyStoredLimits()

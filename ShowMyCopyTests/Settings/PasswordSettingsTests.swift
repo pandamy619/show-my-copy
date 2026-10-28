@@ -8,20 +8,13 @@ struct PasswordSettingsTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     /// Runs `body` with an empty UserDefaults suite that is removed afterwards.
-    private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
-        let suiteName = "ShowMyCopyTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        try body(defaults)
-    }
-
     private func makeSettings(history: InMemoryHistoryStore? = nil, defaults: UserDefaults) -> PasswordSettings {
         PasswordSettings(
             history: .unsaved(history ?? InMemoryHistoryStore()), defaults: defaults, now: { [start] in start })
     }
 
     @Test func passwordsAreNotSavedByDefault() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let settings = makeSettings(defaults: defaults)
             #expect(!settings.savesPasswords)
             #expect(settings.lifetime == .tenMinutes)
@@ -32,7 +25,7 @@ struct PasswordSettingsTests {
 
     /// A damaged copy of the history may hold passwords; the storage the app was given deletes it.
     @Test func turningSavingOffDeletesTheDamagedCopyThroughTheStorage() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let storage = UnsavedHistoryStorage()
             let settings = PasswordSettings(
                 history: AppHistory(store: InMemoryHistoryStore(), storage: storage), defaults: defaults,
@@ -50,7 +43,7 @@ struct PasswordSettingsTests {
     }
 
     @Test func choicesPersistAcrossInstances() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let first = makeSettings(defaults: defaults)
             first.savesPasswords = true
             first.lifetime = .oneHour
@@ -63,7 +56,7 @@ struct PasswordSettingsTests {
     }
 
     @Test func storedSavesPasswordsReadsTheSavedChoice() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             #expect(!PasswordSettings.storedSavesPasswords(in: defaults))
             makeSettings(defaults: defaults).savesPasswords = true
             #expect(PasswordSettings.storedSavesPasswords(in: defaults))
@@ -73,7 +66,7 @@ struct PasswordSettingsTests {
     }
 
     @Test func storedSavesPasswordsIgnoresAValueOfTheWrongType() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set("yes", forKey: SettingsKey.savePasswords)
             #expect(!PasswordSettings.storedSavesPasswords(in: defaults))
             #expect(!makeSettings(defaults: defaults).savesPasswords)
@@ -82,14 +75,14 @@ struct PasswordSettingsTests {
 
     @Test(arguments: [0, 59, 601, -1])
     func unknownSavedLifetimeFallsBackToDefault(saved: Int) throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(saved, forKey: SettingsKey.passwordLifetime)
             #expect(makeSettings(defaults: defaults).lifetime == .tenMinutes)
         }
     }
 
     @Test func savedValuesOfWrongTypeAreIgnored() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set("yes", forKey: SettingsKey.savePasswords)
             defaults.set("long", forKey: SettingsKey.passwordLifetime)
             let settings = makeSettings(defaults: defaults)
@@ -99,7 +92,7 @@ struct PasswordSettingsTests {
     }
 
     @Test func turningSavingOffRemovesConcealedEntriesRightAway() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = InMemoryHistoryStore()
             let settings = makeSettings(history: history, defaults: defaults)
             settings.savesPasswords = true
@@ -113,7 +106,7 @@ struct PasswordSettingsTests {
     }
 
     @Test func turningSavingOnKeepsEntries() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = InMemoryHistoryStore()
             history.record(text: "plain", sourceApp: nil, at: start)
             let settings = makeSettings(history: history, defaults: defaults)
@@ -123,7 +116,7 @@ struct PasswordSettingsTests {
     }
 
     @Test func shorterLifetimeAppliesToSavedPasswords() throws {
-        try withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = InMemoryHistoryStore()
             let settings = makeSettings(history: history, defaults: defaults)
             settings.savesPasswords = true

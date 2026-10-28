@@ -31,15 +31,8 @@ struct AppContainerImageTests {
             defaults: defaults)
     }
 
-    private func withDefaults(_ body: @MainActor (UserDefaults) async throws -> Void) async throws {
-        let suiteName = "ShowMyCopyTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        try await body(defaults)
-    }
-
     @Test func copiedPhotoFilesGetThumbnailsInTheBlobStore() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let store = InMemoryHistoryStore(blobs: blobs)
             let container = makeContainer(
                 store: store, blobs: blobs, defaults: defaults, fileThumbnails: FakeFileThumbnailMaker())
@@ -55,7 +48,7 @@ struct AppContainerImageTests {
     /// The window deletes in the blob store the history and the background work share, so Undo brings an image back
     /// with its data and closing the window deletes it.
     @Test func deletedImageComesBackWithUndoAndItsDataGoesWhenTheWindowCloses() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let store = InMemoryHistoryStore(blobs: blobs)
             let container = makeContainer(store: store, blobs: blobs, defaults: defaults)
             pasteboard.copy([.png: Data([0x89, 0x50])])
@@ -79,7 +72,7 @@ struct AppContainerImageTests {
     }
 
     @Test func withoutABlobStoreFilesGetNoThumbnails() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let store = InMemoryHistoryStore()
             let maker = FakeFileThumbnailMaker()
             let container = makeContainer(store: store, blobs: nil, defaults: defaults, fileThumbnails: maker)
@@ -91,7 +84,7 @@ struct AppContainerImageTests {
     }
 
     @Test func imagesAreStoredInTheBlobStoreAndCopiedBack() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let store = InMemoryHistoryStore(blobs: blobs)
             let container = makeContainer(store: store, blobs: blobs, defaults: defaults)
             pasteboard.copy([.png: Data([0x89, 0x50])])
@@ -108,7 +101,7 @@ struct AppContainerImageTests {
     }
 
     @Test func historyWindowReadsThumbnailsAndFullImagesFromTheBlobStore() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let store = InMemoryHistoryStore(blobs: blobs)
             let container = makeContainer(store: store, blobs: blobs, defaults: defaults)
             pasteboard.copy([.png: Data([0x89, 0x50])])
@@ -132,7 +125,7 @@ struct AppContainerImageTests {
     }
 
     @Test func withoutABlobStoreImagesAreNotRead() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let store = InMemoryHistoryStore()
             let container = makeContainer(store: store, blobs: nil, defaults: defaults)
             pasteboard.copy([.png: Data([0x89, 0x50])])
@@ -143,7 +136,7 @@ struct AppContainerImageTests {
     }
 
     @Test func quittingWaitsUntilAnImageBeingSavedIsInTheHistory() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let gate = AsyncGate()
             let store = InMemoryHistoryStore(blobs: blobs)
             let container = makeContainer(
@@ -164,7 +157,7 @@ struct AppContainerImageTests {
     }
 
     @Test func quittingWaitsNoLongerThanTheBudget() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let gate = AsyncGate()
             let timers = ManualTimers()
             let store = InMemoryHistoryStore(blobs: blobs)
@@ -188,7 +181,7 @@ struct AppContainerImageTests {
     }
 
     @Test func quittingWithNothingBeingSavedDoesNotWait() async throws {
-        try await withDefaults { defaults in
+        try await ContainerFactory.withDefaults { defaults in
             let container = makeContainer(store: InMemoryHistoryStore(blobs: blobs), blobs: blobs, defaults: defaults)
             await container.finishCapturing(within: AppContainer.quitBudget)
             #expect(AppContainer.quitBudget == .seconds(2))

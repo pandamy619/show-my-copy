@@ -37,7 +37,7 @@ struct HistoryAgeLimitOptionsTests {
     /// the longest option when none does, as the size limit does. 0 stays Off.
     @Test(arguments: savedValuesAndOptions)
     func aSavedValueBecomesAnOption(saved: Int, option: Int) throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             defaults.set(saved, forKey: SettingsKey.historyMaxAge)
             let stored = RetentionLimit.age.stored(in: defaults)
             #expect(stored.seconds == option)
@@ -47,7 +47,7 @@ struct HistoryAgeLimitOptionsTests {
     }
 
     @Test func aProposedValueBecomesAnOption() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = InMemoryHistoryStore(retention: .default, now: { [start] in start })
             let settings = HistorySettings(history: history, defaults: defaults, now: { [start] in start })
             #expect(settings.propose(.after(.seconds(90)), for: .age).limit == .after(.seconds(hour)))
@@ -60,7 +60,7 @@ struct HistoryAgeLimitOptionsTests {
 
     /// The picker shows the option for a history whose policy was set to another age, rather than nothing.
     @Test func theValueInEffectShowsAsAnOption() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = InMemoryHistoryStore(retention: RetentionPolicy(maxAge: .seconds(2 * hour)))
             let settings = HistorySettings(history: history, defaults: defaults, now: { [start] in start })
             #expect(settings.value(of: .age) == .after(.seconds(8 * hour)))

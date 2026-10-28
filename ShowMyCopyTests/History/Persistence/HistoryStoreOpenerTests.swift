@@ -71,7 +71,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func aStoreThatOpensIsUsed() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try savedStore(in: folder)
                 let opened = open(in: folder, defaults: defaults)
                 #expect(opened.error == nil)
@@ -83,7 +83,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func aStoreThatFailsForAMomentIsTriedAgain() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try savedStore(in: folder)
                 spy.transientFailures = HistoryStoreOpener.attemptsPerLaunch - 1
 
@@ -98,7 +98,7 @@ struct HistoryStoreOpenerTests {
     /// Another build, a full disk or a busy store: the history is not moved aside after one bad launch.
     @Test func aDatabaseThatCannotBeOpenedIsLeftWhereItIs() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try savedStore(in: folder)
                 spy.failsWhileTheStoreExists = true
 
@@ -116,7 +116,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func aDatabaseIsMovedAsideOnlyAfterFailingOnSeveralLaunchesInARow() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try savedStore(in: folder)
                 spy.failsWhileTheStoreExists = true
                 for _ in 1..<HistoryStoreOpener.failedLaunchesBeforeReset {
@@ -138,7 +138,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func aLaunchThatOpensTheStoreStartsTheCountAgain() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try savedStore(in: folder)
                 for _ in 1..<HistoryStoreOpener.failedLaunchesBeforeReset {
                     spy.failsWhileTheStoreExists = true
@@ -156,7 +156,7 @@ struct HistoryStoreOpenerTests {
     @Test(arguments: [Data("not a database at all, just bytes".utf8), Data(), Data("SQLite".utf8)])
     func aFileThatIsNotADatabaseIsMovedAsideAtOnce(contents: Data) throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try savedStore(in: folder, data: contents)
                 spy.failsWhileTheStoreExists = true
 
@@ -170,7 +170,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func aNewerDamagedCopyReplacesTheOlderOne() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try TemporaryFolder.write(Data("older".utf8), to: "History.store.damaged", in: folder)
                 try TemporaryFolder.write(Data("older".utf8), to: "History.store.damaged-shm", in: folder)
                 try savedStore(in: folder, data: Data("newer".utf8))
@@ -185,7 +185,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func withoutAStoreAFailureMovesNothing() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 spy.alwaysFails = true
                 for _ in 0...HistoryStoreOpener.failedLaunchesBeforeReset {
                     let opened = open(in: folder, defaults: defaults)
@@ -200,7 +200,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func noDamagedCopyMeansNoLeftovers() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 #expect(open(in: folder, defaults: defaults).leftovers?.hasFiles() == false)
                 try TemporaryFolder.write(to: "History.store.damaged", in: folder)
                 #expect(open(in: folder, defaults: defaults).leftovers?.hasFiles() == true)
@@ -212,7 +212,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func aDamagedCopyIsDeletedAtTheFirstLaunchAWeekAfterItWasMovedAside() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try damagedCopy(in: folder, movedAsideAt: now - HistoryStoreOpener.damagedCopyLifetime - 1)
                 let opened = open(in: folder, defaults: defaults)
                 #expect(!TemporaryFolder.exists("History.store.damaged", in: folder))
@@ -224,7 +224,7 @@ struct HistoryStoreOpenerTests {
 
     @Test func aYoungerDamagedCopyIsKept() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try damagedCopy(in: folder, movedAsideAt: now - HistoryStoreOpener.damagedCopyLifetime + 60)
                 #expect(open(in: folder, defaults: defaults).leftovers?.hasFiles() == true)
                 #expect(TemporaryFolder.exists("History.store.damaged-wal", in: folder))
@@ -235,7 +235,7 @@ struct HistoryStoreOpenerTests {
     /// The store's own date is when it was last written; the week counts from when it was moved aside.
     @Test func aCopyIsDatedWhenItIsMovedAside() throws {
         try TemporaryFolder.with { folder in
-            try TemporaryFolder.withDefaults { defaults in
+            try TestDefaults.with { defaults in
                 try savedStore(in: folder, data: Data("damaged".utf8))
                 try FileManager.default.setAttributes(
                     [.modificationDate: now - 30 * 24 * 3600],

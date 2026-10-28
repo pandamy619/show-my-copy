@@ -27,12 +27,4 @@ enum TemporaryFolder {
     static func exists(_ name: String, in folder: URL) -> Bool {
         FileManager.default.fileExists(atPath: folder.appending(path: name).path(percentEncoded: false))
     }
-
-    /// A fresh UserDefaults suite, removed after `body`.
-    static func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
-        let suiteName = "ShowMyCopyTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        try body(defaults)
-    }
 }

@@ -86,7 +86,7 @@ struct HistoryLeftoversTests {
     }
 
     @Test func turningOffSavePasswordsDeletesTheDamagedCopy() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let leftovers = FakeHistoryLeftovers()
             let store = makeStore(leftovers: leftovers)
             let settings = PasswordSettings(history: AppHistory(store), defaults: defaults, now: { Date() })
@@ -100,7 +100,7 @@ struct HistoryLeftoversTests {
 
     /// With saving off from the start, the copy was made from a store whose passwords were already deleted.
     @Test func startingWithSavePasswordsOffKeepsTheDamagedCopy() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let leftovers = FakeHistoryLeftovers()
             let store = makeStore(leftovers: leftovers)
             _ = PasswordSettings(history: AppHistory(store), defaults: defaults, now: { Date() })

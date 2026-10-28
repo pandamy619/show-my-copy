@@ -12,7 +12,7 @@ struct LimitDraftTests {
     /// clock a day later.
     private func withSettings(_ body: (InMemoryHistoryStore, HistorySettings) throws -> Void) throws {
         let now = start + 86_400
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let history = InMemoryHistoryStore(retention: RetentionPolicy(entryLimit: 1000), now: { now })
             for index in 0..<15 {
                 history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
