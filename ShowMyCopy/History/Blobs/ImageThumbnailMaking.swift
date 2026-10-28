@@ -1,6 +1,6 @@
 import Foundation
 
-/// What `ThumbnailMaking` learned about image data.
+/// What `ImageThumbnailMaking` learned about image data.
 struct ImageInspection: Equatable, Sendable {
     struct Thumbnail: Equatable, Sendable {
         /// PNG data.
@@ -28,7 +28,7 @@ enum ThumbnailError: Error, Equatable, Sendable {
 ///
 /// Called off the main actor while an image recorded already is saved (`ImageIngestor`). `async`, so a maker may
 /// suspend instead of holding a thread; `ImageIOThumbnailMaker` does its work at once on the caller's thread.
-protocol ThumbnailMaking: Sendable {
+protocol ImageThumbnailMaking: Sendable {
     /// The image's size and a thumbnail at most `maximumPixelSize` pixels on its longer side (never larger than
     /// the image). `declaredType` is the type the data was copied as. Throws `notAnImage` when the data cannot be
     /// read as an image or fails `ImageDecodingPolicy`. Only an image within the policy's pixel limit is decoded;

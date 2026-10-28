@@ -10,7 +10,7 @@ import ImageIO
 /// Otherwise the thumbnail is made with `kCGImageSourceThumbnailMaxPixelSize`, so ImageIO decodes at a reduced size
 /// (or uses a thumbnail embedded in the file) instead of the whole image, and nothing is cached: the full image is
 /// never kept in memory here.
-struct ImageIOThumbnailMaker: ThumbnailMaking {
+struct ImageIOThumbnailMaker: ImageThumbnailMaking {
     func inspect(_ data: Data, declaredType: String, maximumPixelSize: Int) throws(ThumbnailError) -> ImageInspection {
         guard let image = CheckedImageSource.open(data, declaredType: declaredType) else {
             throw .notAnImage

@@ -14,10 +14,10 @@ enum ImageIngestError: Error, Equatable, Sendable {
 /// It writes only through the reservation it is given (see `InFlightBlobStore`): what it writes is held until the
 /// caller has handed it to the history, and the caller deletes what no entry took.
 struct ImageIngestor: Sendable {
-    let thumbnails: any ThumbnailMaking
+    let thumbnails: any ImageThumbnailMaking
     let hasher: any ContentHasher
 
-    init(thumbnails: any ThumbnailMaking, hasher: any ContentHasher = SHA256ContentHasher()) {
+    init(thumbnails: any ImageThumbnailMaking, hasher: any ContentHasher = SHA256ContentHasher()) {
         self.thumbnails = thumbnails
         self.hasher = hasher
     }

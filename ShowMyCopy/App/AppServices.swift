@@ -28,7 +28,7 @@ struct AppServices {
         /// Where image data and thumbnails are kept. The history store must delete blobs in this same store, so it
         /// never deletes those that background work is about to hand to it.
         var blobs: InFlightBlobStore?
-        var thumbnails: (any ThumbnailMaking)?
+        var thumbnails: (any ImageThumbnailMaking)?
         var fileThumbnails: (any FileThumbnailMaking)?
         var previewImages: (any PreviewImageDecoding)?
         var previewRichText: (any RichTextRendering)?
@@ -38,7 +38,7 @@ struct AppServices {
 
         init(
             blobs: InFlightBlobStore? = nil,
-            thumbnails: (any ThumbnailMaking)? = nil,
+            thumbnails: (any ImageThumbnailMaking)? = nil,
             fileThumbnails: (any FileThumbnailMaking)? = nil,
             previewImages: (any PreviewImageDecoding)? = nil,
             previewRichText: (any RichTextRendering)? = nil

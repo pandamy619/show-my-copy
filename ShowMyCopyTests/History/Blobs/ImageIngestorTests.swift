@@ -6,7 +6,7 @@ import Testing
 
 /// Accepts data that starts with the PNG signature byte as an image of `size`, rejects anything else, and anything
 /// declared as another type than `acceptedType` when one is set.
-struct FakeThumbnailMaker: ThumbnailMaking {
+struct FakeThumbnailMaker: ImageThumbnailMaking {
     var pixelWidth = 640
     var pixelHeight = 480
     var makesThumbnail = true
