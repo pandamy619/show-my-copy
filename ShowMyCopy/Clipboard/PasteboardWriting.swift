@@ -20,6 +20,11 @@ protocol PasteboardWriting: AnyObject {
     /// A `concealed` write marks the item with `PasteboardMarker.concealed`, so other clipboard managers skip it.
     @discardableResult
     func write(_ payload: PasteboardPayload, concealed: Bool) -> Int?
+
+    /// Empties the pasteboard, but only while its change count is still `changeCount`: nothing was copied since the
+    /// app saw it. Returns the change count of the emptied pasteboard, or nil when another app wrote to it and it
+    /// was left as it is.
+    func clearContents(ifChangeCountIs changeCount: Int) -> Int?
 }
 
 extension PasteboardWriting {

@@ -24,6 +24,7 @@ protocol PasteboardBackend: AnyObject {
     var pasteboardItems: [NSPasteboardItem]? { get }
     func readObjects(forClasses classArray: [AnyClass], options: [NSPasteboard.ReadingOptionKey: Any]?) -> [Any]?
     func prepareForNewContents(with options: NSPasteboard.ContentsOptions) -> Int
+    func clearContents() -> Int
     func setString(_ string: String, forType dataType: NSPasteboard.PasteboardType) -> Bool
     func setData(_ data: Data?, forType dataType: NSPasteboard.PasteboardType) -> Bool
     func writeObjects(_ objects: [any NSPasteboardWriting]) -> Bool
@@ -100,6 +101,15 @@ extension SystemPasteboard: PasteboardWriting {
             return nil
         }
         return changeCount
+    }
+
+    func clearContents(ifChangeCountIs changeCount: Int) -> Int? {
+        // NSPasteboard has no way to clear only an item it still holds, so the check and the clear run back to back
+        // on the main thread. Another app could still write between the two; the time for that is a few calls long.
+        guard pasteboard.changeCount == changeCount else {
+            return nil
+        }
+        return pasteboard.clearContents()
     }
 
     private func writeContent(_ payload: PasteboardPayload) -> Bool {

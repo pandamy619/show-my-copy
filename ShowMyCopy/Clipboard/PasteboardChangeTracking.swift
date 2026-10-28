@@ -12,6 +12,11 @@ protocol PasteboardChangeTracking: AnyObject {
     /// Marks a pasteboard change made by this app as seen, so it is not recorded again as a copy.
     func acknowledge(changeCount: Int)
 
+    /// The change count of the pasteboard item the monitor dealt with last: read and recorded or skipped, or
+    /// acknowledged as this app's own. Nil before the first look. While the pasteboard's change count is still this
+    /// one, nothing was copied since, and the history's current entry, if there is one, is what it holds.
+    var handledChangeCount: Int? { get }
+
     /// The user did something only a person at the awake, unlocked Mac can do.
     func userIsActive()
 

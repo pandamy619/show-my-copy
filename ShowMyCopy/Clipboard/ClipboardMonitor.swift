@@ -106,6 +106,10 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         lastChangeCount = changeCount
     }
 
+    var handledChangeCount: Int? {
+        lastChangeCount
+    }
+
     /// Checks the pasteboard once. The first call records whatever is on the pasteboard at launch.
     func poll() {
         expiry.removeExpired()
