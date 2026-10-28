@@ -52,6 +52,52 @@ struct PersistentHistoryStoreWriteTests {
         #expect(savedTexts() == ["b"])
     }
 
+    @Test func restoreSavesTheRemovedEntryAgainInOneWrite() throws {
+        let store = makeStore()
+        let id = store.record(text: "a", sourceApp: notes, at: start)
+        store.record(text: "b", sourceApp: nil, at: start + 1)
+        let removed = try #require(store.entries.first { $0.id == id })
+        store.remove(id: id)
+        #expect(disk.record(id) == nil)
+        disk.resetCalls()
+
+        store.restore([removed])
+        #expect(disk.calls == [.apply])
+        #expect(disk.record(id) != nil)
+        #expect(makeStore().entries.map(\.text) == ["b", "a"])
+    }
+
+    @Test func restoredPasswordIsSavedSealed() throws {
+        let store = makeStore()
+        let id = store.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
+        let removed = try #require(store.entries.first)
+        store.remove(id: id)
+
+        store.restore([removed])
+        let record = try #require(disk.record(id))
+        #expect(record.isConcealed)
+        #expect(record.payload.range(of: Data("hunter2".utf8)) == nil)
+        #expect(savedTexts() == ["hunter2"])
+    }
+
+    @Test func aFailedRestoreKeepsTheEntryAndTheNextChangeSavesIt() throws {
+        let store = makeStore()
+        let id = store.record(text: "a", sourceApp: nil, at: start)
+        let removed = try #require(store.entries.first)
+        store.remove(id: id)
+        disk.failing = [.apply]
+
+        store.restore([removed])
+        #expect(store.entries.map(\.id) == [id])
+        #expect(store.storageError == .saveFailed)
+        #expect(disk.records.isEmpty)
+
+        disk.failing = []
+        store.record(text: "b", sourceApp: nil, at: start + 1)
+        #expect(savedTexts() == ["a", "b"])
+        #expect(store.storageError == nil)
+    }
+
     @Test func removeConcealedDeletesSavedPasswords() {
         let store = makeStore()
         store.record(text: "plain", sourceApp: nil, at: start)
