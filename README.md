@@ -26,6 +26,7 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Previews.** → (or Show Preview in a row's context menu) shows the selected entry larger: the full image, styled text with its formatting, or the copied files with their sizes (except files on network volumes). ← or Esc closes it. Passwords are never previewed.
 - **Delete one entry.** ⌘⌫ (or Delete in a row's context menu, or the VoiceOver action) deletes the selected entry, also the one on the clipboard now; the window stays open and selects the next entry. If the clipboard still holds the deleted entry and nothing was copied since, it is emptied too. ⌘Z brings the entry back while the window is open.
 - **Entry limit** from 10 to 1000, 50 by default. Lowering it asks before removing old entries.
+- **Old history is removed.** History older than 8 hours is removed by default; configurable in Settings: 1 hour, 8 hours, 24 hours, 7 days, 30 days or off. A shorter limit asks before removing old entries.
 - **Clear history** in Settings, with confirmation. It deletes the history from disk too, with any copy of a history that could not be opened.
 - **Storage at a glance.** Settings show how much the history takes, split into text, rich text, images, files and passwords, its size on disk, how much memory the app uses, and a warning if the history cannot be saved. A size limit of 100 MB, 500 MB or 1 GB (1 GB by default; it can be turned off) asks before removing old entries.
 - **Pauses while the Mac sleeps or the screen is locked.**
