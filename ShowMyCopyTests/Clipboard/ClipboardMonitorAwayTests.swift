@@ -13,7 +13,7 @@ import Testing
 @MainActor
 struct ClipboardMonitorAwayTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let environment = MonitorEnvironment()
     private let safari = SourceApp(bundleIdentifier: "com.apple.Safari", name: "Safari")
 

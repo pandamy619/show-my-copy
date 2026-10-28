@@ -14,11 +14,11 @@ struct AppContainerPasswordClipboardTests {
     private let workspace = FakeNotifications()
     private let distributed = FakeNotifications()
     private let screen = ScreenLock()
-    private let store: ClipboardHistory
+    private let store: InMemoryHistoryStore
 
     init() {
-        store = ClipboardHistory(
-            retention: RetentionPolicy(entryLimit: ClipboardHistory.limitRange.upperBound),
+        store = InMemoryHistoryStore(
+            retention: RetentionPolicy(entryLimit: RetentionPolicy.entryLimitRange.upperBound),
             now: clock.read)
     }
 
@@ -62,7 +62,7 @@ struct AppContainerPasswordClipboardTests {
             copyPassword(in: container)
             let passwordChange = pasteboard.changeCount
 
-            container.passwordSettings.savesPasswords = false
+            container.settings.passwords.savesPasswords = false
 
             #expect(store.entries.isEmpty)
             #expect(pasteboard.clearedChangeCounts == [passwordChange])

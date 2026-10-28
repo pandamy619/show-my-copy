@@ -10,17 +10,17 @@ import Testing
 struct PasswordSizeTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
-    private func makeUsage(history: ClipboardHistory) -> StorageUsage {
+    private func makeUsage(history: InMemoryHistoryStore) -> StorageUsage {
         StorageUsage(history: .unsaved(history), memoryReader: NoMemoryUsage())
     }
 
-    private func recordPassword(_ text: String, in history: ClipboardHistory, at offset: TimeInterval = 0) {
+    private func recordPassword(_ text: String, in history: InMemoryHistoryStore, at offset: TimeInterval = 0) {
         history.record(
             text: text, sourceApp: nil, at: start + offset, concealed: true, expiresAt: start + offset + 600)
     }
 
     @Test func onePasswordShowsAsAWholeKilobyte() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         recordPassword("hunter2", in: history, at: 1)
 
@@ -37,7 +37,7 @@ struct PasswordSizeTests {
 
     @Test(arguments: [1, 7, 64, 999, 1000])
     func passwordsOfAnyLengthUpToAKilobyteLookTheSame(length: Int) {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         recordPassword(String(repeating: "p", count: length), in: history, at: 1)
 
@@ -50,7 +50,7 @@ struct PasswordSizeTests {
 
     /// The passwords' total is rounded, not each password, so many short passwords do not add up to kilobytes.
     @Test func theTotalOfAllPasswordsIsRoundedUp() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         recordPassword(String(repeating: "a", count: 600), in: history)
         recordPassword(String(repeating: "b", count: 400), in: history, at: 1)
         #expect(makeUsage(history: history).breakdown.parts.map(\.bytes) == [1000])
@@ -60,7 +60,7 @@ struct PasswordSizeTests {
     }
 
     @Test func whatClearingFreedShowsThePasswordsRounded() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         recordPassword("hunter2", in: history, at: 1)
         let usage = makeUsage(history: history)
@@ -73,9 +73,9 @@ struct PasswordSizeTests {
     }
 
     @Test func whatALowerLimitFreesShowsThePasswordsRounded() throws {
-        try TemporaryFolder.withDefaults { defaults in
-            let history = ClipboardHistory(
-                retention: RetentionPolicy(entryLimit: ClipboardHistory.limitRange.upperBound),
+        try TestDefaults.with { defaults in
+            let history = InMemoryHistoryStore(
+                retention: RetentionPolicy(entryLimit: RetentionPolicy.entryLimitRange.upperBound),
                 now: { [start] in start + 60 })
             let settings = HistorySettings(history: history, defaults: defaults, now: { [start] in start + 60 })
             recordPassword("hunter2", in: history)
@@ -89,7 +89,7 @@ struct PasswordSizeTests {
     }
 
     @Test func withoutPasswordsSizesAreExact() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         history.record(text: "abc", sourceApp: nil, at: start + 1)
         let breakdown = makeUsage(history: history).breakdown

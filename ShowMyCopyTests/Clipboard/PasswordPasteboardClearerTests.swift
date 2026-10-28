@@ -9,7 +9,7 @@ import Testing
 @MainActor
 struct PasswordPasteboardClearerTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let environment = MonitorEnvironment()
 
     /// A monitor that saves passwords for a minute and has recorded "before" and then a marked password.
@@ -116,7 +116,7 @@ struct PasswordPasteboardClearerTests {
     }
 
     @Test func turningSavingPasswordsOffEmptiesTheClipboardThatHoldsOne() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let clearer = PasswordPasteboardClearer(history: history, pasteboard: pasteboard)
             let settings = PasswordSettings(
                 history: .unsaved(history), defaults: defaults, now: { [environment] in environment.now },
@@ -139,7 +139,7 @@ struct PasswordPasteboardClearerTests {
     }
 
     @Test func turningSavingPasswordsOffLeavesANewerCopyAlone() throws {
-        try TemporaryFolder.withDefaults { defaults in
+        try TestDefaults.with { defaults in
             let clearer = PasswordPasteboardClearer(history: history, pasteboard: pasteboard)
             let settings = PasswordSettings(
                 history: .unsaved(history), defaults: defaults, now: { [environment] in environment.now },
