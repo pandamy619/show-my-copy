@@ -3,8 +3,8 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// The history may already hold entries when the app starts (from v2 on it is saved). The pasteboard then usually
-/// still holds the newest entry, which must not be rewritten on every launch.
+/// The history may already hold entries when the app starts, since it is saved. The pasteboard then usually still
+/// holds the newest entry, which must not be rewritten on every launch.
 @MainActor
 struct ClipboardMonitorLaunchTests {
     private let pasteboard = FakePasteboard()

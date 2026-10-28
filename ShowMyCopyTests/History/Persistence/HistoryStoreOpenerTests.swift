@@ -3,8 +3,8 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// Opens a store like SwiftData would: fails while the store file holds what `failsOn` says, and creates an empty
-/// SQLite file when there is none.
+/// Opens a store like SwiftData would: fails as its switches below say, and creates an empty SQLite file when there is
+/// none.
 @MainActor
 private final class StoreOpeningSpy {
     /// The first `transientFailures` calls fail whatever the file holds, like a store that is busy for a moment.

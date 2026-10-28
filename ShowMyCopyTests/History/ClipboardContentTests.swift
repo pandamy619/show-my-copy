@@ -29,7 +29,7 @@ struct ClipboardContentTests {
     }
 
     @Test func contentHashIsTheDigestOfTheCanonicalBytes() {
-        // SHA-256 of 0x01 followed by "é" in NFC. Hashes are stored from v2 on, so this value must never change.
+        // SHA-256 of 0x01 followed by "é" in NFC. Hashes are saved with the history, so this value must never change.
         let expected = "c9acd1a507da6bc057b2d6a5e5e029d06bca4f4787c977c95510c1900d046da0"
         #expect(SHA256ContentHasher().hash(.text("\u{E9}")).description == expected)
         #expect(SHA256ContentHasher().hash(.text("e\u{301}")).description == expected)
