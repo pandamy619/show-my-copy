@@ -1,4 +1,4 @@
-SOURCES := ShowMyCopy ShowMyCopyTests
+SOURCES := ShowMyCopy ShowMyCopyTests ShowMyCopyControl
 
 .PHONY: lint format test security security-selftest build-release
 

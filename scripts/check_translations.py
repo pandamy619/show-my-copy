@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Fails when a string in the catalog lacks a Russian translation, a plural form or a placeholder."""
+"""Fails when a string in a catalog lacks a Russian translation, a plural form or a placeholder.
+
+Checks the app's catalog and the Control Center extension's, which has its own: the extension's strings are
+looked up in its own bundle.
+"""
 
 import json
 import re
 import sys
 from pathlib import Path
 
-CATALOG = Path(__file__).resolve().parent.parent / "ShowMyCopy" / "Localizable.xcstrings"
+ROOT = Path(__file__).resolve().parent.parent
+CATALOGS = [ROOT / "ShowMyCopy" / "Localizable.xcstrings", ROOT / "ShowMyCopyControl" / "Localizable.xcstrings"]
 PLACEHOLDER = re.compile(r"%(?:\d+\$)?(?:@|lld|ld|d|f)")
 PLURAL_FORMS = {"en": ("one", "other"), "ru": ("one", "few", "many", "other")}
 
@@ -50,7 +55,10 @@ def problems(catalog):
 
 
 def main():
-    found = list(problems(json.loads(CATALOG.read_text(encoding="utf-8"))))
+    found = []
+    for catalog in CATALOGS:
+        name = catalog.relative_to(ROOT)
+        found += [f"{name}: {problem}" for problem in problems(json.loads(catalog.read_text(encoding="utf-8")))]
     for problem in found:
         print(problem, file=sys.stderr)
     return 1 if found else 0

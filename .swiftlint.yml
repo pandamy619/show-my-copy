@@ -1,6 +1,7 @@
 included:
   - ShowMyCopy
   - ShowMyCopyTests
+  - ShowMyCopyControl
 
 disabled_rules:
   - trailing_comma
