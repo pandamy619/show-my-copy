@@ -74,51 +74,60 @@ struct SettingsView<ShortcutRecorder: View>: View {
 
     private var limitSection: some View {
         Section("History") {
-            LabeledContent("Items to keep") {
-                HStack(spacing: 6) {
-                    TextField("Number of items", value: $entryLimit.value, format: .number)
-                        .labelsHidden()
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 64)
-                    Stepper(
-                        "Number of items", value: $entryLimit.value, in: RetentionPolicy.entryLimitRange, step: 10
-                    )
+            entryLimitRows
+            ageLimitRows
+        }
+    }
+
+    // Split from limitSection: one builder with every row is too much for the type checker.
+    @ViewBuilder private var entryLimitRows: some View {
+        LabeledContent("Items to keep") {
+            HStack(spacing: 6) {
+                TextField("Number of items", value: $entryLimit.value, format: .number)
                     .labelsHidden()
-                }
-            }
-            LabeledContent("In history") {
-                Text("\(history.entries.count) items now")
-                    .monospacedDigit()
-            }
-            if let change = entryLimit.pending {
-                InlineConfirmation(
-                    message: .removingOldestItems(change.removedCount),
-                    detail: .freeing(bytes: change.freedBytes),
-                    confirmTitle: "Remove",
-                    onConfirm: { entryLimit.confirm() },
-                    onCancel: { entryLimit.cancel() }
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 64)
+                Stepper(
+                    "Number of items", value: $entryLimit.value, in: RetentionPolicy.entryLimitRange, step: 10
                 )
+                .labelsHidden()
             }
-            Picker("Remove items after", selection: $ageLimit.value) {
-                ForEach(HistoryAgeLimit.options, id: \.self) { limit in
-                    Self.title(of: limit).tag(limit)
-                }
+        }
+        LabeledContent("In history") {
+            Text("\(history.entries.count) items now")
+                .monospacedDigit()
+        }
+        if let change = entryLimit.pending {
+            InlineConfirmation(
+                message: .removingOldestItems(change.removedCount),
+                detail: .freeing(bytes: change.freedBytes),
+                confirmTitle: "Remove",
+                onConfirm: { entryLimit.confirm() },
+                onCancel: { entryLimit.cancel() }
+            )
+        }
+    }
+
+    @ViewBuilder private var ageLimitRows: some View {
+        Picker("Remove items after", selection: $ageLimit.value) {
+            ForEach(HistoryAgeLimit.options, id: \.self) { limit in
+                Self.title(of: limit).tag(limit)
             }
-            if let change = ageLimit.pending {
-                // Entries past the age limit are always the oldest ones that are not pinned.
-                InlineConfirmation(
-                    message: .removingOldestItems(change.removedCount),
-                    detail: .freeing(bytes: change.freedBytes),
-                    confirmTitle: "Remove",
-                    onConfirm: { ageLimit.confirm() },
-                    onCancel: { ageLimit.cancel() }
-                )
-            } else {
-                Text("Entries older than this are removed automatically.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        }
+        if let change = ageLimit.pending {
+            // Entries past the age limit are always the oldest ones that are not pinned.
+            InlineConfirmation(
+                message: .removingOldestItems(change.removedCount),
+                detail: .freeing(bytes: change.freedBytes),
+                confirmTitle: "Remove",
+                onConfirm: { ageLimit.confirm() },
+                onCancel: { ageLimit.cancel() }
+            )
+        } else {
+            Text("Entries older than this are removed automatically.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
