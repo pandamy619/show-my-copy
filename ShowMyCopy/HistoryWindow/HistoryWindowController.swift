@@ -8,7 +8,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     private let monitor: any PasteboardChangeTracking
     private let copier: any EntryCopying
     private let onOpenSettings: @MainActor () -> Void
-    /// Read by tests to check the panel's frame.
+    /// Made when the window first opens and kept for the next time.
     private(set) var panel: HistoryPanel?
     /// The resize scheduled by the last change of what the list shows. Tests await it instead of guessing when the
     /// main actor gets to it.
