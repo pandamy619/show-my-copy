@@ -19,10 +19,6 @@ struct PasteboardMarkerTests {
             ]
         )
     }
-
-    @Test func legacyMarkersAreAllSortedIntoAGroup() {
-        #expect(PasteboardMarker.legacy.isSubset(of: PasteboardMarker.secret.union(PasteboardMarker.alwaysSkipped)))
-    }
 }
 
 struct PasswordManagerTests {

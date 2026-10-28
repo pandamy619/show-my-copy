@@ -25,9 +25,6 @@ enum PasteboardMarker {
         "Pasteboard generator type",
     ]
 
-    /// Older markers that some password managers and clipboard tools still use.
-    static let legacy: Set<String> = legacyPassword.union(legacyTransient)
-
     /// Passwords. They are kept, hidden and for a limited time, only when the user allows it in Settings.
     static let secret: Set<String> = legacyPassword.union([concealed])
 
