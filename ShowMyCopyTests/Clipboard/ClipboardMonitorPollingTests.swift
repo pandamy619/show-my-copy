@@ -46,7 +46,7 @@ final class ManualSleeper {
 @MainActor
 struct ClipboardMonitorPollingTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let sleeper = ManualSleeper()
 
     private func makeMonitor() -> ClipboardMonitor {
@@ -113,7 +113,7 @@ final class CountingActivity: PollingActivity {
 @MainActor
 struct ClipboardMonitorActivityTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let activity = CountingActivity()
 
     private func makeMonitor() -> ClipboardMonitor {

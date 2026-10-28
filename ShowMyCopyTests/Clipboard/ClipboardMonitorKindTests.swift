@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct ClipboardMonitorKindTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let date = Date(timeIntervalSince1970: 1_790_000_000)
     private let finder = SourceApp(bundleIdentifier: "com.apple.finder", name: "Finder")
 

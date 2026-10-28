@@ -10,7 +10,7 @@ import Testing
 @Suite(.serialized)
 struct HistoryWindowControllerTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let monitor: ClipboardMonitor
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 

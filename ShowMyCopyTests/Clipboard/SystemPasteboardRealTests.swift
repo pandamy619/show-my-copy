@@ -112,7 +112,7 @@ struct SystemPasteboardRealTests {
 
     @Test func monitorRecordsACopyFromARealPasteboard() {
         withIsolatedPasteboard { backend in
-            let history = ClipboardHistory()
+            let history = InMemoryHistoryStore()
             let monitor = MonitorFactory.make(
                 pasteboard: SystemPasteboard(pasteboard: backend, bundleIdentifier: nil), history: history)
             monitor.poll()

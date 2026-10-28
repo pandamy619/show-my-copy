@@ -8,7 +8,7 @@ import Testing
 @MainActor
 struct ClipboardMonitorLaunchTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let yesterday = Date(timeIntervalSince1970: 1_790_000_000)
     private let now = Date(timeIntervalSince1970: 1_790_000_100)
     private let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")

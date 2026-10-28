@@ -7,7 +7,7 @@ import Testing
 @MainActor
 struct HistoryWindowDeleteKeyTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let deleter: EntryDeleterSpy
 
     init() {

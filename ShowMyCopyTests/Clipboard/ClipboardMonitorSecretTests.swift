@@ -11,7 +11,7 @@ final class MonitorEnvironment {
     var policy = PasswordPolicy.default
     var frontmostApp: SourceApp?
 
-    func makeMonitor(pasteboard: FakePasteboard, history: ClipboardHistory) -> ClipboardMonitor {
+    func makeMonitor(pasteboard: FakePasteboard, history: InMemoryHistoryStore) -> ClipboardMonitor {
         MonitorFactory.make(
             pasteboard: pasteboard,
             history: history,
@@ -29,7 +29,7 @@ final class MonitorEnvironment {
 @MainActor
 struct ClipboardMonitorSecretTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let environment = MonitorEnvironment()
     private let onePassword = SourceApp(bundleIdentifier: "com.1password.1password", name: "1Password")
     private let safari = SourceApp(bundleIdentifier: "com.apple.Safari", name: "Safari")

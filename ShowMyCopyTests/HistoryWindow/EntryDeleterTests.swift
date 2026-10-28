@@ -8,7 +8,7 @@ import Testing
 @MainActor
 struct EntryDeleterTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let environment = MonitorEnvironment()
     private let monitor: ClipboardMonitor
     private let deleter: EntryDeleter

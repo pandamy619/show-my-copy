@@ -2,9 +2,6 @@ import Foundation
 
 @testable import ShowMyCopy
 
-/// The name the in-memory store had before `HistoryStore`; the tests still use it.
-typealias ClipboardHistory = InMemoryHistoryStore
-
 extension InMemoryHistoryStore {
     nonisolated static let defaultLimit = RetentionPolicy.defaultEntryLimit
     nonisolated static let limitRange = RetentionPolicy.entryLimitRange

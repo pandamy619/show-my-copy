@@ -5,7 +5,7 @@ import Testing
 /// The Control Center button opens the history window and never closes it, unlike the shortcut.
 @MainActor
 struct HistoryWindowOpenRequestTests {
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let monitor: ClipboardMonitor
 
     init() {

@@ -88,7 +88,7 @@ struct SystemActivityObserverTests {
     private let workspace = FakeNotifications()
     private let distributed = FakeNotifications()
     private let session = FakeSessionState()
-    private let monitor = MonitorFactory.make(pasteboard: FakePasteboard(), history: ClipboardHistory())
+    private let monitor = MonitorFactory.make(pasteboard: FakePasteboard(), history: InMemoryHistoryStore())
 
     private func makeObserver() -> SystemActivityObserver {
         SystemActivityObserver(
@@ -158,7 +158,7 @@ struct SystemActivityObserverTests {
         let clock = ManualInstant()
         let sleeper = ManualSleeper()
         let monitor = MonitorFactory.make(
-            pasteboard: FakePasteboard(), history: ClipboardHistory(),
+            pasteboard: FakePasteboard(), history: InMemoryHistoryStore(),
             sleep: { [sleeper] in await sleeper.sleep(for: $0) }, activity: activity, activityClock: clock.read)
         let observer = SystemActivityObserver(
             monitor: monitor, workspace: workspace, distributed: distributed, isScreenLocked: { false },
@@ -256,7 +256,7 @@ struct SystemActivityObserverTests {
 @MainActor
 struct ClipboardMonitorUserIsActiveTests {
     @Test func userActivityClearsEveryPauseReason() {
-        let monitor = MonitorFactory.make(pasteboard: FakePasteboard(), history: ClipboardHistory())
+        let monitor = MonitorFactory.make(pasteboard: FakePasteboard(), history: InMemoryHistoryStore())
         monitor.start()
         defer { monitor.stop() }
         monitor.pause(for: .screenLocked)
@@ -271,7 +271,7 @@ struct ClipboardMonitorUserIsActiveTests {
 
     @Test func userActivityCreditsTheNextFoundCopyToNoApp() throws {
         let pasteboard = FakePasteboard()
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
         let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history, frontmostApp: { notes })
         monitor.start()

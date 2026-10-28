@@ -9,7 +9,7 @@ struct HistoryContentFactoryTests {
     @Test func contentIgnoresTheTitleBarSafeArea() throws {
         // The hidden title bar would otherwise push the search field down by its height.
         let view = HistoryContentFactory.makeView(
-            model: HistoryWindowModel(history: ClipboardHistory()),
+            model: HistoryWindowModel(history: InMemoryHistoryStore()),
             onChoose: { _ in },
             onClose: {},
             onOpenSettings: {}

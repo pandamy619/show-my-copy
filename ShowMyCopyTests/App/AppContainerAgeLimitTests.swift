@@ -13,11 +13,11 @@ struct AppContainerAgeLimitTests {
     private let pasteboard = FakePasteboard()
     private let workspace = FakeNotifications()
     private let distributed = FakeNotifications()
-    private let store: ClipboardHistory
+    private let store: InMemoryHistoryStore
 
     init() {
-        store = ClipboardHistory(
-            retention: RetentionPolicy(entryLimit: ClipboardHistory.limitRange.upperBound),
+        store = InMemoryHistoryStore(
+            retention: RetentionPolicy(entryLimit: InMemoryHistoryStore.limitRange.upperBound),
             now: clock.read)
     }
 

@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct EntryCopierTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
     private let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
     private let safari = SourceApp(bundleIdentifier: "com.apple.Safari", name: "Safari")
@@ -154,7 +154,7 @@ struct EntryCopierTests {
     }
 
     @Test func concealedEntryTrimmedByTheCatchUpPollComesBackConcealed() throws {
-        let history = ClipboardHistory(limit: 10)
+        let history = InMemoryHistoryStore(limit: 10)
         history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
         for index in 1..<10 {
             history.record(text: "item \(index)", sourceApp: notes, at: start + Double(index))
@@ -218,7 +218,7 @@ struct EntryCopierTests {
     }
 
     @Test func pickedEntryStaysWhenCatchUpPollFillsTheHistory() throws {
-        let history = ClipboardHistory(limit: 10)
+        let history = InMemoryHistoryStore(limit: 10)
         for index in 0..<10 {
             history.record(text: "item \(index)", sourceApp: notes, at: start + Double(index))
         }
@@ -243,7 +243,7 @@ struct EntryCopierTests {
 struct ClipboardMonitorAcknowledgeTests {
     @Test func acknowledgedChangeIsNotRecorded() {
         let pasteboard = FakePasteboard()
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
         monitor.poll()
 

@@ -66,14 +66,14 @@ struct ClipboardHistoryContentHashTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     @Test func canonicallyEqualTextIsOneEntry() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         let id = history.record(text: "caf\u{E9}", sourceApp: nil, at: start)
         #expect(history.record(text: "cafe\u{301}", sourceApp: nil, at: start + 1) == id)
         #expect(history.entries.count == 1)
     }
 
     @Test func entriesWithTheSameHashAreOneEntry() {
-        let history = ClipboardHistory(hasher: ConstantHasher())
+        let history = InMemoryHistoryStore(hasher: ConstantHasher())
         let id = history.record(text: "first", sourceApp: nil, at: start)
         #expect(history.record(text: "second", sourceApp: nil, at: start + 1) == id)
         #expect(history.entries.map(\.text) == ["first"])

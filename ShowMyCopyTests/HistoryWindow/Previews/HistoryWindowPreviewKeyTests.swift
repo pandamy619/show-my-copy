@@ -9,7 +9,7 @@ struct HistoryWindowPreviewKeyTests {
 
     /// History with "third" on top, then "second", then "first".
     private func makeModel(missing: Set<String> = []) -> HistoryWindowModel {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         for (index, text) in ["first", "second", "third"].enumerated() {
             history.record(text: text, sourceApp: nil, at: start + Double(index))
         }
@@ -86,7 +86,7 @@ struct HistoryWindowPreviewKeyTests {
         _ = model.handleKey(.right, isCaretAtEnd: true)
         #expect(model.handleKey(.return, isCaretAtEnd: true) == .choose(selected))
 
-        let empty = HistoryWindowModel(history: ClipboardHistory())
+        let empty = HistoryWindowModel(history: InMemoryHistoryStore())
         #expect(empty.handleKey(.return, isCaretAtEnd: true) == .handled)
         #expect(empty.handleKey(.right, isCaretAtEnd: true) == .ignored)
     }

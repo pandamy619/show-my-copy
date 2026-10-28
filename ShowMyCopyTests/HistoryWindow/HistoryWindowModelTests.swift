@@ -11,7 +11,7 @@ struct HistoryWindowModelTests {
 
     /// History with "third" (Safari) on top, then "second" (Notes), then "first" (no app).
     private func makeModel(texts: [String] = ["first", "second", "third"]) -> HistoryWindowModel {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         let apps = [nil, notes, safari]
         for (index, text) in texts.enumerated() {
             history.record(text: text, sourceApp: apps[index % apps.count], at: start + Double(index))
@@ -36,7 +36,7 @@ struct HistoryWindowModelTests {
     }
 
     @Test func showsEntriesOnlyWhenSomethingIsListed() {
-        let model = HistoryWindowModel(history: ClipboardHistory())
+        let model = HistoryWindowModel(history: InMemoryHistoryStore())
         #expect(!model.showsEntries)
 
         model.history.record(text: "hello", sourceApp: notes, at: start)
@@ -53,7 +53,7 @@ struct HistoryWindowModelTests {
     }
 
     @Test func emptyHistoryHasNoSelection() {
-        let model = HistoryWindowModel(history: ClipboardHistory())
+        let model = HistoryWindowModel(history: InMemoryHistoryStore())
         #expect(model.items.isEmpty)
         #expect(model.selectedIndex == nil)
         #expect(model.selectedEntry == nil)
@@ -229,7 +229,7 @@ struct HistoryWindowModelConcealedTests {
 
     /// "hunter2" is a concealed entry from 1Password, "hunter2 notes" a plain entry from Notes.
     private func makeModel() -> HistoryWindowModel {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hunter2 notes", sourceApp: notes, at: start)
         history.record(
             text: "hunter2", sourceApp: onePassword, at: start + 1, concealed: true, expiresAt: start + 600)
@@ -285,7 +285,7 @@ struct HistoryWindowModelSearchTests {
     private let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
 
     @Test func searchLooksOnlyAtTheStartOfLongText() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         let text = String(repeating: "a", count: SearchKey.searchedCharacters) + "needle"
         history.record(text: text, sourceApp: nil, at: start)
         let model = HistoryWindowModel(history: history)
@@ -294,7 +294,7 @@ struct HistoryWindowModelSearchTests {
     }
 
     @Test func entryConcealedLaterMatchesOnlyByItsAppName() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         let id = history.record(text: "hunter2", sourceApp: notes, at: start)
         let model = HistoryWindowModel(history: history)
         model.query = "hunter"
@@ -313,7 +313,7 @@ struct HistoryWindowModelCacheTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     private func makeModel() -> HistoryWindowModel {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         for (index, text) in ["first", "second", "third"].enumerated() {
             history.record(text: text, sourceApp: nil, at: start + Double(index))
         }

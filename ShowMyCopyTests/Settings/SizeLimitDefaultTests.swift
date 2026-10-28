@@ -48,7 +48,7 @@ struct SizeLimitDefaultTests {
 
     @Test func deliberateNoLimitIsKept() throws {
         try withDefaults { defaults in
-            let settings = HistorySettings(history: ClipboardHistory(), defaults: defaults, now: { Date() })
+            let settings = HistorySettings(history: InMemoryHistoryStore(), defaults: defaults, now: { Date() })
             settings.apply(.noLimit, for: .size)
             #expect(RetentionLimit.size.stored(in: defaults) == .noLimit)
             #expect(HistorySettings.storedRetention(in: defaults).byteLimit == nil)

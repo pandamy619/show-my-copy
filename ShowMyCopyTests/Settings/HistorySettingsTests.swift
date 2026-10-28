@@ -18,15 +18,15 @@ struct HistorySettingsTests {
     }
 
     /// Settings as the app sets them up when it starts: the saved limit is applied to the history.
-    private func makeSettings(history: ClipboardHistory, defaults: UserDefaults) -> HistorySettings {
+    private func makeSettings(history: InMemoryHistoryStore, defaults: UserDefaults) -> HistorySettings {
         let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
         settings.applyStoredLimits()
         return settings
     }
 
-    private func makeHistory(withEntries count: Int) -> ClipboardHistory {
-        let history = ClipboardHistory(
-            retention: RetentionPolicy(entryLimit: ClipboardHistory.limitRange.upperBound), now: { [now] in now })
+    private func makeHistory(withEntries count: Int) -> InMemoryHistoryStore {
+        let history = InMemoryHistoryStore(
+            retention: RetentionPolicy(entryLimit: InMemoryHistoryStore.limitRange.upperBound), now: { [now] in now })
         for index in 0..<count {
             history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
         }
@@ -35,10 +35,10 @@ struct HistorySettingsTests {
 
     @Test func usesDefaultLimitWhenNothingIsSaved() throws {
         try withDefaults { defaults in
-            let history = ClipboardHistory(limit: 200)
+            let history = InMemoryHistoryStore(limit: 200)
             let settings = makeSettings(history: history, defaults: defaults)
-            #expect(settings.limit == ClipboardHistory.defaultLimit)
-            #expect(history.limit == ClipboardHistory.defaultLimit)
+            #expect(settings.limit == InMemoryHistoryStore.defaultLimit)
+            #expect(history.limit == InMemoryHistoryStore.defaultLimit)
         }
     }
 
@@ -49,9 +49,9 @@ struct HistorySettingsTests {
 
             let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
 
-            #expect(history.limit == ClipboardHistory.limitRange.upperBound)
+            #expect(history.limit == InMemoryHistoryStore.limitRange.upperBound)
             #expect(history.entries.count == 15)
-            #expect(settings.limit == ClipboardHistory.limitRange.upperBound)
+            #expect(settings.limit == InMemoryHistoryStore.limitRange.upperBound)
         }
     }
 
@@ -74,7 +74,7 @@ struct HistorySettingsTests {
     @Test func appliesSavedLimitToHistory() throws {
         try withDefaults { defaults in
             defaults.set(120, forKey: SettingsKey.historyLimit)
-            let history = ClipboardHistory()
+            let history = InMemoryHistoryStore()
             _ = makeSettings(history: history, defaults: defaults)
             #expect(history.limit == 120)
         }
@@ -85,26 +85,26 @@ struct HistorySettingsTests {
         try withDefaults { defaults in
             defaults.set(saved, forKey: SettingsKey.historyLimit)
             #expect(RetentionLimit.entries.stored(in: defaults) == expected)
-            #expect(makeSettings(history: ClipboardHistory(), defaults: defaults).limit == expected)
+            #expect(makeSettings(history: InMemoryHistoryStore(), defaults: defaults).limit == expected)
         }
     }
 
     @Test func ignoresSavedValueOfWrongType() throws {
         try withDefaults { defaults in
             defaults.set("lots", forKey: SettingsKey.historyLimit)
-            #expect(RetentionLimit.entries.stored(in: defaults) == ClipboardHistory.defaultLimit)
+            #expect(RetentionLimit.entries.stored(in: defaults) == InMemoryHistoryStore.defaultLimit)
             defaults.set(["a": 1], forKey: SettingsKey.historyLimit)
-            #expect(RetentionLimit.entries.stored(in: defaults) == ClipboardHistory.defaultLimit)
+            #expect(RetentionLimit.entries.stored(in: defaults) == InMemoryHistoryStore.defaultLimit)
         }
     }
 
     @Test func appliedLimitPersistsAcrossInstances() throws {
         try withDefaults { defaults in
-            let first = makeSettings(history: ClipboardHistory(), defaults: defaults)
+            let first = makeSettings(history: InMemoryHistoryStore(), defaults: defaults)
             first.apply(300, for: .entries)
             #expect(defaults.object(forKey: SettingsKey.historyLimit) as? Int == 300)
 
-            let history = ClipboardHistory()
+            let history = InMemoryHistoryStore()
             let second = makeSettings(history: history, defaults: defaults)
             #expect(second.limit == 300)
             #expect(history.limit == 300)
@@ -113,7 +113,7 @@ struct HistorySettingsTests {
 
     @Test func applySavesClampedValue() throws {
         try withDefaults { defaults in
-            let settings = makeSettings(history: ClipboardHistory(), defaults: defaults)
+            let settings = makeSettings(history: InMemoryHistoryStore(), defaults: defaults)
             settings.apply(5000, for: .entries)
             #expect(settings.limit == 1000)
             #expect(RetentionLimit.entries.stored(in: defaults) == 1000)
@@ -147,7 +147,7 @@ struct HistorySettingsTests {
             #expect(change.needsConfirmation)
             // Proposing changes nothing.
             #expect(history.entries.count == 40)
-            #expect(settings.limit == ClipboardHistory.defaultLimit)
+            #expect(settings.limit == InMemoryHistoryStore.defaultLimit)
             #expect(defaults.object(forKey: SettingsKey.historyLimit) == nil)
         }
     }

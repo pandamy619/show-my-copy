@@ -15,9 +15,9 @@ struct PasswordSettingsTests {
         try body(defaults)
     }
 
-    private func makeSettings(history: ClipboardHistory? = nil, defaults: UserDefaults) -> PasswordSettings {
+    private func makeSettings(history: InMemoryHistoryStore? = nil, defaults: UserDefaults) -> PasswordSettings {
         PasswordSettings(
-            history: .unsaved(history ?? ClipboardHistory()), defaults: defaults, now: { [start] in start })
+            history: .unsaved(history ?? InMemoryHistoryStore()), defaults: defaults, now: { [start] in start })
     }
 
     @Test func passwordsAreNotSavedByDefault() throws {
@@ -100,7 +100,7 @@ struct PasswordSettingsTests {
 
     @Test func turningSavingOffRemovesConcealedEntriesRightAway() throws {
         try withDefaults { defaults in
-            let history = ClipboardHistory()
+            let history = InMemoryHistoryStore()
             let settings = makeSettings(history: history, defaults: defaults)
             settings.savesPasswords = true
             history.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)
@@ -114,7 +114,7 @@ struct PasswordSettingsTests {
 
     @Test func turningSavingOnKeepsEntries() throws {
         try withDefaults { defaults in
-            let history = ClipboardHistory()
+            let history = InMemoryHistoryStore()
             history.record(text: "plain", sourceApp: nil, at: start)
             let settings = makeSettings(history: history, defaults: defaults)
             settings.savesPasswords = true
@@ -124,7 +124,7 @@ struct PasswordSettingsTests {
 
     @Test func shorterLifetimeAppliesToSavedPasswords() throws {
         try withDefaults { defaults in
-            let history = ClipboardHistory()
+            let history = InMemoryHistoryStore()
             let settings = makeSettings(history: history, defaults: defaults)
             settings.savesPasswords = true
             history.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 600)

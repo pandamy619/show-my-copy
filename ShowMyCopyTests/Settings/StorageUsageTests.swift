@@ -26,14 +26,14 @@ struct StorageUsageTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     private func makeUsage(
-        history: ClipboardHistory,
+        history: InMemoryHistoryStore,
         memory: FakeMemoryReader = FakeMemoryReader(nil)
     ) -> StorageUsage {
         StorageUsage(history: .unsaved(history), memoryReader: memory)
     }
 
     @Test func emptyHistoryHasNoParts() {
-        let usage = makeUsage(history: ClipboardHistory())
+        let usage = makeUsage(history: InMemoryHistoryStore())
         #expect(usage.breakdown == .empty)
         #expect(usage.breakdown.parts.isEmpty)
         #expect(usage.breakdown.totalCount == 0)
@@ -41,7 +41,7 @@ struct StorageUsageTests {
     }
 
     @Test func splitsTextAndPasswords() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         history.record(text: "пароль", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 60)
         history.record(text: "abc", sourceApp: nil, at: start + 2)
@@ -60,14 +60,14 @@ struct StorageUsageTests {
     }
 
     @Test func leavesOutCategoriesWithoutEntries() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
         let breakdown = makeUsage(history: history).breakdown
         #expect(breakdown.parts.map(\.category) == [.passwords])
     }
 
     @Test func partsFollowCategoryOrder() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "secret", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
         history.record(text: "plain", sourceApp: nil, at: start + 1)
         let breakdown = makeUsage(history: history).breakdown
@@ -75,7 +75,7 @@ struct StorageUsageTests {
     }
 
     @Test func fractionsShareTheTotalSize() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: String(repeating: "a", count: 30), sourceApp: nil, at: start)
         history.record(
             text: String(repeating: "b", count: 10), sourceApp: nil, at: start + 1, concealed: true,
@@ -86,7 +86,7 @@ struct StorageUsageTests {
     }
 
     @Test func concealingMovesAnEntryToPasswords() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         let id = history.record(text: "hunter2", sourceApp: nil, at: start)
         let usage = makeUsage(history: history)
         #expect(usage.breakdown.parts.map(\.category) == [.text])
@@ -97,7 +97,7 @@ struct StorageUsageTests {
     }
 
     @Test func computesOncePerRevision() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "one", sourceApp: nil, at: start)
         let usage = makeUsage(history: history)
 
@@ -119,7 +119,7 @@ struct StorageUsageTests {
 
     @Test func readsAppMemoryOnlyWhenAsked() {
         let memory = FakeMemoryReader(48_000_000, 50_000_000)
-        let usage = makeUsage(history: ClipboardHistory(), memory: memory)
+        let usage = makeUsage(history: InMemoryHistoryStore(), memory: memory)
         #expect(usage.appMemoryBytes == nil)
         #expect(memory.calls == 0)
 
@@ -131,7 +131,7 @@ struct StorageUsageTests {
     }
 
     @Test func appMemoryCanBeUnavailable() {
-        let usage = makeUsage(history: ClipboardHistory(), memory: FakeMemoryReader(nil))
+        let usage = makeUsage(history: InMemoryHistoryStore(), memory: FakeMemoryReader(nil))
         usage.refreshAppMemory()
         #expect(usage.appMemoryBytes == nil)
     }
@@ -139,7 +139,7 @@ struct StorageUsageTests {
     // MARK: Clearing
 
     @Test func clearForecastMatchesWhatClearingFrees() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         history.record(text: "secret", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 60)
         let usage = makeUsage(history: history)
@@ -154,7 +154,7 @@ struct StorageUsageTests {
     }
 
     @Test func remembersTheLastClearUntilTheHistoryChanges() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         let usage = makeUsage(history: history)
         #expect(usage.recentClear == nil)
@@ -167,13 +167,13 @@ struct StorageUsageTests {
     }
 
     @Test func clearingAnEmptyHistoryReportsNothing() {
-        let usage = makeUsage(history: ClipboardHistory())
+        let usage = makeUsage(history: InMemoryHistoryStore())
         usage.clearHistory()
         #expect(usage.recentClear == nil)
     }
 
     @Test func forgettingTheLastClear() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         let usage = makeUsage(history: history)
         usage.clearHistory()

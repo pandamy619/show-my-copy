@@ -13,7 +13,7 @@ struct ClipboardMonitorAgeLimitTests {
     private static let eightHours: TimeInterval = 8 * 3600
 
     /// A history with the limits of someone who never chose, on the environment's clock, starting with `saved`.
-    private func makeDefaultHistory(restoring saved: [ClipboardEntry] = []) throws -> ClipboardHistory {
+    private func makeDefaultHistory(restoring saved: [ClipboardEntry] = []) throws -> InMemoryHistoryStore {
         var retention = RetentionPolicy.default
         try TemporaryFolder.withDefaults { defaults in
             retention = HistorySettings.storedRetention(in: defaults)

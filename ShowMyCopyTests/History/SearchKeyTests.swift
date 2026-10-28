@@ -35,7 +35,7 @@ struct SearchKeyTests {
     }
 
     @Test func concealedEntryHasNoTextKey() throws {
-        let store = ClipboardHistory()
+        let store = InMemoryHistoryStore()
         store.record(text: "Hunter2", sourceApp: onePassword, at: date, concealed: true, expiresAt: date + 60)
         let entry = try #require(store.entries.first)
         #expect(entry.searchKey == nil)
@@ -43,7 +43,7 @@ struct SearchKeyTests {
     }
 
     @Test func concealingAnEntryDropsItsTextKey() throws {
-        let store = ClipboardHistory()
+        let store = InMemoryHistoryStore()
         let id = store.record(text: "Hunter2", sourceApp: notes, at: date)
         #expect(store.entries.first?.searchKey == "hunter2")
 
@@ -54,7 +54,7 @@ struct SearchKeyTests {
     }
 
     @Test func appKeyFollowsTheSourceApp() throws {
-        let store = ClipboardHistory()
+        let store = InMemoryHistoryStore()
         store.record(text: "same", sourceApp: notes, at: date)
         store.record(text: "same", sourceApp: SourceApp(bundleIdentifier: "com.apple.Safari", name: "Safari"), at: date)
         let entry = try #require(store.entries.first)

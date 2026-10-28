@@ -95,7 +95,7 @@ struct ClipboardMonitorAppNapTests {
 
     private func makeMonitor() -> ClipboardMonitor {
         MonitorFactory.make(
-            pasteboard: pasteboard, history: ClipboardHistory(),
+            pasteboard: pasteboard, history: InMemoryHistoryStore(),
             sleep: { [sleeper] in await sleeper.sleep(for: $0) }, activity: activity, activityClock: clock.read)
     }
 

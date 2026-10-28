@@ -58,7 +58,7 @@ final class TickCounter {
 struct HistoryExpiryTests {
     @Test func removesThePasswordsWhoseTimeIsUp() {
         let start = Date(timeIntervalSince1970: 1_790_000_000)
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(text: "kept", sourceApp: nil, at: start)
         history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
         let environment = MonitorEnvironment()

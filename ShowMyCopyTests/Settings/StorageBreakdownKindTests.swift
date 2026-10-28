@@ -8,7 +8,7 @@ struct StorageBreakdownKindTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     @Test func everyKindHasItsOwnPartInOrder() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(ContentFixtures.files("/Users/me/a.txt"), sourceApp: nil, at: start)
         history.record(ContentFixtures.image(byteSize: 1000, thumbnailBytes: 100), sourceApp: nil, at: start + 1)
         history.record(.richText(rtf: Data(count: 50), plain: "plain"), sourceApp: nil, at: start + 2)
@@ -29,7 +29,7 @@ struct StorageBreakdownKindTests {
     }
 
     @Test func concealedRichTextCountsAsAPassword() {
-        let history = ClipboardHistory()
+        let history = InMemoryHistoryStore()
         history.record(
             .richText(rtf: Data(count: 10), plain: "pw"), sourceApp: nil, at: start, concealed: true,
             expiresAt: start + 60)

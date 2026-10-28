@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct ClipboardMonitorTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
     private let date = Date(timeIntervalSince1970: 1_790_000_000)
     private let notes = SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes")
 
@@ -128,7 +128,7 @@ struct ClipboardMonitorTests {
 @MainActor
 struct ClipboardMonitorCurrentEntryTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
 
     private func makeMonitorWithRecordedEntry() -> ClipboardMonitor {
         let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
@@ -195,7 +195,7 @@ struct ClipboardMonitorCurrentEntryTests {
 @MainActor
 struct ClipboardMonitorPauseTests {
     private let pasteboard = FakePasteboard()
-    private let history = ClipboardHistory()
+    private let history = InMemoryHistoryStore()
 
     private func makeStartedMonitor() -> ClipboardMonitor {
         let monitor = MonitorFactory.make(pasteboard: pasteboard, history: history)
