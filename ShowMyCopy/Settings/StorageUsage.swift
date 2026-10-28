@@ -31,22 +31,35 @@ enum StorageCategory: CaseIterable, Sendable {
     }
 }
 
-/// How the history's size splits into categories.
+/// How the history's size splits into categories, as Settings show it.
+///
+/// Settings must not tell how long a saved password is, also to someone watching the screen. With one saved password
+/// its exact size would be its length, so the passwords' total is shown rounded up to whole `passwordSizeStep`s. The
+/// total adds the rounded size, so subtracting the other parts gives nothing away either; every other part is exact.
+/// The history size shown is then up to a kilobyte larger than the size the limits count.
+///
+/// The total is rounded rather than each password, and rather than leaving passwords out, so the figures still add
+/// up and many passwords still show as the room they take. Passwords stay in the history for an hour at most, so
+/// there are rarely enough of them to pass a kilobyte: until then one password looks like any other, and like several.
 struct StorageBreakdown: Equatable, Sendable {
     struct Part: Equatable, Sendable, Identifiable {
         let category: StorageCategory
         let count: Int
-        /// The total `byteSize` of the part's entries.
+        /// The total `byteSize` of the part's entries; for passwords rounded up (`passwordSizeStep`).
         let bytes: Int
 
         var id: StorageCategory { category }
     }
+
+    /// What the passwords' total size is rounded up to: 1 KB as Settings format sizes.
+    static let passwordSizeStep = 1000
 
     static let empty = StorageBreakdown(entries: [])
 
     /// The categories that have entries, in `StorageCategory.allCases` order.
     let parts: [Part]
     let totalCount: Int
+    /// The sum of the parts' `bytes`, so it includes the passwords rounded up.
     let totalBytes: Int
 
     init(entries: [ClipboardEntry]) {
@@ -58,10 +71,20 @@ struct StorageBreakdown: Equatable, Sendable {
             bytes[category, default: 0] += entry.byteSize
         }
         parts = StorageCategory.allCases.compactMap { category in
-            counts[category].map { Part(category: category, count: $0, bytes: bytes[category, default: 0]) }
+            counts[category].map { count in
+                let exact = bytes[category, default: 0]
+                return Part(
+                    category: category, count: count,
+                    bytes: category == .passwords ? Self.roundedUpPasswordBytes(exact) : exact)
+            }
         }
         totalCount = entries.count
         totalBytes = parts.reduce(0) { $0 + $1.bytes }
+    }
+
+    /// At least one step, so even an empty concealed text does not show as nothing.
+    private static func roundedUpPasswordBytes(_ bytes: Int) -> Int {
+        max(1, (bytes + passwordSizeStep - 1) / passwordSizeStep) * passwordSizeStep
     }
 
     /// The part's share of the total size, from 0 to 1. Zero when the history holds no bytes.
@@ -161,7 +184,7 @@ final class StorageUsage {
         return breakdown
     }
 
-    /// What clearing the history would remove now.
+    /// What clearing the history would remove now, with the passwords' size rounded up as in `breakdown`.
     var clearForecast: HistoryStats {
         let breakdown = breakdown
         return HistoryStats(count: breakdown.totalCount, totalBytes: breakdown.totalBytes)
@@ -184,10 +207,13 @@ final class StorageUsage {
         }
     }
 
-    /// Removes every entry and remembers what was freed, for a calm note in place of the button.
+    /// Removes every entry and remembers what was freed, for a calm note in place of the button. The freed size is
+    /// the one `clearForecast` showed, with the passwords' size rounded up, not the history's exact count.
     @discardableResult
     func clearHistory() -> ClearResult {
-        let result = history.clear()
+        let shownBytes = breakdown.totalBytes
+        let cleared = history.clear()
+        let result = ClearResult(removedCount: cleared.removedCount, freedBytes: shownBytes)
         lastClear = result.removedCount > 0 ? (result, history.revision) : nil
         clearToken &+= 1
         return result

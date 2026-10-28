@@ -7,7 +7,8 @@ struct LimitChange<Limit: Equatable & Sendable>: Equatable, Sendable {
     let limit: Limit
     /// How many of the oldest entries the new limit would delete.
     let removedCount: Int
-    /// The total `byteSize` of those entries.
+    /// The total `byteSize` of those entries, with the size of passwords among them rounded up as Settings show it
+    /// (`StorageBreakdown`).
     let freedBytes: Int
 
     /// True when applying the limit deletes entries, so the user should confirm first.
@@ -102,12 +103,12 @@ final class HistorySettings {
         history.setRetention(limit.apply(value, history.retention))
     }
 
-    /// What applying `policy` to the history now would remove, reported as a change to `limit`.
+    /// What applying `policy` to the history now would remove, reported as a change to `limit`. The freed size is
+    /// shown to the user, so it does not tell a password's length (`StorageBreakdown`).
     func forecast<Limit>(_ limit: Limit, under policy: RetentionPolicy) -> LimitChange<Limit> {
         let entries = history.entries
-        let kept = policy.kept(entries, at: now())
-        let totalBytes = entries.reduce(0) { $0 + $1.byteSize }
-        let keptBytes = kept.reduce(0) { $0 + $1.byteSize }
-        return LimitChange(limit: limit, removedCount: entries.count - kept.count, freedBytes: totalBytes - keptBytes)
+        let keptIDs = Set(policy.kept(entries, at: now()).map(\.id))
+        let removed = StorageBreakdown(entries: entries.filter { !keptIDs.contains($0.id) })
+        return LimitChange(limit: limit, removedCount: removed.totalCount, freedBytes: removed.totalBytes)
     }
 }
