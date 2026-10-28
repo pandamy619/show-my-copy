@@ -88,7 +88,7 @@ struct AppContainerTests {
             container.start()
 
             #expect(limitAtFirstRead.value == 10)
-            #expect(container.historySettings.limit == 10)
+            #expect(container.settings.history.limit == 10)
             #expect(store.entries.count == 10)
             #expect(store.entries.first?.text == "fresh")
             #expect(container.monitor.isPolling)
@@ -202,8 +202,8 @@ struct AppContainerTests {
         try withContainer { container in
             let settings = try #require(settingsWindow.settings)
             #expect(settings.store === store)
-            #expect(settings.history === container.historySettings)
-            #expect(settings.passwords === container.passwordSettings)
+            #expect(settings.history === container.settings.history)
+            #expect(settings.passwords === container.settings.passwords)
             #expect(settings.storage === container.settings.storage)
 
             container.showSettings()
@@ -214,7 +214,7 @@ struct AppContainerTests {
     @Test func monitorFollowsThePasswordSettings() throws {
         try withContainer { container in
             container.start()
-            container.passwordSettings.savesPasswords = true
+            container.settings.passwords.savesPasswords = true
             pasteboard.copy("hunter2", markers: [PasteboardMarker.concealed])
             container.monitor.poll()
             let password = try #require(store.entries.first)
@@ -225,11 +225,11 @@ struct AppContainerTests {
 
     @Test func turningOffSavePasswordsRemovesConcealedEntries() throws {
         try withContainer { container in
-            container.passwordSettings.savesPasswords = true
+            container.settings.passwords.savesPasswords = true
             store.record(text: "plain", sourceApp: nil, at: start)
             store.record(text: "hunter2", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 600)
 
-            container.passwordSettings.savesPasswords = false
+            container.settings.passwords.savesPasswords = false
 
             #expect(store.entries.map(\.text) == ["plain"])
         }

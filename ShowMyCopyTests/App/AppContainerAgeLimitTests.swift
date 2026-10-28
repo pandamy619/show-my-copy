@@ -47,7 +47,7 @@ struct AppContainerAgeLimitTests {
 
         try withContainer { container in
             container.start()
-            #expect(container.historySettings.value(of: .age) == .after(.seconds(8 * 3600)))
+            #expect(container.settings.history.value(of: .age) == .after(.seconds(8 * 3600)))
             #expect(store.entries.map(\.text) == ["just under"])
         }
     }
@@ -58,7 +58,7 @@ struct AppContainerAgeLimitTests {
 
         try withContainer(savedMaxAge: 0) { container in
             container.start()
-            #expect(container.historySettings.value(of: .age) == .off)
+            #expect(container.settings.history.value(of: .age) == .off)
             #expect(store.entries.map(\.text) == ["a month ago"])
         }
     }
@@ -127,7 +127,7 @@ struct AppContainerAgeLimitTests {
             container.monitor.poll()
             clock.advance(by: 2 * 3600)
 
-            let draft = LimitDraft(settings: container.historySettings, limit: .age)
+            let draft = LimitDraft(settings: container.settings.history, limit: .age)
             draft.value = .after(.seconds(3600))
             #expect(draft.pending?.removedCount == 1)
             #expect(store.entries.map(\.text) == ["copied"])

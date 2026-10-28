@@ -30,9 +30,6 @@ final class AppContainer: HistoryShowing {
     /// the app too, so this stays short.
     nonisolated static let quitBudget: Duration = .seconds(2)
 
-    var historySettings: HistorySettings { settings.history }
-    var passwordSettings: PasswordSettings { settings.passwords }
-
     /// `history` is the saved history, loaded with the limits and password choice saved in `defaults`
     /// (`HistorySettings.storedRetention(in:)`, `PasswordSettings.storedSavesPasswords(in:)`).
     init(history: AppHistory, services: AppServices, defaults: UserDefaults) {
@@ -135,10 +132,10 @@ final class AppContainer: HistoryShowing {
     func start() {
         // The monitor records what is on the pasteboard as soon as it starts. Apply the saved limit first, so the
         // history never holds more entries than the user allowed.
-        historySettings.applyStoredLimits()
+        settings.history.applyStoredLimits()
         // The saved history may still hold passwords from a session in which removing them from disk failed,
         // for example after saving passwords was turned off. Saving them is off now, so they go.
-        if !passwordSettings.savesPasswords {
+        if !settings.passwords.savesPasswords {
             store.removeConcealed()
         }
         activityObserver.start()
