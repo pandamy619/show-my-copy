@@ -22,6 +22,7 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Background history of text, rich text, images and files.** What you copy is collected quietly, with the app it came from. Styled text keeps its formatting when copied back. Images (up to 20 MB each) are kept as files in the app's sandbox with a small thumbnail (images over 120 megapixels without one); copied files are kept as references (path and name), never as copies. An image is listed as soon as you copy it and gets its thumbnail a moment later, and copies made meanwhile are not missed. Copied photos and videos get a small thumbnail when you copy them (a frame for a video). The history window shows thumbnails of images, photos and videos and icons of other files, with a mark on files that may have been moved or deleted.
 - **History survives a restart.** It is saved only on your Mac, in the app's sandbox, and left out of backups. Saved passwords are encrypted with a key kept in your Keychain, which is used only if you save passwords.
 - **Hotkey window.** ⌥⌘V by default, changeable in Settings, opens your recent copies on top of any app.
+- **Control Center button** on macOS 26 and later. Add Clipboard History to Control Center to open the history window with a click; if the app is not running, the button starts it.
 - **Search and keyboard navigation.** Type to filter, arrow keys to move, Enter to copy the entry back to the clipboard, Esc to close.
 - **Previews.** → (or Show Preview in a row's context menu) shows the selected entry larger: the full image, styled text with its formatting, or the copied files with their sizes (except files on network volumes). ← or Esc closes it. Passwords are never previewed.
 - **Delete one entry.** ⌘⌫ (or Delete in a row's context menu, or the VoiceOver action) deletes the selected entry, also the one on the clipboard now; the window stays open and selects the next entry. If the clipboard still holds the deleted entry and nothing was copied since, it is emptied too. ⌘Z brings the entry back while the window is open.
@@ -37,12 +38,6 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Private by design.** No analytics. Sandboxed without network access, so the app itself makes no connections; file thumbnails are drawn by macOS QuickLook outside the sandbox, for local files only (see [SECURITY.md](SECURITY.md)).
 
 Deleted entries can stay in the history file's free space until they are overwritten. A password copied without a marker from an app that is not a known password manager, such as a browser extension, can still be kept like normal text — see [SECURITY.md](SECURITY.md) for the details and known limitations.
-
-## Planned features
-
-Not available yet:
-
-- **Control Center button** on macOS 26.
 
 ## Building
 
