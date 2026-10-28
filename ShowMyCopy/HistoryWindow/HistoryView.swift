@@ -10,7 +10,7 @@ struct HistoryView: View {
 
     @FocusState private var isSearchFocused: Bool
 
-    private let icons: any FileIconProviding = WorkspaceFileIconProvider()
+    private let icons = WorkspaceFileIconProvider()
 
     var body: some View {
         let items = model.items
@@ -265,7 +265,7 @@ private struct HistoryRow: View {
     let isSelected: Bool
     let now: Date
     let model: HistoryWindowModel
-    let icons: any FileIconProviding
+    let icons: WorkspaceFileIconProvider
 
     var body: some View {
         HStack(spacing: 10) {

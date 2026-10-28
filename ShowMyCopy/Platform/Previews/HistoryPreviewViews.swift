@@ -57,7 +57,7 @@ struct EntryThumbnail: View {
 struct FileIcon: View {
     let path: String
     let size: CGFloat
-    let icons: any FileIconProviding
+    let icons: WorkspaceFileIconProvider
 
     var body: some View {
         Image(nsImage: icons.icon(forPath: path))
@@ -138,7 +138,7 @@ struct EntryPreviewPane: View {
     let entry: ClipboardEntry
     let preview: EntryPreviewModel
     let thumbnails: ThumbnailProvider
-    let icons: any FileIconProviding
+    let icons: WorkspaceFileIconProvider
     let onClose: @MainActor () -> Void
 
     var body: some View {
@@ -279,7 +279,7 @@ private struct PlainTextPreview: View {
 private struct FilesPreview: View {
     let items: [FilePreviewItem]
     let thumbnails: ThumbnailProvider
-    let icons: any FileIconProviding
+    let icons: WorkspaceFileIconProvider
 
     var body: some View {
         ScrollView {

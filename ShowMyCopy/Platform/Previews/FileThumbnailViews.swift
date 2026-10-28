@@ -8,7 +8,7 @@ struct FileThumbnailIcon: View {
     let thumbnail: FileThumbnail?
     let size: CGFloat
     let provider: ThumbnailProvider
-    let icons: any FileIconProviding
+    let icons: WorkspaceFileIconProvider
     @State private var state: PreviewLoadState<any PreviewImage>
 
     init(
@@ -16,7 +16,7 @@ struct FileThumbnailIcon: View {
         thumbnail: FileThumbnail?,
         size: CGFloat,
         provider: ThumbnailProvider,
-        icons: any FileIconProviding
+        icons: WorkspaceFileIconProvider
     ) {
         self.path = path
         self.thumbnail = thumbnail
