@@ -517,7 +517,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				CODE_SIGN_ENTITLEMENTS = Config/ShowMyCopyControl.entitlements;
 				INFOPLIST_FILE = ShowMyCopyControl/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ShowMyCopyControl;
+				INFOPLIST_KEY_CFBundleDisplayName = "Show My Copy";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -574,7 +574,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				CODE_SIGN_ENTITLEMENTS = Config/ShowMyCopyControl.entitlements;
 				INFOPLIST_FILE = ShowMyCopyControl/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ShowMyCopyControl;
+				INFOPLIST_KEY_CFBundleDisplayName = "Show My Copy";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
