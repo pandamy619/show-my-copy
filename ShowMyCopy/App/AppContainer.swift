@@ -56,10 +56,14 @@ final class AppContainer {
         )
         let copier = EntryCopier(
             history: store, pasteboard: services.pasteboard, monitor: monitor, blobs: media.blobs, now: system.now)
+        // The deleter holds a deleted entry's blobs in the store the history deletes them in, so Undo can bring them
+        // back.
+        let deleter = EntryDeleter(
+            history: store, pasteboard: services.pasteboard, monitor: monitor, blobs: media.blobs, now: system.now)
         // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.
         let previews = PreviewServices(blobs: media.blobs, images: media.previewImages, richText: media.previewRichText)
         let historyWindow = HistoryWindowController(
-            model: HistoryWindowModel(history: store, previews: previews),
+            model: HistoryWindowModel(history: store, deleter: deleter, previews: previews),
             copier: copier,
             monitor: monitor,
             onOpenSettings: { [weak settingsWindow] in

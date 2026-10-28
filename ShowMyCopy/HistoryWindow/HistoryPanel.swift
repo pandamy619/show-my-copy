@@ -5,6 +5,9 @@ import AppKit
 final class HistoryPanel: NSPanel {
     /// Called when the user presses Escape and no view handled it.
     var onCancel: (@MainActor () -> Void)?
+    /// Called with ⌘⌫ and ⌘Z (`commandKey(characters:modifiers:)`). Returns whether it handled the key; when it did
+    /// not, the key goes on as usual, for example to Undo in the Edit menu, which undoes typing in the search field.
+    var onCommandKey: (@MainActor (HistoryWindowModel.Key) -> Bool)?
 
     convenience init(contentRect: NSRect) {
         self.init(
@@ -50,6 +53,40 @@ final class HistoryPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) {
         onCancel?()
     }
+
+    /// Key presses with ⌘ come here before the search field gets them and before the main menu does, so ⌘Z can
+    /// bring back a deleted entry instead of undoing typing.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard let key = Self.commandKey(characters: event.characters, modifiers: event.modifierFlags),
+            onCommandKey?(key) == true
+        else {
+            return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
+    /// The history window's key for a key press with ⌘ and no other modifier: ⌘⌫ (Delete, not Forward Delete) and
+    /// ⌘Z. Nil for anything else, such as ⇧⌘Z or ⌥⌘⌫. `characters` are those the keyboard layout gives with ⌘,
+    /// which are Latin letters also on layouts such as Russian, as for menu shortcuts.
+    nonisolated static func commandKey(
+        characters: String?,
+        modifiers: NSEvent.ModifierFlags
+    ) -> HistoryWindowModel.Key? {
+        guard modifiers.intersection([.command, .shift, .option, .control]) == .command else {
+            return nil
+        }
+        switch characters?.lowercased() {
+        case Self.deleteCharacter:
+            return .delete
+        case "z":
+            return .undo
+        default:
+            return nil
+        }
+    }
+
+    /// What the Delete (Backspace) key types: `NSDeleteCharacter`.
+    private nonisolated static let deleteCharacter = "\u{7F}"
 }
 
 /// Where the history panel appears and how big it is: centered horizontally in the upper part of a screen, like

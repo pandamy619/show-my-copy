@@ -162,8 +162,15 @@ struct HistoryView: View {
                         model.showPreview(of: entry)
                     }
                 }
+                // Also the current entry: deleting it empties the clipboard when it still holds it.
+                Button("Delete", role: .destructive) {
+                    model.delete(entry)
+                }
             }
             .modifier(PreviewAccessibility(entry: entry, model: model))
+            .accessibilityAction(named: Text("Delete")) {
+                model.delete(entry)
+            }
             if entry.isConcealed {
                 RevealButton(isRevealed: isRevealed) {
                     model.toggleReveal(entry.id)

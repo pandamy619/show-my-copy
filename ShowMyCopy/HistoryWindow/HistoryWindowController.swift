@@ -58,6 +58,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         model.concealAll()
         // Drop the preview, and with it a full image, while the window is closed.
         model.preview.close()
+        // Undo works only while the window is open: a deleted entry's files go now.
+        model.finishDeleting()
     }
 
     func toggle() {
@@ -86,6 +88,27 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
             return
         }
         hide()
+    }
+
+    /// ⌘⌫ and ⌘Z, which reach the panel as key equivalents before the search field or the Edit menu sees them.
+    /// Returns false for a key the model leaves to the search field, such as ⌘Z with nothing to bring back, which
+    /// then undoes typing.
+    func handleCommandKey(_ key: HistoryWindowModel.Key) -> Bool {
+        guard isVisible else {
+            return false
+        }
+        switch model.handleKey(key, isCaretAtEnd: true) {
+        case .handled:
+            return true
+        case .ignored:
+            return false
+        case .choose(let entry):
+            choose(entry)
+            return true
+        case .close:
+            hide()
+            return true
+        }
     }
 
     // MARK: - NSWindowDelegate
@@ -146,6 +169,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         panel.delegate = self
         panel.onCancel = { [weak self] in
             self?.hide()
+        }
+        panel.onCommandKey = { [weak self] key in
+            self?.handleCommandKey(key) ?? false
         }
 
         // The background and the hosting view follow the panel's size as it switches between compact and full.

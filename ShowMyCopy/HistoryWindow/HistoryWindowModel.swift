@@ -18,6 +18,10 @@ final class HistoryWindowModel {
         case right
         case `return`
         case escape
+        /// ⌘⌫: deletes the selected entry. Delete without ⌘ edits the search text.
+        case delete
+        /// ⌘Z: brings back the entry deleted last, while there is one. Otherwise it undoes typing in the search field.
+        case undo
     }
 
     /// What the view does after the model handled a key.
@@ -33,6 +37,7 @@ final class HistoryWindowModel {
     }
 
     let history: any HistoryStore
+    private let deleter: any EntryDeleting
     /// The large preview of the selected entry.
     let preview: EntryPreviewModel
     /// Thumbnails for image rows, loaded as rows appear.
@@ -63,8 +68,9 @@ final class HistoryWindowModel {
     /// Concealed entries the user revealed with the eye button. Hidden again when the window closes or opens.
     private var revealedIDs: Set<ClipboardEntry.ID> = []
 
-    init(history: any HistoryStore, previews: PreviewServices = PreviewServices()) {
+    init(history: any HistoryStore, deleter: any EntryDeleting, previews: PreviewServices = PreviewServices()) {
         self.history = history
+        self.deleter = deleter
         preview = EntryPreviewModel(services: previews)
         thumbnails = ThumbnailProvider(blobs: previews.blobs, decoder: previews.images)
         fileAvailability = previews.fileAvailability
@@ -165,6 +171,8 @@ final class HistoryWindowModel {
     /// Clears the search, hides revealed passwords, closes the preview and selects the first row. Called each time
     /// the window is shown.
     func prepareForPresentation() {
+        // Undo works only in the window the entry was deleted in.
+        deleter.finishDeleting()
         query = ""
         concealAll()
         preview.close()
@@ -177,9 +185,12 @@ final class HistoryWindowModel {
     ///
     /// Up and Down Arrow move the selection, and the open preview follows it. Right Arrow opens the preview, like
     /// opening a folder in a column view; Left Arrow and Esc close it. Esc with no preview closes the window, and
-    /// Return copies the selected entry back.
+    /// Return copies the selected entry back. ⌘⌫ deletes the selected entry and ⌘Z brings it back; with nothing to
+    /// delete or bring back they are left to the search field.
     func handleKey(_ key: Key, isCaretAtEnd: Bool) -> KeyResult {
         switch key {
+        case .delete, .undo:
+            return handleDeleteKey(key)
         case .up, .down:
             moveSelection(key == .up ? .up : .down)
             if preview.isOpen {
@@ -287,5 +298,64 @@ final class HistoryWindowModel {
             return nil
         }
         return min(max(index, 0), count - 1)
+    }
+}
+
+// MARK: - Deleting
+
+extension HistoryWindowModel {
+    /// ⌘⌫ and ⌘Z, left to the search field when there is nothing to delete or bring back.
+    fileprivate func handleDeleteKey(_ key: Key) -> KeyResult {
+        if key == .undo {
+            guard deleter.canUndoDelete else {
+                return .ignored
+            }
+            undoDelete()
+            return .handled
+        }
+        guard let entry = selectedEntry else {
+            return .ignored
+        }
+        delete(entry)
+        return .handled
+    }
+
+    /// Deletes `entry`, for ⌘⌫, the row's "Delete" action and VoiceOver. The window stays open. When the entry was
+    /// selected, the entry after it is selected, or the one before it when it was the last.
+    func delete(_ entry: ClipboardEntry) {
+        let items = items
+        let row = items.firstIndex { $0.id == entry.id }
+        let wasSelected = row != nil && row == selectedIndex(in: items)
+        let neighbours = row.map { row in
+            [row + 1, row - 1].filter(items.indices.contains).map { items[$0].id }
+        }
+        deleter.delete(entry.id)
+        revealedIDs.remove(entry.id)
+        if preview.entryID == entry.id {
+            preview.close()
+        }
+        guard wasSelected, let row, let neighbours else {
+            return
+        }
+        // The neighbours by ID: a copy recorded meanwhile may have moved the rows.
+        let remaining = self.items
+        let neighbourRow = neighbours.lazy.compactMap { id in remaining.firstIndex { $0.id == id } }.first
+        select(row: neighbourRow ?? max(min(row, remaining.count - 1), 0), in: remaining)
+    }
+
+    /// Brings back the entry deleted last and selects it, for ⌘Z.
+    func undoDelete() {
+        guard let id = deleter.undoDelete() else {
+            return
+        }
+        let items = items
+        if let row = items.firstIndex(where: { $0.id == id }) {
+            select(row: row, in: items)
+        }
+    }
+
+    /// The window closed: the deleted entry can no longer come back, and its files are deleted.
+    func finishDeleting() {
+        deleter.finishDeleting()
     }
 }
