@@ -6,6 +6,13 @@ import Testing
 private let hour = 3600
 private let day = 24 * hour
 
+/// Saved seconds and the option they become. A typed constant: as an inline argument list of arithmetic tuples it
+/// takes the type checker too long.
+private let savedValuesAndOptions: [(Int, Int)] = [
+    (1, 1 * hour), (hour, hour), (hour + 1, 8 * hour), (8 * hour, 8 * hour), (9 * hour, 24 * hour),
+    (2 * day, 7 * day), (8 * day, 30 * day), (100 * day, 30 * day), (10_000 * day, 30 * day), (0, 0),
+]
+
 /// The age limits Settings offers, how each is named, and how a value it does not offer becomes one it does.
 @MainActor
 struct HistoryAgeLimitOptionsTests {
@@ -28,10 +35,7 @@ struct HistoryAgeLimitOptionsTests {
 
     /// A saved value Settings does not offer becomes the shortest option that keeps entries at least as long, or
     /// the longest option when none does, as the size limit does. 0 stays Off.
-    @Test(arguments: [
-        (1, 1 * hour), (hour, hour), (hour + 1, 8 * hour), (8 * hour, 8 * hour), (9 * hour, 24 * hour),
-        (2 * day, 7 * day), (8 * day, 30 * day), (100 * day, 30 * day), (10_000 * day, 30 * day), (0, 0),
-    ])
+    @Test(arguments: savedValuesAndOptions)
     func aSavedValueBecomesAnOption(saved: Int, option: Int) throws {
         try TemporaryFolder.withDefaults { defaults in
             defaults.set(saved, forKey: SettingsKey.historyMaxAge)
