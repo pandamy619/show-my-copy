@@ -17,7 +17,7 @@ struct AppContainerAgeLimitTests {
 
     init() {
         store = InMemoryHistoryStore(
-            retention: RetentionPolicy(entryLimit: InMemoryHistoryStore.limitRange.upperBound),
+            retention: RetentionPolicy(entryLimit: RetentionPolicy.entryLimitRange.upperBound),
             now: clock.read)
     }
 

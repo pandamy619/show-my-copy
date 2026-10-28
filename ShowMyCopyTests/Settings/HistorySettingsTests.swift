@@ -26,7 +26,7 @@ struct HistorySettingsTests {
 
     private func makeHistory(withEntries count: Int) -> InMemoryHistoryStore {
         let history = InMemoryHistoryStore(
-            retention: RetentionPolicy(entryLimit: InMemoryHistoryStore.limitRange.upperBound), now: { [now] in now })
+            retention: RetentionPolicy(entryLimit: RetentionPolicy.entryLimitRange.upperBound), now: { [now] in now })
         for index in 0..<count {
             history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
         }
@@ -37,8 +37,8 @@ struct HistorySettingsTests {
         try withDefaults { defaults in
             let history = InMemoryHistoryStore(limit: 200)
             let settings = makeSettings(history: history, defaults: defaults)
-            #expect(settings.limit == InMemoryHistoryStore.defaultLimit)
-            #expect(history.limit == InMemoryHistoryStore.defaultLimit)
+            #expect(settings.limit == RetentionPolicy.defaultEntryLimit)
+            #expect(history.limit == RetentionPolicy.defaultEntryLimit)
         }
     }
 
@@ -49,9 +49,9 @@ struct HistorySettingsTests {
 
             let settings = HistorySettings(history: history, defaults: defaults, now: { [now] in now })
 
-            #expect(history.limit == InMemoryHistoryStore.limitRange.upperBound)
+            #expect(history.limit == RetentionPolicy.entryLimitRange.upperBound)
             #expect(history.entries.count == 15)
-            #expect(settings.limit == InMemoryHistoryStore.limitRange.upperBound)
+            #expect(settings.limit == RetentionPolicy.entryLimitRange.upperBound)
         }
     }
 
@@ -92,9 +92,9 @@ struct HistorySettingsTests {
     @Test func ignoresSavedValueOfWrongType() throws {
         try withDefaults { defaults in
             defaults.set("lots", forKey: SettingsKey.historyLimit)
-            #expect(RetentionLimit.entries.stored(in: defaults) == InMemoryHistoryStore.defaultLimit)
+            #expect(RetentionLimit.entries.stored(in: defaults) == RetentionPolicy.defaultEntryLimit)
             defaults.set(["a": 1], forKey: SettingsKey.historyLimit)
-            #expect(RetentionLimit.entries.stored(in: defaults) == InMemoryHistoryStore.defaultLimit)
+            #expect(RetentionLimit.entries.stored(in: defaults) == RetentionPolicy.defaultEntryLimit)
         }
     }
 
@@ -147,7 +147,7 @@ struct HistorySettingsTests {
             #expect(change.needsConfirmation)
             // Proposing changes nothing.
             #expect(history.entries.count == 40)
-            #expect(settings.limit == InMemoryHistoryStore.defaultLimit)
+            #expect(settings.limit == RetentionPolicy.defaultEntryLimit)
             #expect(defaults.object(forKey: SettingsKey.historyLimit) == nil)
         }
     }

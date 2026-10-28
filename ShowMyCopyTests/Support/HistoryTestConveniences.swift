@@ -3,9 +3,6 @@ import Foundation
 @testable import ShowMyCopy
 
 extension InMemoryHistoryStore {
-    nonisolated static let defaultLimit = RetentionPolicy.defaultEntryLimit
-    nonisolated static let limitRange = RetentionPolicy.entryLimitRange
-
     /// A store that keeps at most `limit` entries.
     convenience init(limit: Int) {
         self.init(retention: RetentionPolicy(entryLimit: limit))

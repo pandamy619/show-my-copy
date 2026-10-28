@@ -28,7 +28,7 @@ struct HistorySizeLimitTests {
     /// Entries "item 0" (oldest) to "item 9", 6 bytes each.
     private func makeHistory() -> InMemoryHistoryStore {
         let history = InMemoryHistoryStore(
-            retention: RetentionPolicy(entryLimit: InMemoryHistoryStore.limitRange.upperBound), now: { [now] in now })
+            retention: RetentionPolicy(entryLimit: RetentionPolicy.entryLimitRange.upperBound), now: { [now] in now })
         for index in 0..<10 {
             history.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
         }

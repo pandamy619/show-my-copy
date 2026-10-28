@@ -14,7 +14,7 @@ final class LimitAtFirstRead {
 struct AppContainerTests {
     /// On the container's clock, so the age limit measures entries against the same time as the monitor.
     private let store = InMemoryHistoryStore(
-        retention: RetentionPolicy(entryLimit: InMemoryHistoryStore.limitRange.upperBound),
+        retention: RetentionPolicy(entryLimit: RetentionPolicy.entryLimitRange.upperBound),
         now: { ContainerFactory.date })
     private let pasteboard = FakePasteboard()
     private let sleeper = ManualSleeper()
@@ -65,7 +65,7 @@ struct AppContainerTests {
         pasteboard.copy("fresh")
 
         try withContainer(savedLimit: 10) { container in
-            #expect(store.limit == InMemoryHistoryStore.limitRange.upperBound)
+            #expect(store.limit == RetentionPolicy.entryLimitRange.upperBound)
             #expect(store.entries.count == 15)
             #expect(pasteboard.stringReadCount == 0)
             #expect(pasteboard.dataReadCount == 0)
