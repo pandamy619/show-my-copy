@@ -20,10 +20,6 @@ struct PersistentHistoryStoreWriteTests {
         disk.makeStore(sealer: sealer, retention: retention, now: now ?? start, openError: openError)
     }
 
-    private func savedTexts() -> Set<String> {
-        disk.savedTexts()
-    }
-
     // MARK: - Changes reach the disk
 
     @Test func trimmingOnRecordDeletesTheOldestRecord() {
@@ -32,7 +28,7 @@ struct PersistentHistoryStoreWriteTests {
             store.record(text: "item \(index)", sourceApp: nil, at: start + Double(index))
         }
         #expect(disk.records.count == 10)
-        #expect(!savedTexts().contains("item 0"))
+        #expect(!disk.savedTexts().contains("item 0"))
     }
 
     @Test func lowerLimitDeletesRecords() {
@@ -49,7 +45,7 @@ struct PersistentHistoryStoreWriteTests {
         let id = store.record(text: "a", sourceApp: nil, at: start)
         store.record(text: "b", sourceApp: nil, at: start + 1)
         store.remove(id: id)
-        #expect(savedTexts() == ["b"])
+        #expect(disk.savedTexts() == ["b"])
     }
 
     @Test func restoreSavesTheRemovedEntryAgainInOneWrite() throws {
@@ -77,7 +73,7 @@ struct PersistentHistoryStoreWriteTests {
         let record = try #require(disk.record(id))
         #expect(record.isConcealed)
         #expect(record.payload.range(of: Data("hunter2".utf8)) == nil)
-        #expect(savedTexts() == ["hunter2"])
+        #expect(disk.savedTexts() == ["hunter2"])
     }
 
     @Test func aFailedRestoreKeepsTheEntryAndTheNextChangeSavesIt() throws {
@@ -94,7 +90,7 @@ struct PersistentHistoryStoreWriteTests {
 
         disk.failing = []
         store.record(text: "b", sourceApp: nil, at: start + 1)
-        #expect(savedTexts() == ["a", "b"])
+        #expect(disk.savedTexts() == ["a", "b"])
         #expect(store.storageError == nil)
     }
 
@@ -105,7 +101,7 @@ struct PersistentHistoryStoreWriteTests {
         store.removeConcealed()
 
         #expect(disk.records.count == 1)
-        #expect(savedTexts() == ["plain"])
+        #expect(disk.savedTexts() == ["plain"])
         #expect(makeStore().entries.map(\.text) == ["plain"])
     }
 
@@ -162,7 +158,7 @@ struct PersistentHistoryStoreWriteTests {
 
         store.record(text: "b", sourceApp: nil, at: start + 1)
         #expect(store.storageError == nil)
-        #expect(savedTexts() == ["a", "b"])
+        #expect(disk.savedTexts() == ["a", "b"])
     }
 
     @Test func aFailedDeleteIsMadeGoodByTheNextChange() {
@@ -175,7 +171,7 @@ struct PersistentHistoryStoreWriteTests {
         disk.failing = []
 
         store.record(text: "next", sourceApp: nil, at: start + 2)
-        #expect(savedTexts() == ["plain", "next"])
+        #expect(disk.savedTexts() == ["plain", "next"])
         #expect(store.storageError == nil)
     }
 

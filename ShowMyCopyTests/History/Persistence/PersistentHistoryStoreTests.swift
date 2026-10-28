@@ -19,10 +19,6 @@ struct PersistentHistoryStoreTests {
         disk.makeStore(sealer: sealer, retention: retention, now: now ?? start, openError: openError)
     }
 
-    private func savedTexts() -> Set<String> {
-        disk.savedTexts()
-    }
-
     // MARK: - Across restarts
 
     @Test func historySurvivesARestart() throws {
@@ -113,7 +109,7 @@ struct PersistentHistoryStoreTests {
         store.record(text: "hunter2", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 600)
 
         #expect(store.entries.count == 2)
-        #expect(savedTexts() == ["plain"])
+        #expect(disk.savedTexts() == ["plain"])
         #expect(store.storageError == nil)
     }
 
@@ -190,7 +186,7 @@ struct PersistentHistoryStoreTests {
         #expect(second.entries.count == 10)
         #expect(second.entries.last?.text == "item 5")
         #expect(disk.records.count == 10)
-        #expect(!savedTexts().contains("item 4"))
+        #expect(!disk.savedTexts().contains("item 4"))
     }
 
     @Test func entriesPastTheAgeLimitAreDeletedFromDisk() {

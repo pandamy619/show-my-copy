@@ -13,10 +13,6 @@ struct PersistentHistoryStoreFailureTests {
         disk.makeStore(now: now ?? start, blobs: blobs)
     }
 
-    private func savedTexts() -> Set<String> {
-        disk.savedTexts()
-    }
-
     /// An image record on disk that a store without a blob store leaves unloaded.
     private func saveImageRecord() throws -> UUID {
         let blobs = InMemoryBlobStore()
@@ -37,7 +33,7 @@ struct PersistentHistoryStoreFailureTests {
         store.record(text: "c", sourceApp: nil, at: start + 2)
         #expect(disk.calls == [.apply])
         #expect(disk.changes.first?.deletesAll == false)
-        #expect(savedTexts() == ["a", "b", "c"])
+        #expect(disk.savedTexts() == ["a", "b", "c"])
     }
 
     @Test(arguments: 1...3)
@@ -52,10 +48,10 @@ struct PersistentHistoryStoreFailureTests {
         disk.failingCalls = [disk.nextCall + failingOperation - 1]
         for index in 0..<3 {
             store.record(text: "more \(index)", sourceApp: nil, at: start + 3 + Double(index))
-            #expect(savedTexts().isSuperset(of: ["a", "b"]))
+            #expect(disk.savedTexts().isSuperset(of: ["a", "b"]))
         }
         store.record(text: "last", sourceApp: nil, at: start + 10)
-        #expect(savedTexts() == ["a", "b", "c", "more 0", "more 1", "more 2", "last"])
+        #expect(disk.savedTexts() == ["a", "b", "c", "more 0", "more 1", "more 2", "last"])
         #expect(store.storageError == nil)
     }
 
@@ -82,7 +78,7 @@ struct PersistentHistoryStoreFailureTests {
         disk.failing = []
 
         store.record(text: "c", sourceApp: nil, at: start + 2)
-        #expect(savedTexts() == ["b", "c"])
+        #expect(disk.savedTexts() == ["b", "c"])
         #expect(disk.record(removed) == nil)
     }
 
@@ -100,7 +96,7 @@ struct PersistentHistoryStoreFailureTests {
 
         store.record(text: "next", sourceApp: nil, at: start + 121)
         #expect(disk.record(expired) == nil)
-        #expect(savedTexts() == ["plain", "next"])
+        #expect(disk.savedTexts() == ["plain", "next"])
     }
 
     // MARK: - Records this session does not own
@@ -115,7 +111,7 @@ struct PersistentHistoryStoreFailureTests {
 
         store.record(text: "b", sourceApp: nil, at: start + 1)
         #expect(disk.record(imageID) != nil)
-        #expect(savedTexts() == ["a", "b"])
+        #expect(disk.savedTexts() == ["a", "b"])
     }
 
     @Test func writesAfterAFailedLoadNeverTouchTheSavedHistory() throws {
@@ -133,7 +129,7 @@ struct PersistentHistoryStoreFailureTests {
 
         store.record(text: "d", sourceApp: nil, at: start + 3)
         store.remove(id: removed)
-        #expect(savedTexts() == ["a", "b", "d"])
+        #expect(disk.savedTexts() == ["a", "b", "d"])
         #expect(store.storageError == .loadFailed)
         for change in disk.changes {
             #expect(!change.deletesAll)
@@ -152,7 +148,7 @@ struct PersistentHistoryStoreFailureTests {
         disk.failing = []
 
         store.record(text: "b", sourceApp: nil, at: start + 1)
-        #expect(savedTexts() == ["b"])
+        #expect(disk.savedTexts() == ["b"])
         #expect(disk.record(unloaded) == nil)
         #expect(store.storageError == nil)
     }
@@ -166,6 +162,6 @@ struct PersistentHistoryStoreFailureTests {
         disk.failing = []
 
         store.record(text: "c", sourceApp: nil, at: start + 2)
-        #expect(savedTexts() == ["b", "c"])
+        #expect(disk.savedTexts() == ["b", "c"])
     }
 }
