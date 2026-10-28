@@ -51,6 +51,8 @@ final class EntryPreviewModel {
     private(set) var entryID: ClipboardEntry.ID?
     private(set) var content: Content?
 
+    /// The content of the open entry that `content` shows, to tell when the history changes it.
+    @ObservationIgnored private var shownContent: ClipboardContent?
     /// Counts opens, so a load that finishes after the preview moved on is dropped.
     @ObservationIgnored private var generation = 0
     /// The load started by the last `open`. Tests await it.
@@ -69,7 +71,8 @@ final class EntryPreviewModel {
         !entry.isConcealed
     }
 
-    /// Shows `entry`. Returns false, and closes the preview, for an entry that cannot be previewed.
+    /// Shows `entry`. Returns false, and closes the preview, for an entry that cannot be previewed. Called again
+    /// for the open entry after the history changed it, it shows what the entry holds now (`update(to:)`).
     @discardableResult
     func open(_ entry: ClipboardEntry) -> Bool {
         guard Self.canPreview(entry) else {
@@ -77,11 +80,13 @@ final class EntryPreviewModel {
             return false
         }
         guard entry.id != entryID else {
+            update(to: entry.content)
             return true
         }
         close()
         generation += 1
         entryID = entry.id
+        shownContent = entry.content
         start(entry.content, generation: generation)
         return true
     }
@@ -90,11 +95,35 @@ final class EntryPreviewModel {
     func close() {
         pendingLoad?.cancel()
         pendingLoad = nil
+        shownContent = nil
         if entryID != nil {
             entryID = nil
         }
         if content != nil {
             content = nil
+        }
+    }
+
+    /// The open entry changed in the history after the preview opened: its image's data was saved, or its files
+    /// got their thumbnails and sizes (see `CaptureEnrichment`). What is shown already stays: a loaded image is not
+    /// read again, its bytes are the same, and files keep the availability checked for them.
+    private func update(to newContent: ClipboardContent) {
+        guard newContent != shownContent else {
+            return
+        }
+        shownContent = newContent
+        switch (newContent, content) {
+        case (.image(let image), .image(_, .loaded(let decoded))):
+            content = .image(image, .loaded(decoded))
+        case (.files(let files), .files(let items)) where files.count == items.count:
+            content = .files(
+                zip(files, items).map { file, item in
+                    FilePreviewItem(id: item.id, file: file, availability: item.availability)
+                })
+        default:
+            pendingLoad?.cancel()
+            generation += 1
+            start(newContent, generation: generation)
         }
     }
 
@@ -148,10 +177,11 @@ final class EntryPreviewModel {
         let checker = services.fileAvailability
         pendingLoad = Task { [weak self] in
             let availabilities = await FileAvailabilityProbe.check(files, with: checker)
-            guard let self, self.generation == generation, !Task.isCancelled else {
+            // Into the items shown now: they may have got thumbnails meanwhile (`update(to:)`).
+            guard let self, self.generation == generation, !Task.isCancelled, case .files(var checked) = content
+            else {
                 return
             }
-            var checked = items
             for (index, availability) in zip(checked.indices, availabilities) {
                 checked[index].availability = availability
             }

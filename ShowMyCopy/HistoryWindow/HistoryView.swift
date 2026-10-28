@@ -37,6 +37,10 @@ struct HistoryView: View {
                             }
                         }
                     }
+                    // An image saved or thumbnails made after the preview opened show up in it.
+                    .onChange(of: previewed?.content) {
+                        model.previewedEntryChanged()
+                    }
             }
         }
         // Follow the panel's size: compact with nothing to list, full with entries. Pinned to the top, so the

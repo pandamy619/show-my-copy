@@ -248,6 +248,14 @@ final class HistoryWindowModel {
         return items.first { $0.id == id }
     }
 
+    /// The open preview's entry changed in the history: its image was saved, or its files got thumbnails and sizes,
+    /// after the preview opened. The view calls this when it sees the change, so the preview shows them at once.
+    func previewedEntryChanged() {
+        if let entry = previewedEntry {
+            preview.open(entry)
+        }
+    }
+
     /// Whether the copied files of a row may be unavailable, checked off the main actor when the row appears.
     func availability(of files: [FileReference]) async -> FileAvailability {
         FileAvailabilityProbe.summary(await FileAvailabilityProbe.check(files, with: fileAvailability))

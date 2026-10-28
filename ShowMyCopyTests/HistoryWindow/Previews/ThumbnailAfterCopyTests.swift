@@ -187,7 +187,8 @@ struct ThumbnailAfterCopyTests {
             await app.monitor.finishEnriching()
             await app.model.preview.pendingLoad?.value
             let completed = try #require(app.model.previewedEntry)
-            app.model.showPreview(of: completed)
+            // What the view does when it sees the previewed entry change.
+            app.model.previewedEntryChanged()
             await app.model.preview.pendingLoad?.value
             guard case .files(let items) = app.model.preview.content, case .files(let files) = completed.content else {
                 Issue.record("expected files")
@@ -197,5 +198,50 @@ struct ThumbnailAfterCopyTests {
             #expect(items.map(\.thumbnail) == files.map(\.thumbnail))
             #expect(items.first?.availability == .available)
         }
+    }
+
+    // MARK: - The preview, on its own
+
+    private func entry(_ files: [FileReference], id: UUID = UUID()) -> ClipboardEntry {
+        let content = ClipboardContent.files(files)
+        return ClipboardEntry(
+            id: id, content: content, contentHash: SHA256ContentHasher().hash(content), date: MonitorFactory.date,
+            sourceApp: nil)
+    }
+
+    /// The availability check that started with the preview finishes after the thumbnails arrived, and keeps them.
+    @Test func filesCheckedAfterTheirThumbnailsArrivedKeepThem() async throws {
+        let blobs = ReadCountingBlobStore()
+        let preview = EntryPreviewModel(
+            services: PreviewServices(
+                blobs: blobs, images: decoder, fileAvailability: FakeAvailabilityChecker(missing: ["/Users/me/b.png"])))
+        let recorded = entry([ContentFixtures.file("/Users/me/a.jpg"), ContentFixtures.file("/Users/me/b.png")])
+        preview.open(recorded)
+        let photo = try ContentFixtures.fileWithThumbnail("/Users/me/a.jpg", kind: .image, in: blobs)
+        let completed = entry([photo, ContentFixtures.file("/Users/me/b.png")], id: recorded.id)
+
+        #expect(preview.open(completed))
+        await preview.pendingLoad?.value
+        guard case .files(let items) = preview.content else {
+            Issue.record("expected files")
+            return
+        }
+        #expect(items.map(\.thumbnail) == [photo.thumbnail, nil])
+        #expect(items.map(\.availability) == [.available, .mayBeUnavailable])
+    }
+
+    @Test func openingTheSameUnchangedEntryAgainChangesNothing() async throws {
+        let preview = EntryPreviewModel(services: PreviewServices(fileAvailability: FakeAvailabilityChecker()))
+        let files = entry([ContentFixtures.file("/Users/me/a.jpg")])
+        preview.open(files)
+        await preview.pendingLoad?.value
+        let changed = ChangeFlag()
+        withObservationTracking {
+            _ = preview.content
+        } onChange: {
+            changed.set()
+        }
+        #expect(preview.open(files))
+        #expect(!changed.value)
     }
 }
