@@ -12,6 +12,9 @@ struct SettingsView<ShortcutRecorder: View>: View {
     /// The entry limit being picked. A lower limit that would delete entries is applied only after the user
     /// confirms it.
     @State private var entryLimit: LimitDraft<Int>
+    /// The age limit being picked. A shorter limit that would delete entries is applied only after the user
+    /// confirms it.
+    @State private var ageLimit: LimitDraft<HistoryAgeLimit>
 
     init(settings: AppSettings, @ViewBuilder shortcutRecorder: () -> ShortcutRecorder) {
         self.history = settings.store
@@ -20,6 +23,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
         self.usage = settings.storage
         self.shortcutRecorder = shortcutRecorder()
         _entryLimit = State(initialValue: LimitDraft(settings: settings.history, limit: .entries))
+        _ageLimit = State(initialValue: LimitDraft(settings: settings.history, limit: .age))
     }
 
     var body: some View {
@@ -37,6 +41,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
         .onChange(of: history.revision) {
             // The history can change while a confirmation is shown. Re-check what the change would do.
             entryLimit.historyChanged()
+            ageLimit.historyChanged()
         }
         .task {
             // Memory changes all the time, so it is read again while the settings are open. The window stays
@@ -94,6 +99,38 @@ struct SettingsView<ShortcutRecorder: View>: View {
                     onCancel: { entryLimit.cancel() }
                 )
             }
+            Picker("Remove items after", selection: $ageLimit.value) {
+                ForEach(HistoryAgeLimit.options, id: \.self) { limit in
+                    Self.title(of: limit).tag(limit)
+                }
+            }
+            if let change = ageLimit.pending {
+                // Entries past the age limit are always the oldest ones that are not pinned.
+                InlineConfirmation(
+                    message: .removingOldestItems(change.removedCount),
+                    detail: .freeing(bytes: change.freedBytes),
+                    confirmTitle: "Remove",
+                    onConfirm: { ageLimit.confirm() },
+                    onCancel: { ageLimit.cancel() }
+                )
+            } else {
+                Text("Entries older than this are removed automatically. Pinned entries are kept.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Hours and days are plural strings in the catalog, such as "1 hour" and "8 hours".
+    private static func title(of limit: HistoryAgeLimit) -> Text {
+        switch limit.span {
+        case .hours(let count):
+            Text("\(count) hours")
+        case .days(let count):
+            Text("\(count) days")
+        case nil:
+            Text("Off", comment: "The history age limit option that keeps entries until the user removes them.")
         }
     }
 
@@ -146,6 +183,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
 
     private func resetDrafts() {
         entryLimit.reset()
+        ageLimit.reset()
         usage.forgetRecentClear()
     }
 }

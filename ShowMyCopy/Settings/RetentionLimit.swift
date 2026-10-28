@@ -100,7 +100,8 @@ extension RetentionLimit where Value == HistorySizeLimit {
 }
 
 extension RetentionLimit where Value == HistoryAgeLimit {
-    /// The age limit, saved in whole seconds, 0 for none. A negative value is not valid.
+    /// The age limit, saved in whole seconds, 0 for none, as one of the options. A negative value is not valid, and
+    /// other ages are moved to an option.
     static var age: RetentionLimit<HistoryAgeLimit> {
         RetentionLimit(
             key: SettingsKey.historyMaxAge,
@@ -109,10 +110,10 @@ extension RetentionLimit where Value == HistoryAgeLimit {
                 guard saved >= 0 else {
                     return nil
                 }
-                return saved == 0 ? .off : .after(.seconds(saved))
+                return saved == 0 ? .off : HistoryAgeLimit.after(.seconds(saved)).offered
             },
             encode: { $0.seconds },
-            value: { HistoryAgeLimit(maxAge: $0.maxAge) },
+            value: { HistoryAgeLimit(maxAge: $0.maxAge).offered },
             apply: { $1.withMaxAge($0.maxAge) }
         )
     }
@@ -125,7 +126,46 @@ enum HistoryAgeLimit: Hashable, Sendable {
 
     /// 8 hours, for everyone who has not chosen: clipboard history is private, so it is kept no longer than a working
     /// day unless the user asks for longer. A saved choice, Off included, stays.
-    static let `default` = HistoryAgeLimit.after(.seconds(8 * 3600))
+    static let `default` = HistoryAgeLimit.hours(8)
+
+    /// The age limits offered in Settings, shortest first, then Off.
+    static let options: [HistoryAgeLimit] = [.hours(1), .hours(8), .hours(24), .days(7), .days(30), .off]
+
+    /// How Settings names an age limit: in days from a week up, in hours below.
+    enum Span: Hashable, Sendable {
+        case hours(Int)
+        case days(Int)
+    }
+
+    static func hours(_ count: Int) -> HistoryAgeLimit {
+        .after(.seconds(count * 3600))
+    }
+
+    static func days(_ count: Int) -> HistoryAgeLimit {
+        hours(count * 24)
+    }
+
+    /// The option that stands for this limit: the shortest that keeps entries at least as long, or the longest when
+    /// none does, as the size limit does. Off stays off.
+    var offered: HistoryAgeLimit {
+        guard let maxAge else {
+            return .off
+        }
+        let limited = Self.options.compactMap(\.maxAge)
+        guard let option = limited.first(where: { $0 >= maxAge }) ?? limited.last else {
+            return self
+        }
+        return .after(option)
+    }
+
+    /// The limit in the units Settings names it in, or nil when off. Whole units only, as the options are.
+    var span: Span? {
+        guard maxAge != nil else {
+            return nil
+        }
+        let hours = seconds / 3600
+        return hours >= 7 * 24 ? .days(hours / 24) : .hours(hours)
+    }
 
     init(maxAge: Duration?) {
         guard let maxAge, maxAge > .zero else {
