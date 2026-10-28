@@ -63,7 +63,10 @@ struct HistoryExpiryTests {
         history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: start + 60)
         let environment = MonitorEnvironment()
         environment.now = start + 59
-        let expiry = HistoryExpiry(history: history, now: { environment.now })
+        let expiry = HistoryExpiry(
+            history: history,
+            pasteboardClearer: PasswordPasteboardClearer(history: history, pasteboard: FakePasteboard()),
+            now: { environment.now })
 
         expiry.removeExpired()
         #expect(history.entries.count == 2)
@@ -79,7 +82,10 @@ struct HistoryExpiryTests {
         history.record(text: "recent", sourceApp: nil, at: start)
         let environment = MonitorEnvironment()
         environment.now = start + 3599
-        let expiry = HistoryExpiry(history: history, now: { environment.now })
+        let expiry = HistoryExpiry(
+            history: history,
+            pasteboardClearer: PasswordPasteboardClearer(history: history, pasteboard: FakePasteboard()),
+            now: { environment.now })
 
         expiry.removeExpired()
         #expect(history.entries.map(\.text) == ["recent"])

@@ -4,7 +4,7 @@ import Foundation
 
 /// Builds the clipboard monitors of the tests, so a new dependency of the monitor is added here once instead of in
 /// every test file. Every default is a fake: no app is in front, the clock stands still, the polling loop never
-/// wakes up on its own and App Nap is never touched.
+/// wakes up on its own and App Nap is never touched. Expired passwords are cleared from `pasteboard` as in the app.
 @MainActor
 enum MonitorFactory {
     /// The time a monitor reads unless a test sets one: months after the dates the tests record entries at, as the
@@ -12,7 +12,7 @@ enum MonitorFactory {
     static let date = Date(timeIntervalSince1970: 1_800_000_000)
 
     static func make(
-        pasteboard: any PasteboardReading,
+        pasteboard: any PasteboardReading & PasteboardWriting,
         history: any HistoryStore,
         frontmostApp: @escaping @MainActor () -> SourceApp? = { nil },
         now: @escaping @MainActor () -> Date = { MonitorFactory.date },
@@ -26,11 +26,12 @@ enum MonitorFactory {
         fileSizes: FileSizeReader = MonitorFactory.noFileSizes,
         fileThumbnailIngestor: FileThumbnailIngestor? = nil
     ) -> ClipboardMonitor {
-        ClipboardMonitor(
+        let pasteboardClearer = PasswordPasteboardClearer(history: history, pasteboard: pasteboard)
+        let monitor = ClipboardMonitor(
             pasteboard: pasteboard,
             history: history,
             schedule: PollingSchedule(interval: interval, sleep: sleep, activity: activity, now: activityClock),
-            expiry: HistoryExpiry(history: history, now: now),
+            expiry: HistoryExpiry(history: history, pasteboardClearer: pasteboardClearer, now: now),
             clearedClipboard: ClearedClipboardCheck(history: history),
             capture: blobs.map { blobs in
                 CaptureEnrichment(
@@ -41,6 +42,8 @@ enum MonitorFactory {
             now: now,
             passwordPolicy: passwordPolicy
         )
+        pasteboardClearer.connect(to: monitor)
+        return monitor
     }
 
     /// Reads no file: every size is unknown, as for files the sandbox hides.

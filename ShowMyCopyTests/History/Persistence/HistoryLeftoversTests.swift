@@ -89,7 +89,9 @@ struct HistoryLeftoversTests {
         try TestDefaults.with { defaults in
             let leftovers = FakeHistoryLeftovers()
             let store = makeStore(leftovers: leftovers)
-            let settings = PasswordSettings(history: AppHistory(store), defaults: defaults, now: { Date() })
+            let settings = PasswordSettings(
+                history: AppHistory(store), defaults: defaults, now: { Date() },
+                pasteboardClearer: PasswordPasteboardClearer(history: store, pasteboard: FakePasteboard()))
             settings.savesPasswords = true
             #expect(leftovers.hasDamagedCopy)
 
@@ -103,7 +105,9 @@ struct HistoryLeftoversTests {
         try TestDefaults.with { defaults in
             let leftovers = FakeHistoryLeftovers()
             let store = makeStore(leftovers: leftovers)
-            _ = PasswordSettings(history: AppHistory(store), defaults: defaults, now: { Date() })
+            _ = PasswordSettings(
+                history: AppHistory(store), defaults: defaults, now: { Date() },
+                pasteboardClearer: PasswordPasteboardClearer(history: store, pasteboard: FakePasteboard()))
             store.removeConcealed()
             #expect(leftovers.hasDamagedCopy)
         }

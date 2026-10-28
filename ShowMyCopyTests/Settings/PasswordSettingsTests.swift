@@ -9,8 +9,10 @@ struct PasswordSettingsTests {
 
     /// Runs `body` with an empty UserDefaults suite that is removed afterwards.
     private func makeSettings(history: InMemoryHistoryStore? = nil, defaults: UserDefaults) -> PasswordSettings {
-        PasswordSettings(
-            history: .unsaved(history ?? InMemoryHistoryStore()), defaults: defaults, now: { [start] in start })
+        let history = history ?? InMemoryHistoryStore()
+        return PasswordSettings(
+            history: .unsaved(history), defaults: defaults, now: { [start] in start },
+            pasteboardClearer: PasswordPasteboardClearer(history: history, pasteboard: FakePasteboard()))
     }
 
     @Test func passwordsAreNotSavedByDefault() throws {
@@ -27,9 +29,11 @@ struct PasswordSettingsTests {
     @Test func turningSavingOffDeletesTheDamagedCopyThroughTheStorage() throws {
         try TestDefaults.with { defaults in
             let storage = UnsavedHistoryStorage()
+            let store = InMemoryHistoryStore()
             let settings = PasswordSettings(
-                history: AppHistory(store: InMemoryHistoryStore(), storage: storage), defaults: defaults,
-                now: { [start] in start })
+                history: AppHistory(store: store, storage: storage), defaults: defaults,
+                now: { [start] in start },
+                pasteboardClearer: PasswordPasteboardClearer(history: store, pasteboard: FakePasteboard()))
             settings.savesPasswords = true
             #expect(storage.damagedHistoryDeletions == 0)
             settings.savesPasswords = false
