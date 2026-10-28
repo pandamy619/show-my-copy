@@ -156,15 +156,8 @@ struct ClipboardContentKindTests {
 }
 
 struct ContentHashHexTests {
-    @Test func hexRoundTrips() {
-        let hash = ContentHash(bytes: [0x00, 0x0F, 0xAB, 0xFF])
-        #expect(ContentHash(hex: hash.description) == hash)
-        #expect(ContentHash(hex: "000FABFF") == hash)
-    }
-
-    @Test(arguments: ["", "abc", "zz", "0g", "-1"])
-    func invalidHexIsRejected(hex: String) {
-        #expect(ContentHash(hex: hex) == nil)
+    @Test func descriptionIsLowerCaseHexWithLeadingZeros() {
+        #expect(ContentHash(bytes: [0x00, 0x0F, 0xAB, 0xFF]).description == "000fabff")
     }
 }
 

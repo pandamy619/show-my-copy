@@ -17,37 +17,6 @@ struct ContentHash: Hashable, Sendable, CustomStringConvertible {
     init(bytes: [UInt8]) {
         self.bytes = bytes
     }
-
-    /// The hash written as `description`, or nil when `hex` is not an even number of hexadecimal digits.
-    init?(hex: String) {
-        let digits = Array(hex.utf8)
-        guard !digits.isEmpty, digits.count.isMultiple(of: 2) else {
-            return nil
-        }
-        var bytes: [UInt8] = []
-        bytes.reserveCapacity(digits.count / 2)
-        for index in stride(from: 0, to: digits.count, by: 2) {
-            guard let high = Self.value(ofHexDigit: digits[index]), let low = Self.value(ofHexDigit: digits[index + 1])
-            else {
-                return nil
-            }
-            bytes.append(high << 4 | low)
-        }
-        self.bytes = bytes
-    }
-
-    private static func value(ofHexDigit digit: UInt8) -> UInt8? {
-        switch digit {
-        case UInt8(ascii: "0")...UInt8(ascii: "9"):
-            digit - UInt8(ascii: "0")
-        case UInt8(ascii: "a")...UInt8(ascii: "f"):
-            digit - UInt8(ascii: "a") + 10
-        case UInt8(ascii: "A")...UInt8(ascii: "F"):
-            digit - UInt8(ascii: "A") + 10
-        default:
-            nil
-        }
-    }
 }
 
 /// Computes content hashes. The app uses `SHA256ContentHasher`; the protocol keeps CryptoKit out of everything else.
