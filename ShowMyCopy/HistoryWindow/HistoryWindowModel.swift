@@ -278,9 +278,6 @@ final class HistoryWindowModel {
         }
     }
 
-    /// Only the beginning of each entry is searched, so typing stays fast with long entries.
-    nonisolated static let searchedCharacters = SearchKey.searchedCharacters
-
     /// Case- and diacritic-insensitive match against the text and the source app name, using the keys folded when
     /// the entry was made. `foldedQuery` must be folded with `SearchKey.fold(_:)`. A concealed entry matches only by
     /// its source app name, so typing part of a password does not reveal which entry holds it.
