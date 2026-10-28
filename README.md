@@ -15,11 +15,11 @@
 
 <p align="center"><a href="README.ru.md">Русская версия</a></p>
 
-## Current status (0.1)
+## Current status (0.1.0)
 
 Show My Copy is in early development. There are no releases yet; build it from source. What works now:
 
-- **Background history of text, rich text, images and files.** What you copy is collected quietly, with the app it came from. Styled text keeps its formatting when copied back. Images (up to 20 MB each) are kept as files in the app's sandbox with a small thumbnail (images over 120 megapixels without one); copied files are kept as references (path and name), never as copies. An image is listed as soon as you copy it and gets its thumbnail a moment later, and copies made meanwhile are not missed. Copied photos and videos get a small thumbnail when you copy them (a frame for a video). The history window shows thumbnails of images, photos and videos and icons of other files, with a mark on files that may have been moved or deleted.
+- **Background history of text, rich text, images and files.** What you copy is collected quietly, with the app it came from. Text is kept up to 1 MB per copy, and styled text keeps its formatting when copied back. Images (up to 20 MB each) are kept as files in the app's sandbox with a small thumbnail (images over 120 megapixels without one); copied files are kept as references (path and name), never as copies. An image is listed as soon as you copy it and gets its thumbnail a moment later, and copies made meanwhile are not missed. Copied photos and videos get a small thumbnail when you copy them (a frame for a video). The history window shows thumbnails of images, photos and videos and icons of other files, with a mark on files that may have been moved or deleted.
 - **History survives a restart.** It is saved only on your Mac, in the app's sandbox, and left out of backups. Saved passwords are encrypted with a key kept in your Keychain, which is used only if you save passwords.
 - **Hotkey window.** ⌥⌘V by default, changeable in Settings, opens your recent copies on top of any app.
 - **Control Center button** on macOS 26 and later. Add Clipboard History to Control Center to open the history window with a click; if the app is not running, the button starts it.
@@ -53,6 +53,7 @@ Settings every target shares (Swift 6 with complete concurrency checking, warnin
 | `make lint` | SwiftLint + swift-format, strict; security and translation checks |
 | `make format` | auto-format |
 | `make security` | build Release with ad-hoc signing and check its entitlements |
+| `make security-selftest` | check that every security check can fail (runs on Linux too) |
 
 `make lint` needs SwiftLint: `brew install swiftlint`.
 
