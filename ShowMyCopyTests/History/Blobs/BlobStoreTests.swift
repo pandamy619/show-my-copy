@@ -49,6 +49,13 @@ private func checkDeletingMissingBlobs(_ store: any BlobStore) throws {
     try store.delete([])
 }
 
+private func checkEmptyData(_ store: any BlobStore) throws {
+    let id = try store.write(Data())
+    #expect(store.size(of: id) == 0)
+    #expect(try store.read(id).isEmpty)
+}
+
+/// The test stand-in behaves like the real store, so tests that use it hold for the app.
 struct InMemoryBlobStoreTests {
     @Test func writesReadsAndDeletes() throws {
         try checkRoundTrip(InMemoryBlobStore())
@@ -59,10 +66,7 @@ struct InMemoryBlobStoreTests {
     }
 
     @Test func emptyDataIsABlobToo() throws {
-        let store = InMemoryBlobStore()
-        let id = try store.write(Data())
-        #expect(store.size(of: id) == 0)
-        #expect(try store.read(id).isEmpty)
+        try checkEmptyData(InMemoryBlobStore())
     }
 }
 
@@ -76,6 +80,12 @@ struct FileBlobStoreTests {
     @Test func deletingMissingBlobsIsNotAnError() throws {
         try withTemporaryBlobDirectory { directory in
             try checkDeletingMissingBlobs(try FileBlobStore(directory: directory))
+        }
+    }
+
+    @Test func emptyDataIsABlobToo() throws {
+        try withTemporaryBlobDirectory { directory in
+            try checkEmptyData(try FileBlobStore(directory: directory))
         }
     }
 
