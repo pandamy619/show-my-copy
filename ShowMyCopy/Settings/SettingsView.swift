@@ -114,7 +114,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
                     onCancel: { ageLimit.cancel() }
                 )
             } else {
-                Text("Entries older than this are removed automatically. Pinned entries are kept.")
+                Text("Entries older than this are removed automatically.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
