@@ -25,7 +25,7 @@ final class PollingActivityPolicy {
     private var isPolling = false
     private var isWindowOpen = false
     private var holdsUntil: ContinuousClock.Instant?
-    private(set) var isHeld = false
+    private var isHeld = false
 
     init(activity: any PollingActivity, now: @escaping @MainActor () -> ContinuousClock.Instant = { .now }) {
         self.activity = activity

@@ -47,11 +47,6 @@ final class PollingSchedule {
         self.activity = PollingActivityPolicy(activity: activity, now: now)
     }
 
-    /// Whether the App Nap activity is held now.
-    var holdsActivity: Bool {
-        activity.isHeld
-    }
-
     /// A change was seen on the pasteboard, or the user switched apps: more copies are likely soon.
     func noteActivity() {
         activity.noteActivity()
