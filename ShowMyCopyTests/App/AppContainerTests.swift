@@ -152,6 +152,25 @@ struct AppContainerTests {
         }
     }
 
+    @Test func showHistoryListsTheLatestCopyAndLeavesTheWindowOpen() throws {
+        try withContainer { container in
+            container.start()
+            // The unlock notification was missed, so the monitor still thinks the screen is locked.
+            container.monitor.pause(for: .screenLocked)
+            pasteboard.copy("just copied")
+
+            container.showHistory()
+
+            #expect(container.monitor.pauseReasons.isEmpty)
+            #expect(container.historyWindow.isVisible)
+            let selected = try #require(container.historyWindow.model.selectedEntry)
+            #expect(selected.text == "just copied")
+
+            container.showHistory()
+            #expect(container.historyWindow.isVisible)
+        }
+    }
+
     @Test func hideHistoryClosesTheWindow() throws {
         try withContainer { container in
             container.toggleHistory()
