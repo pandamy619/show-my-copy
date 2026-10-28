@@ -31,10 +31,12 @@ final class PasswordSettings {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let history: any HistoryStore
     @ObservationIgnored private let storage: any HistoryStorage
+    @ObservationIgnored private let pasteboardClearer: PasswordPasteboardClearer
     @ObservationIgnored private let now: @MainActor () -> Date
 
     /// Off by default. Turning it off removes every saved password from the history at once, and a damaged copy of
-    /// the history, which may hold passwords too.
+    /// the history, which may hold passwords too. A password still on the pasteboard as the app recorded it is
+    /// emptied from there as well (`PasswordPasteboardClearer`).
     var savesPasswords: Bool {
         didSet {
             guard savesPasswords != oldValue else {
@@ -42,7 +44,9 @@ final class PasswordSettings {
             }
             defaults.set(savesPasswords, forKey: SettingsKey.savePasswords)
             if !savesPasswords {
-                history.removeConcealed()
+                pasteboardClearer.removePasswords {
+                    history.removeConcealed()
+                }
                 storage.deleteDamagedHistory()
             }
         }
@@ -62,12 +66,14 @@ final class PasswordSettings {
     init(
         history: AppHistory,
         defaults: UserDefaults,
-        now: @escaping @MainActor () -> Date
+        now: @escaping @MainActor () -> Date,
+        pasteboardClearer: PasswordPasteboardClearer
     ) {
         self.history = history.store
         self.storage = history.storage
         self.defaults = defaults
         self.now = now
+        self.pasteboardClearer = pasteboardClearer
         savesPasswords = Self.storedSavesPasswords(in: defaults)
         let storedLifetime = (defaults.object(forKey: SettingsKey.passwordLifetime) as? Int)
             .flatMap(PasswordLifetime.init(rawValue:))

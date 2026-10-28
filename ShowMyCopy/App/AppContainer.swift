@@ -36,7 +36,10 @@ final class AppContainer: HistoryShowing {
         let store = history.store
         let system = services.system
         let media = services.media
-        let settings = Self.makeSettings(history: history, services: services, defaults: defaults)
+        // Empties the pasteboard of a password that leaves the history through expiry or the password setting.
+        let pasteboardClearer = PasswordPasteboardClearer(history: store, pasteboard: services.pasteboard)
+        let settings = Self.makeSettings(
+            history: history, services: services, defaults: defaults, pasteboardClearer: pasteboardClearer)
         let settingsWindow = services.makeSettingsWindow(settings)
 
         // The monitor reads the password setting on every change, so a new choice applies to the next copy.
@@ -44,13 +47,15 @@ final class AppContainer: HistoryShowing {
             pasteboard: services.pasteboard,
             history: store,
             schedule: PollingSchedule(sleep: system.sleep, activity: system.pollingActivity),
-            expiry: HistoryExpiry(history: store, now: system.now),
+            expiry: HistoryExpiry(history: store, pasteboardClearer: pasteboardClearer, now: system.now),
             clearedClipboard: ClearedClipboardCheck(history: store),
             capture: Self.makeCapture(store: store, media: media),
             frontmostApp: system.frontmostApp,
             now: system.now,
             passwordPolicy: { [passwords = settings.passwords] in passwords.policy }
         )
+        // Only the monitor knows which pasteboard change a password was recorded at.
+        pasteboardClearer.connect(to: monitor)
         let copier = EntryCopier(
             history: store, pasteboard: services.pasteboard, monitor: monitor, blobs: media.blobs, now: system.now)
         // The deleter holds a deleted entry's blobs in the store the history deletes them in, so Undo can bring them
@@ -92,12 +97,14 @@ final class AppContainer: HistoryShowing {
     private static func makeSettings(
         history: AppHistory,
         services: AppServices,
-        defaults: UserDefaults
+        defaults: UserDefaults,
+        pasteboardClearer: PasswordPasteboardClearer
     ) -> AppSettings {
         AppSettings(
             store: history.store,
             history: HistorySettings(history: history.store, defaults: defaults, now: services.system.now),
-            passwords: PasswordSettings(history: history, defaults: defaults, now: services.system.now),
+            passwords: PasswordSettings(
+                history: history, defaults: defaults, now: services.system.now, pasteboardClearer: pasteboardClearer),
             storage: StorageUsage(history: history, memoryReader: services.memoryReader)
         )
     }
