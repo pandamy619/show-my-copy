@@ -77,6 +77,17 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         toggle()
     }
 
+    /// Called when the user asks for the history from outside the app, such as with the Control Center button. Like
+    /// the shortcut, only a person at the Mac can ask. Unlike the shortcut, it only opens the window: an open window
+    /// stays open, with its search and selection.
+    func openRequested() {
+        monitor.userIsActive()
+        guard !isVisible else {
+            return
+        }
+        show()
+    }
+
     /// Copies the entry back to the clipboard and closes the window. When the copy fails, the window stays open,
     /// so the user can try again or pick another entry.
     func choose(_ entry: ClipboardEntry) {

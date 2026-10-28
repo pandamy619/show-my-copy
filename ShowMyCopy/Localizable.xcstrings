@@ -610,6 +610,16 @@
         }
       }
     },
+    "Open Clipboard History" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть историю буфера"
+          }
+        }
+      }
+    },
     "Opens the clipboard history window. Avoid ⇧⌘V: it would replace Paste and Match Style in other apps." : {
       "localizations" : {
         "ru" : {

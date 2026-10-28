@@ -1,3 +1,4 @@
+import AppIntents
 import AppKit
 import KeyboardShortcuts
 
@@ -6,6 +7,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     private var container: AppContainer?
+    /// How the Control Center button reaches the container, which is made only once the history has loaded.
+    private let historyRequests = HistoryRequests()
+
+    /// Before launching finishes: the Control Center button can launch the app, and its intent needs the requests
+    /// registered by the time the system performs it.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        guard !Self.isRunningTests else {
+            return
+        }
+        // The intent exists only on macOS 26 and later.
+        if #available(macOS 26, *) {
+            let requests = historyRequests
+            AppDependencyManager.shared.add(dependency: requests)
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Unit tests run inside the app. Do not open the saved history, read the real clipboard or register the
@@ -35,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         container.start()
         self.container = container
+        historyRequests.connect(container)
 
         if firstLaunch.shouldShowSettings {
             container.showSettings()

@@ -64,11 +64,22 @@
 			);
 			target = E35B7A813091D33900B290BD /* ShowMyCopyControlExtension */;
 		};
+		E35B7AC13091D33B00B290BD /* Exceptions for "ShowMyCopy" folder in "ShowMyCopyControlExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				App/HistoryRequests.swift,
+				Platform/Intents/OpenHistoryIntent.swift,
+			);
+			target = E35B7A813091D33900B290BD /* ShowMyCopyControlExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA0000000000000000000006 /* ShowMyCopy */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E35B7AC13091D33B00B290BD /* Exceptions for "ShowMyCopy" folder in "ShowMyCopyControlExtension" target */,
+			);
 			path = ShowMyCopy;
 			sourceTree = "<group>";
 		};
@@ -471,8 +482,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = E35B7AC03091D33B00B290BD /* Widget.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -530,8 +539,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = E35B7AC03091D33B00B290BD /* Widget.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_OBJC_WEAK = YES;

@@ -9,13 +9,13 @@ import Synchronization
 /// (`AppServices`); everything else it makes itself, and everything it makes takes protocols. The initializer has no
 /// side effects: nothing reads the pasteboard, changes the history or observes notifications until `start()`.
 ///
-/// The operations below are what the app offers to the outside: the global shortcut, reopening the app and, once
-/// they are added, App Intents. An intent reaches the container through App Intents dependencies, without a global:
-/// the app registers it once at launch with `AppDependencyManager.shared.add { container }`, and the intent declares
-/// `@Dependency private var container: AppContainer` and calls `container.toggleHistory()` on the main actor.
-/// The intent must run in the app's process, not in a widget extension, because the container lives here.
+/// The operations below are what the app offers to the outside: the global shortcut, reopening the app and the
+/// Control Center button. The button's intent (`OpenHistoryIntent`) reaches the container without a global: it is
+/// also built into the Control Center extension, where the container does not exist, so it depends on
+/// `HistoryRequests`, which the app registers with App Intents at launch and connects to the container once the
+/// container is made. The intent runs only in the app's process, because the container lives here.
 @MainActor
-final class AppContainer {
+final class AppContainer: HistoryShowing {
     let store: any HistoryStore
     let storage: any HistoryStorage
     let settings: AppSettings
@@ -163,6 +163,11 @@ final class AppContainer {
     /// the pasteboard.
     func toggleHistory() {
         historyWindow.shortcutPressed()
+    }
+
+    /// Shows the history window, or leaves it open: the Control Center button opens the history and never closes it.
+    func showHistory() {
+        historyWindow.openRequested()
     }
 
     func showSettings() {

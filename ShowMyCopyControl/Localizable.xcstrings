@@ -1,0 +1,36 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Clipboard History" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "История буфера"
+          }
+        }
+      }
+    },
+    "Open Clipboard History" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть историю буфера"
+          }
+        }
+      }
+    },
+    "Opens the history of what you copied." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открывает историю того, что вы скопировали."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
