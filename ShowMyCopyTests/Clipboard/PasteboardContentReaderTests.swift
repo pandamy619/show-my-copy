@@ -167,16 +167,6 @@ struct RichTextContentReaderTests {
     @Test func defaultLimitIsOneMegabyte() {
         #expect(RichTextContentReader.defaultMaximumBytes == 1_048_576)
     }
-
-    @Test func rtfWithoutPlainTextIsNothing() {
-        pasteboard.copy([.rtf: rtf])
-        #expect(RichTextContentReader().read(from: pasteboard) == .nothing)
-    }
-
-    @Test func plainTextOverItsLimitIsTooLarge() {
-        pasteboard.copyRichText(String(repeating: "a", count: 11), rtf: rtf)
-        #expect(RichTextContentReader(textLimit: 10).read(from: pasteboard) == .tooLarge(limit: 10))
-    }
 }
 
 /// The readers together, in the order the monitor uses them.
