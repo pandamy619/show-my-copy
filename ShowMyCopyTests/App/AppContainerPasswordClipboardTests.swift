@@ -13,6 +13,7 @@ struct AppContainerPasswordClipboardTests {
     private let pasteboard = FakePasteboard()
     private let workspace = FakeNotifications()
     private let distributed = FakeNotifications()
+    private let screen = ScreenLock()
     private let store: ClipboardHistory
 
     init() {
@@ -29,7 +30,8 @@ struct AppContainerPasswordClipboardTests {
         defaults.set(true, forKey: SettingsKey.savePasswords)
         defaults.set(PasswordLifetime.oneMinute.rawValue, forKey: SettingsKey.passwordLifetime)
         let services = ContainerFactory.services(
-            pasteboard: pasteboard, now: clock.read, workspace: workspace, distributed: distributed)
+            pasteboard: pasteboard, now: clock.read, workspace: workspace, distributed: distributed,
+            isScreenLocked: { [screen] in screen.isLocked })
         let container = AppContainer(history: .unsaved(store), services: services, defaults: defaults)
         defer { container.monitor.stop() }
         container.start()
@@ -83,4 +85,28 @@ struct AppContainerPasswordClipboardTests {
             #expect(pasteboard.clearedChangeCounts == [copiedChange])
         }
     }
+
+    /// The Mac wakes up with the screen still locked: polling stays paused, but the password whose time is up goes.
+    @Test func anExpiredPasswordGoesWhenTheMacWakesWithTheScreenStillLocked() throws {
+        try withContainer { container in
+            copyPassword(in: container)
+            let passwordChange = pasteboard.changeCount
+            screen.isLocked = true
+            distributed.post(SystemActivityObserver.screenIsLockedNotification)
+            workspace.post(NSWorkspace.willSleepNotification)
+            clock.advance(by: 3600)
+
+            workspace.post(NSWorkspace.didWakeNotification)
+
+            #expect(container.monitor.pauseReasons == [.screenLocked])
+            #expect(store.entries.isEmpty)
+            #expect(pasteboard.clearedChangeCounts == [passwordChange])
+        }
+    }
+}
+
+/// Whether the screen is locked, as the system reports it when asked.
+@MainActor
+private final class ScreenLock {
+    var isLocked = false
 }

@@ -27,6 +27,7 @@ enum ContainerFactory {
         sleep: @escaping @Sendable (Duration) async throws -> Void = MonitorFactory.sleepUntilCancelled,
         workspace: any NotificationObserving = FakeNotifications(),
         distributed: any NotificationObserving = FakeNotifications(),
+        isScreenLocked: @escaping @MainActor () -> Bool = { false },
         media: AppServices.Media = .none,
         settingsWindow: SettingsWindowSpy = SettingsWindowSpy()
     ) -> AppServices {
@@ -39,7 +40,7 @@ enum ContainerFactory {
                 pollingActivity: CountingActivity(),
                 workspaceNotifications: workspace,
                 distributedNotifications: distributed,
-                isScreenLocked: { false },
+                isScreenLocked: isScreenLocked,
                 isSessionActive: { true }
             ),
             media: media,
