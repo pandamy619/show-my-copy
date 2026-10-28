@@ -16,8 +16,7 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
     /// The SQLite file, or nil for a store in memory.
     private let storeURL: URL?
 
-    /// Opens the store described by `configuration`. Use `open(in:)` for the app's store and `inMemory()` in
-    /// tests.
+    /// Opens the store described by `configuration`. Use `open(in:)` for the app's store.
     init(configuration: ModelConfiguration) throws(HistoryPersistenceError) {
         do {
             container = try ModelContainer(for: Self.schema, configurations: [configuration])
@@ -29,15 +28,6 @@ final class SwiftDataHistoryPersistence: HistoryPersistence {
         context = ModelContext(container)
         context.autosaveEnabled = false
         storeURL = configuration.isStoredInMemoryOnly ? nil : configuration.url
-    }
-
-    /// A store that lives in memory only, for tests.
-    static func inMemory() throws(HistoryPersistenceError) -> SwiftDataHistoryPersistence {
-        // A unique name, so two stores in one process never share their contents.
-        try SwiftDataHistoryPersistence(
-            configuration: ModelConfiguration(
-                UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-        )
     }
 
     func loadAll() throws(HistoryPersistenceError) -> [StoredEntryRecord] {

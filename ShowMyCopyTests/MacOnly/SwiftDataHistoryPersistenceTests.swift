@@ -4,6 +4,17 @@ import Testing
 
 @testable import ShowMyCopy
 
+extension SwiftDataHistoryPersistence {
+    /// A store that lives in memory only.
+    fileprivate static func inMemory() throws(HistoryPersistenceError) -> SwiftDataHistoryPersistence {
+        // A unique name, so two stores in one process never share their contents.
+        try SwiftDataHistoryPersistence(
+            configuration: ModelConfiguration(
+                UUID().uuidString, schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        )
+    }
+}
+
 @MainActor
 struct SwiftDataHistoryPersistenceTests {
     private let date = Date(timeIntervalSince1970: 1_790_000_000)
