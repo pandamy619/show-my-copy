@@ -36,6 +36,7 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **Passwords are not kept** by default: items that password managers mark as concealed and anything copied from a known password manager are skipped, as are items marked as transient or auto-generated. When a password manager clears a password it copied without a marker, the entry leaves the history too: text copied shortly before the clipboard is emptied, if it stays empty.
 - **Save passwords, if you want.** Turn it on in Settings to keep passwords hidden in the history: an eye button reveals one, search skips them, and they are removed after 1 minute, 10 minutes or 1 hour. If the clipboard still holds a password when it is removed, the clipboard is emptied too. Settings show their size only rounded up to whole kilobytes, so it never tells a password's length.
 - **No menu bar icon, no Dock icon.**
+- **Open at login, if you want.** Settings → General → Open at login, off by default; the first launch's Settings offer it once. It is also listed in System Settings → General → Login Items, where you can turn it off.
 - **English and Russian** interface.
 - **Private by design.** No analytics. Sandboxed without network access, so the app itself makes no connections; file thumbnails are drawn by macOS QuickLook outside the sandbox, for local files only (see [SECURITY.md](SECURITY.md)).
 

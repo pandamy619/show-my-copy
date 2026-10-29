@@ -48,6 +48,7 @@ First version, 0.1.0. Not released yet. Requires macOS 15 Sequoia or later.
 
 - No menu bar or Dock icon. Sandboxed without network access: the app itself makes no connections.
 - Settings open on first launch and explain how to open the history, with a button to quit the app.
+- Settings → General → Open at login, off by default: the app opens when you log in, as a login item macOS keeps for the app itself (`SMAppService`, no helper app). The app never turns it on by itself; the first launch's Settings offer it once, with a line next to the toggle. The toggle shows what macOS says each time Settings open or come back to the front, so turning the app off in System Settings → General → Login Items shows there too. When macOS wants your approval first, Settings say so, with a button that opens Login Items; a change that fails shows a short note.
 - English and Russian localization.
 
 ### Development builds
