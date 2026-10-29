@@ -25,10 +25,12 @@ enum ContainerFactory {
     static func services(
         pasteboard: any PasteboardReading & PasteboardWriting = FakePasteboard(),
         now: @escaping @MainActor () -> Date = { ContainerFactory.date },
+        frontmostApp: @escaping @MainActor () -> SourceApp? = { nil },
         sleep: @escaping @Sendable (Duration) async throws -> Void = MonitorFactory.sleepUntilCancelled,
         workspace: any NotificationObserving = FakeNotifications(),
         distributed: any NotificationObserving = FakeNotifications(),
         isScreenLocked: @escaping @MainActor () -> Bool = { false },
+        runningApps: any RunningAppsListing = FakeRunningApps(),
         media: AppServices.Media = .none,
         settingsWindow: SettingsWindowSpy = SettingsWindowSpy(),
         loginItem: FakeLoginItem = FakeLoginItem()
@@ -37,13 +39,14 @@ enum ContainerFactory {
             pasteboard: pasteboard,
             system: AppServices.System(
                 now: now,
-                frontmostApp: { nil },
+                frontmostApp: frontmostApp,
                 sleep: sleep,
                 pollingActivity: CountingActivity(),
                 workspaceNotifications: workspace,
                 distributedNotifications: distributed,
                 isScreenLocked: isScreenLocked,
-                isSessionActive: { true }
+                isSessionActive: { true },
+                runningApps: runningApps
             ),
             media: media,
             memoryReader: NoMemoryUsage(),

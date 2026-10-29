@@ -4,7 +4,8 @@ import Foundation
 
 /// Builds the clipboard monitors of the tests, so a new dependency of the monitor is added here once instead of in
 /// every test file. Every default is a fake: no app is in front, the clock stands still, the polling loop never
-/// wakes up on its own and App Nap is never touched. Expired passwords are cleared from `pasteboard` as in the app.
+/// wakes up on its own, App Nap is never touched and no app is excluded. Expired passwords are cleared from
+/// `pasteboard` as in the app.
 @MainActor
 enum MonitorFactory {
     /// The time a monitor reads unless a test sets one: months after the dates the tests record entries at, as the
@@ -17,6 +18,7 @@ enum MonitorFactory {
         frontmostApp: @escaping @MainActor () -> SourceApp? = { nil },
         now: @escaping @MainActor () -> Date = { MonitorFactory.date },
         passwordPolicy: @escaping @MainActor () -> PasswordPolicy = { .default },
+        isExcluded: @escaping @MainActor (String) -> Bool = { _ in false },
         interval: Duration = PollingSchedule.defaultInterval,
         sleep: @escaping @Sendable (Duration) async throws -> Void = MonitorFactory.sleepUntilCancelled,
         activity: any PollingActivity = CountingActivity(),
@@ -40,7 +42,8 @@ enum MonitorFactory {
             },
             frontmostApp: frontmostApp,
             now: now,
-            passwordPolicy: passwordPolicy
+            passwordPolicy: passwordPolicy,
+            isExcluded: isExcluded
         )
         pasteboardClearer.connect(to: monitor)
         return monitor

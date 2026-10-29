@@ -5,7 +5,19 @@ import AppKit
 @MainActor
 final class FakePasteboard: PasteboardReading, PasteboardWriting {
     var changeCount = 0
-    var types: [NSPasteboard.PasteboardType] = []
+    /// The types of the current item. Reading them counts in `typesReadCount`; the fake itself uses `currentTypes`.
+    var types: [NSPasteboard.PasteboardType] {
+        get {
+            typesReadCount += 1
+            return currentTypes
+        }
+        set {
+            currentTypes = newValue
+        }
+    }
+    private var currentTypes: [NSPasteboard.PasteboardType] = []
+    /// How often the types were read, to check that nothing at all is read from the pasteboard.
+    private(set) var typesReadCount = 0
     /// The data of the current item per type, like `NSPasteboard.data(forType:)` returns it. Text is UTF-8 data
     /// under `.string`; other kinds (RTF, PNG, file URLs) can be put here under their own types.
     var contents: [NSPasteboard.PasteboardType: Data] = [:]
@@ -59,7 +71,7 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
 
     /// One item per file, otherwise one item while there is anything on the pasteboard.
     var itemCount: Int {
-        max(copiedFileURLs.count, types.isEmpty ? 0 : 1)
+        max(copiedFileURLs.count, currentTypes.isEmpty ? 0 : 1)
     }
 
     func fileURLs() -> [URL] {
@@ -87,7 +99,7 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
 
     /// Adds a marker to the current item without a new change count, like an app that adds types after the text.
     func addMarker(_ marker: String) {
-        types.append(NSPasteboard.PasteboardType(marker))
+        currentTypes.append(NSPasteboard.PasteboardType(marker))
     }
 
     func copy(_ text: String, markers: [String] = []) {
@@ -95,7 +107,7 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         contents = [:]
         copiedFileURLs = []
         self.text = text
-        types = [.string] + markers.map { NSPasteboard.PasteboardType($0) }
+        currentTypes = [.string] + markers.map { NSPasteboard.PasteboardType($0) }
     }
 
     /// Another app copies an item with the given data per type, for kinds other than plain text.
@@ -104,7 +116,8 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         self.contents = contents
         convertedString = nil
         copiedFileURLs = []
-        types = contents.keys.sorted { $0.rawValue < $1.rawValue } + markers.map { NSPasteboard.PasteboardType($0) }
+        currentTypes =
+            contents.keys.sorted { $0.rawValue < $1.rawValue } + markers.map { NSPasteboard.PasteboardType($0) }
     }
 
     /// Another app empties the pasteboard, like a password manager clearing a copied password.
@@ -113,7 +126,7 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         contents = [:]
         convertedString = nil
         copiedFileURLs = []
-        types = []
+        currentTypes = []
     }
 
     /// The app that emptied the pasteboard writes text into it now, without a new change count, like an app that
@@ -122,7 +135,7 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         contents = [:]
         copiedFileURLs = []
         self.text = text
-        types = [.string]
+        currentTypes = [.string]
     }
 
     func copyImage() {

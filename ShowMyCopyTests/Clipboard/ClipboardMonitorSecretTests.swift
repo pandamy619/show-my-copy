@@ -10,6 +10,8 @@ final class MonitorEnvironment {
     var now = Date(timeIntervalSince1970: 1_790_000_000)
     var policy = PasswordPolicy.default
     var frontmostApp: SourceApp?
+    /// Bundle identifiers the user excluded, compared as `ExcludedApps` compares them.
+    var excludedApps: Set<String> = []
 
     func makeMonitor(pasteboard: FakePasteboard, history: InMemoryHistoryStore) -> ClipboardMonitor {
         MonitorFactory.make(
@@ -17,7 +19,8 @@ final class MonitorEnvironment {
             history: history,
             frontmostApp: { [unowned self] in frontmostApp },
             now: { [unowned self] in now },
-            passwordPolicy: { [unowned self] in policy }
+            passwordPolicy: { [unowned self] in policy },
+            isExcluded: { [unowned self] in excludedApps.contains($0.lowercased()) }
         )
     }
 
