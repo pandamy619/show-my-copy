@@ -249,6 +249,16 @@
         }
       }
     },
+    "Add an Open App" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить открытое приложение"
+          }
+        }
+      }
+    },
     "Allow Show My Copy in Login Items in System Settings to open it at login." : {
       "localizations" : {
         "ru" : {
@@ -319,6 +329,16 @@
         }
       }
     },
+    "Copies from known password managers are skipped unless Save passwords is on." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопированное в известных менеджерах паролей пропускается, если не включено «Сохранять пароли»."
+          }
+        }
+      }
+    },
     "Current clipboard" : {
       "localizations" : {
         "ru" : {
@@ -345,6 +365,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Записи старше этого срока удаляются автоматически. Закреплённые записи сохраняются."
+          }
+        }
+      }
+    },
+    "Excluded apps" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Исключённые приложения"
           }
         }
       }
@@ -579,6 +609,16 @@
         }
       }
     },
+    "No apps are excluded." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Исключённых приложений нет."
+          }
+        }
+      }
+    },
     "No limit" : {
       "localizations" : {
         "ru" : {
@@ -599,6 +639,16 @@
         }
       }
     },
+    "No other apps are open." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Других открытых приложений нет."
+          }
+        }
+      }
+    },
     "Not available" : {
       "localizations" : {
         "ru" : {
@@ -615,6 +665,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Пока ничего не скопировано"
+          }
+        }
+      }
+    },
+    "Nothing is read from the clipboard while one of these apps is in front." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока одно из этих приложений на переднем плане, буфер обмена не читается."
           }
         }
       }
@@ -826,6 +886,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Удалить"
+          }
+        }
+      }
+    },
+    "Remove %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убрать %@"
           }
         }
       }
