@@ -7,6 +7,7 @@ import Foundation
 ///
 /// Being wrong hides or deletes an ordinary entry, so the check acts only where that is unlikely:
 /// - Only text can be such a password. Images and files are never touched.
+/// - Never a pinned entry: the user chose to keep it, and a password cannot be pinned.
 /// - Only within `window` of the copy.
 /// - Only when the clipboard is still empty at the next poll, with no new change. Many apps empty the clipboard and
 ///   write to it a moment later, some without a new change count; a poll can land in between.
@@ -67,7 +68,7 @@ final class ClearedClipboardCheck {
         pause = nil
         guard let currentID = history.currentEntryID,
             let current = history.entries.first(where: { $0.id == currentID }),
-            current.content.canBeConcealed,
+            current.content.canBeConcealed, !current.isPinned,
             emptiedAt.timeIntervalSince(current.date) <= Self.window
         else {
             return

@@ -26,8 +26,9 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     var revision: Int { get }
 
     /// Adds copied content as the newest entry and makes it current. Content that is already in the history (an
-    /// entry with the same content hash) moves to the top with the new date and source app. Returns the ID of the
-    /// entry.
+    /// entry with the same content hash) moves to the top with the new date and source app, except a pinned entry,
+    /// which only becomes current and keeps its place, date and source app (a concealed copy unpins it first).
+    /// Returns the ID of the entry.
     ///
     /// A `concealed` copy hides the entry, also one that was plain before, and sets `expiresAt` when one is given.
     /// A plain copy of concealed content keeps the entry concealed with its expiry, for example after the user
@@ -63,14 +64,16 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// When another entry already holds the same image, the two become one at this entry's place and the other is
     /// removed: the newer copy keeps its date and source app. With `keepsEarlierCopy`, used for the image found on
     /// the pasteboard at launch, the entry just below it keeps its own instead when it holds the image, as
-    /// `markNewestCurrent(ifItHolds:)` does for other content.
+    /// `markNewestCurrent(ifItHolds:)` does for other content. When the other entry is pinned, it is the one kept, at
+    /// its place, as for a copy of pinned content in `record`.
     ///
     /// The store owns the blobs of `image` from this call on: those no entry uses afterwards (the entry is gone, or
     /// another entry's copy of the image is kept) are deleted.
     func completeImage(_ unsaved: ImageReference, with image: ImageReference, keepsEarlierCopy: Bool)
 
-    /// Makes the newest entry current, without changing it, when it holds `content`. Returns its ID, or nil when
-    /// the newest entry holds other content.
+    /// Makes the newest entry current, without changing it, when it holds `content`. Pinned entries do not count as
+    /// newer: a pinned entry that holds `content` and is newer than the newest unpinned one is made current instead.
+    /// Returns its ID, or nil when the newest entry holds other content.
     ///
     /// Used for the pasteboard found at launch: it usually still holds the newest entry from the last session, and
     /// recording it again would give that entry a new date and lose its source app.
@@ -108,9 +111,16 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// `InFlightBlobStore`).
     func restore(_ entries: [ClipboardEntry])
 
-    /// Removes every entry.
+    /// Pins or unpins entry `id`. Pinning gives the entry the store's time as its date, so pinned entries keep the
+    /// order they were pinned in; the limits no longer count it. Unpinning puts it at the top as if just copied, so
+    /// the age limit does not remove it at once, and the limits count it again. A concealed entry cannot be pinned:
+    /// nothing changes. Nothing changes for an entry already in that state or one that is gone either.
+    func setPinned(_ isPinned: Bool, id: ClipboardEntry.ID)
+
+    /// Removes every entry, or every entry that is not pinned with `keepingPinned`. A current entry that is kept
+    /// stays current.
     @discardableResult
-    func clear() -> ClearResult
+    func clear(keepingPinned: Bool) -> ClearResult
 
     /// Applies new limits, removing the entries they no longer allow.
     func setRetention(_ policy: RetentionPolicy)
@@ -133,6 +143,12 @@ struct HistoryStats: Equatable, Sendable {
 }
 
 extension HistoryStore {
+    /// Removes every entry, pinned ones too.
+    @discardableResult
+    func clear() -> ClearResult {
+        clear(keepingPinned: false)
+    }
+
     /// Records a plain copy.
     @discardableResult
     func record(_ content: ClipboardContent, sourceApp: SourceApp?, at date: Date) -> ClipboardEntry.ID {

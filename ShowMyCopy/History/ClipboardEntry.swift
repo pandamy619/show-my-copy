@@ -15,17 +15,23 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
     /// Short, sanitized text for a history row, made once at capture so the list never walks large content.
     /// For a concealed entry it is shown only after the user reveals it.
     let previewText: String
+    /// When the entry was last copied. For a pinned entry, when it was pinned: that sets its place among the pinned
+    /// entries and is saved like any date, so the order survives a relaunch, and copying it again does not change it.
     var date: Date
     var sourceApp: SourceApp? {
         didSet {
             sourceAppSearchKey = SearchKey.appName(of: sourceApp)
         }
     }
-    /// A password: shown masked, left out of text search and removed at `expiresAt`.
+    /// A password: shown masked, left out of text search and removed at `expiresAt`. A password is never pinned: it
+    /// keeps its own expiry, so concealing an entry unpins it.
     var isConcealed: Bool {
         didSet {
             if isConcealed != oldValue {
                 searchKey = isConcealed ? nil : SearchKey.text(of: content)
+            }
+            if isConcealed {
+                isPinned = false
             }
         }
     }
@@ -36,7 +42,8 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
     private(set) var sourceAppSearchKey: String?
     /// When a concealed entry is removed from the history. Nil for plain entries.
     var expiresAt: Date?
-    /// A pinned entry is never removed by the history limits. Nothing pins entries yet.
+    /// A pinned entry is never removed by the history limits (`RetentionPolicy`) and keeps its place when copied
+    /// again. Only `HistoryStore.setPinned(_:id:)` pins an entry; a concealed entry is never pinned.
     var isPinned: Bool
 
     init(
@@ -58,7 +65,7 @@ struct ClipboardEntry: Identifiable, Equatable, Sendable {
         self.sourceApp = sourceApp
         self.isConcealed = isConcealed
         self.expiresAt = expiresAt
-        self.isPinned = isPinned
+        self.isPinned = isPinned && !isConcealed
         self.searchKey = isConcealed ? nil : SearchKey.text(of: content)
         self.sourceAppSearchKey = SearchKey.appName(of: sourceApp)
     }

@@ -167,6 +167,10 @@ final class PersistentHistoryStore: HistoryStore, HistoryStorage {
         change { $0.remove(id: id) }
     }
 
+    func setPinned(_ isPinned: Bool, id: ClipboardEntry.ID) {
+        change { $0.setPinned(isPinned, id: id) }
+    }
+
     /// Writes the entries it puts back, like any other change: in one transaction, and with the next change when
     /// that fails.
     func restore(_ entries: [ClipboardEntry]) {
@@ -175,9 +179,17 @@ final class PersistentHistoryStore: HistoryStore, HistoryStorage {
 
     /// Removes every entry from memory and every record from disk, also records that were not loaded, any copy
     /// of a history that could not be opened, or the store itself while it cannot be opened (`HistoryLeftovers`),
-    /// and with them every saved image. When deleting the records fails, the next write tries again.
+    /// and with them every saved image. When deleting the records fails, the next write tries again. `keepingPinned`
+    /// removes the other entries like any change, the passwords waiting for the key and a damaged copy, but leaves
+    /// what may hold pinned entries this session did not load: records not loaded, a store that could not be opened.
     @discardableResult
-    func clear() -> ClearResult {
+    func clear(keepingPinned: Bool) -> ClearResult {
+        if keepingPinned {
+            let result = change { $0.clear(keepingPinned: true) }
+            deleteUnopened { _ in true }
+            deleteDamagedHistory()
+            return result
+        }
         let result = memory.clear()
         // Every entry is gone, so what earlier writes left unsaved is deleted with the rest, and so are the saved
         // passwords that wait for the key.

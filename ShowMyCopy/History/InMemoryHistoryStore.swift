@@ -64,6 +64,9 @@ final class InMemoryHistoryStore: HistoryStore {
         }
         var entry: ClipboardEntry
         if let index = entries.firstIndex(where: { $0.contentHash == contentHash }) {
+            if entries[index].isPinned, !concealed {
+                return recordAgain(content, pinnedAt: index)
+            }
             entry = entries.remove(at: index)
             // Files copied again may bring the thumbnails the first copy could not make, such as for an entry from
             // before thumbnails or after a timeout. Those it has stay.
@@ -120,18 +123,24 @@ final class InMemoryHistoryStore: HistoryStore {
         var completed = entries[index].replacingContent(content, contentHash: hasher.hash(content))
         var merged = [entries[index].id]
         let other = entries.firstIndex { $0.contentHash == completed.contentHash }
+        // A pinned copy of the image keeps its place, as when pinned content is copied again (`record`).
+        let keepsPinnedCopy = other.map { entries[$0].isPinned && !completed.isPinned } == true
         if let other {
             merged.append(entries[other].id)
             released.formUnion(entries[other].content.blobIDs)
-            if keepsEarlierCopy, other == index + 1 {
-                // The image on the pasteboard at launch is the entry from before: nothing says it was copied again.
+            // The image on the pasteboard at launch is the entry from before: nothing says it was copied again.
+            if keepsPinnedCopy || (keepsEarlierCopy && other == index + 1) {
                 completed = entries[other]
             }
         }
         let wasCurrent = currentEntryID.map(merged.contains) == true
-        entries[index] = completed
-        if let other {
-            entries.remove(at: other)
+        if keepsPinnedCopy {
+            entries.remove(at: index)
+        } else {
+            entries[index] = completed
+            if let other {
+                entries.remove(at: other)
+            }
         }
         entriesChanged()
         if wasCurrent {
@@ -190,7 +199,11 @@ final class InMemoryHistoryStore: HistoryStore {
 
     @discardableResult
     func markNewestCurrent(ifItHolds content: ClipboardContent) -> ClipboardEntry.ID? {
-        guard let newest = entries.first, newest.contentHash == hasher.hash(content) else {
+        let contentHash = hasher.hash(content)
+        // Pinned entries are newer by the time they were pinned, not by a copy.
+        guard let newest = entries.first(where: { !$0.isPinned || $0.contentHash == contentHash }),
+            newest.contentHash == contentHash
+        else {
             return nil
         }
         if currentEntryID != newest.id {
@@ -206,19 +219,6 @@ final class InMemoryHistoryStore: HistoryStore {
     func setRetention(_ policy: RetentionPolicy) {
         retention = policy
         trim()
-    }
-
-    @discardableResult
-    func clear() -> ClearResult {
-        let stats = stats()
-        if !entries.isEmpty {
-            let removed = entries
-            entries.removeAll()
-            entriesChanged()
-            deleteBlobs(of: removed)
-        }
-        currentEntryID = nil
-        return ClearResult(removedCount: stats.count, freedBytes: stats.totalBytes)
     }
 
     func stats() -> HistoryStats {
@@ -321,5 +321,57 @@ extension InMemoryHistoryStore {
         }
         entriesChanged()
         trim()
+    }
+}
+
+// MARK: - Pinning and clearing
+
+extension InMemoryHistoryStore {
+    func setPinned(_ isPinned: Bool, id: ClipboardEntry.ID) {
+        guard let index = entries.firstIndex(where: { $0.id == id }), entries[index].isPinned != isPinned,
+            !entries[index].isConcealed
+        else {
+            return
+        }
+        var entry = entries.remove(at: index)
+        entry.isPinned = isPinned
+        // Pinned: its place among the pinned entries. Unpinned: the top, as if just copied.
+        entry.date = now()
+        entries.insert(entry, at: entries.firstIndex { $0.date <= entry.date } ?? entries.endIndex)
+        entriesChanged()
+        trim()
+    }
+
+    @discardableResult
+    func clear(keepingPinned: Bool) -> ClearResult {
+        let removed = keepingPinned ? entries.filter { !$0.isPinned } : entries
+        if !removed.isEmpty {
+            entries = keepingPinned ? entries.filter(\.isPinned) : []
+            entriesChanged()
+            deleteBlobs(of: removed)
+        }
+        if keepingPinned {
+            forgetMissingCurrentEntry()
+        } else {
+            currentEntryID = nil
+        }
+        return ClearResult(removedCount: removed.count, freedBytes: removed.reduce(0) { $0 + $1.byteSize })
+    }
+
+    /// A copy of the content of the pinned entry at `index`: the entry becomes current and keeps its place, date and
+    /// source app, so the pinned entries stay in the order they were pinned in. Files may get the thumbnails they
+    /// lacked; the copy's other blobs are not needed.
+    private func recordAgain(_ content: ClipboardContent, pinnedAt index: Int) -> ClipboardEntry.ID {
+        let filled = entries[index].content.addingMissingFileDetails(from: content)
+        if filled != entries[index].content {
+            entries[index] = entries[index].replacingContent(filled)
+            entriesChanged()
+        }
+        let kept = Set(entries[index].content.blobIDs)
+        deleteBlobs(content.blobIDs.filter { !kept.contains($0) })
+        let id = entries[index].id
+        currentEntryID = id
+        trim()
+        return id
     }
 }
