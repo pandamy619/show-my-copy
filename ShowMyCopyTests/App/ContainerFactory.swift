@@ -16,7 +16,8 @@ final class SettingsWindowSpy: SettingsWindowShowing {
 
 /// Builds the containers of the tests from fakes, so a new service is added here once instead of in every test
 /// file. Every default is a fake: no app is in front, the clock stands still, the polling loop never wakes up on its
-/// own, App Nap and notifications are never touched, the screen is unlocked and there are no images or previews.
+/// own, App Nap and notifications are never touched, the screen is unlocked, there are no images or previews,
+/// and the app is not a login item.
 @MainActor
 enum ContainerFactory {
     static let date = Date(timeIntervalSince1970: 1_790_000_000)
@@ -29,7 +30,8 @@ enum ContainerFactory {
         distributed: any NotificationObserving = FakeNotifications(),
         isScreenLocked: @escaping @MainActor () -> Bool = { false },
         media: AppServices.Media = .none,
-        settingsWindow: SettingsWindowSpy = SettingsWindowSpy()
+        settingsWindow: SettingsWindowSpy = SettingsWindowSpy(),
+        loginItem: FakeLoginItem = FakeLoginItem()
     ) -> AppServices {
         AppServices(
             pasteboard: pasteboard,
@@ -45,6 +47,7 @@ enum ContainerFactory {
             ),
             media: media,
             memoryReader: NoMemoryUsage(),
+            loginItem: loginItem,
             makeSettingsWindow: { settings in
                 settingsWindow.settings = settings
                 return settingsWindow
