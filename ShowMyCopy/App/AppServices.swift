@@ -20,6 +20,8 @@ struct AppServices {
         var distributedNotifications: any NotificationObserving
         var isScreenLocked: @MainActor () -> Bool
         var isSessionActive: @MainActor () -> Bool
+        /// The apps open now, offered in Settings → Excluded apps.
+        var runningApps: any RunningAppsListing
     }
 
     /// Images, thumbnails and previews. Each is nil when it is not available: then images are not recorded, files
@@ -74,4 +76,6 @@ struct AppSettings {
     let storage: StorageUsage
     /// Whether the app opens at login. Lives as long as the app, so the first launch's suggestion reaches the window.
     let launchAtLogin: LaunchAtLoginSettings
+    /// The apps whose copies are never recorded. The clipboard monitor reads the same object.
+    let excludedApps: ExcludedApps
 }

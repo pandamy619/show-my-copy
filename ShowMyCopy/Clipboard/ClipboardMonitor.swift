@@ -5,7 +5,8 @@ import AppKit
 /// - `schedule` says when to look at the pasteboard. On each look the monitor compares `changeCount` and reads the
 ///   item only when the count changed; `PasteboardSnapshotReader` says what the item is.
 /// - The monitor decides who copied (the app in front, or nobody known after a pause) and what the password settings
-///   allow, and records text and rich text itself.
+///   allow, and records text and rich text itself. `CopySource` says what the app means: a copy made in an app the
+///   user excluded is left alone before anything is read from the pasteboard.
 /// - `capture` records images and files at once and fills in their data, sizes and thumbnails in the background. The
 ///   monitor goes on reading meanwhile, so no copy is missed while an image is saved.
 /// - `expiry` removes expired passwords and entries past the age limit on every look, and when the Mac wakes or the
@@ -24,6 +25,8 @@ final class ClipboardMonitor: PasteboardChangeTracking {
     private let frontmostApp: @MainActor () -> SourceApp?
     private let now: @MainActor () -> Date
     private let passwordPolicy: @MainActor () -> PasswordPolicy
+    /// Whether the user excluded the app with this bundle identifier (`ExcludedApps`).
+    private let isExcluded: @MainActor (String) -> Bool
     private var lastChangeCount: Int?
     /// True until the monitor has looked at the pasteboard while running. A change found then was made before
     /// launch or while the monitor was stopped or paused, so the app in front now did not necessarily make it.
@@ -38,7 +41,8 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         capture: CaptureEnrichment?,
         frontmostApp: @escaping @MainActor () -> SourceApp?,
         now: @escaping @MainActor () -> Date,
-        passwordPolicy: @escaping @MainActor () -> PasswordPolicy
+        passwordPolicy: @escaping @MainActor () -> PasswordPolicy,
+        isExcluded: @escaping @MainActor (String) -> Bool
     ) {
         self.pasteboard = pasteboard
         self.reader = PasteboardSnapshotReader(
@@ -52,6 +56,7 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         self.frontmostApp = frontmostApp
         self.now = now
         self.passwordPolicy = passwordPolicy
+        self.isExcluded = isExcluded
         schedule.tick = { [weak self] in
             self?.poll()
         }
@@ -139,12 +144,13 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         }
         // Text copied before launch, during sleep or while the screen was locked (for example on another device
         // through Universal Clipboard) came from an unknown app, not from the one in front now.
-        let sourceApp = sourceOfNextChangeIsUnknown ? nil : frontmostApp()
+        let source = CopySource(app: sourceOfNextChangeIsUnknown ? nil : frontmostApp(), isExcluded: isExcluded)
+        if source == .excluded {
+            leaveExcludedCopy(at: changeCount)
+            return
+        }
         let policy = passwordPolicy()
-        let item = reader.read(
-            fromPasswordManager: PasswordManager.isPasswordManager(bundleIdentifier: sourceApp?.bundleIdentifier),
-            savesPasswords: policy.savesPasswords
-        )
+        let item = reader.read(fromPasswordManager: source.isPasswordManager, savesPasswords: policy.savesPasswords)
         // The reader makes separate calls, so another app can replace the item between them, for example a
         // password manager writing a concealed item after the marker check. Then the text may belong to a newer
         // item than the markers. Record nothing and keep the old count, so the next poll reads the new item again.
@@ -160,10 +166,22 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         clearedClipboard.dismiss()
         // More copies are likely soon: keep the timer on time for a while.
         schedule.noteActivity()
-        let copy = CopyEvent(sourceApp: sourceApp, date: date, isFirstRead: lastChangeCount == nil)
+        let copy = CopyEvent(sourceApp: source.app, date: date, isFirstRead: lastChangeCount == nil)
         sourceOfNextChangeIsUnknown = false
         lastChangeCount = changeCount
         handle(item, copy: copy, changeCount: changeCount, policy: policy)
+    }
+
+    /// A copy made in an excluded app: nothing of it is read, not even whether the clipboard was emptied, so it is
+    /// never recorded and never taken for a password manager clearing a password. The change counts as seen, and the
+    /// entry that was current is no longer on the pasteboard.
+    private func leaveExcludedCopy(at changeCount: Int) {
+        AppLogger.clipboard.debug("Left a copy from an excluded app unread")
+        clearedClipboard.dismiss()
+        schedule.noteActivity()
+        sourceOfNextChangeIsUnknown = false
+        lastChangeCount = changeCount
+        history.markCurrentSkipped()
     }
 
     /// Whether the data or thumbnails of a recorded copy are still being made.

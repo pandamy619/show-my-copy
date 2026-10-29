@@ -8,4 +8,6 @@ enum SettingsKey {
     static let didShowSettingsOnFirstLaunch = "launch.didShowSettings"
     static let savePasswords = "passwords.save"
     static let passwordLifetime = "passwords.lifetime"
+    /// The apps whose copies are never recorded: an array of dictionaries with a bundle identifier and a name.
+    static let excludedApps = "capture.excludedApps"
 }

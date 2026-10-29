@@ -4,8 +4,8 @@ import KeyboardShortcuts
 extension AppServices {
     /// The services the app runs on: the system pasteboard, clock, notifications and session state, ImageIO and
     /// QuickLook for images and thumbnails, Mach calls for the app's memory, `SMAppService` for opening at login,
-    /// and the SwiftUI settings window with the shortcut recorder. This file is the only place that names the macOS
-    /// implementations the app runs on.
+    /// the workspace's list of open apps, and the SwiftUI settings window with the shortcut recorder. This file is the
+    /// only place that names the macOS implementations the app runs on.
     @MainActor
     static func live(blobs: InFlightBlobStore?) -> AppServices {
         AppServices(
@@ -18,7 +18,8 @@ extension AppServices {
                 workspaceNotifications: NotificationCenterObserver(center: NSWorkspace.shared.notificationCenter),
                 distributedNotifications: DistributedNotificationObserver(),
                 isScreenLocked: { ConsoleSession.isScreenLocked() },
-                isSessionActive: { ConsoleSession.isActive() }
+                isSessionActive: { ConsoleSession.isActive() },
+                runningApps: WorkspaceRunningApps()
             ),
             media: Media(
                 blobs: blobs,

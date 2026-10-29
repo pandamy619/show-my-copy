@@ -42,7 +42,8 @@ final class AppContainer: HistoryShowing {
             history: history, services: services, defaults: defaults, pasteboardClearer: pasteboardClearer)
         let settingsWindow = services.makeSettingsWindow(settings)
 
-        // The monitor reads the password setting on every change, so a new choice applies to the next copy.
+        // The monitor reads the password setting and the excluded apps on every change, so a new choice applies to
+        // the next copy.
         let monitor = ClipboardMonitor(
             pasteboard: services.pasteboard,
             history: store,
@@ -52,7 +53,8 @@ final class AppContainer: HistoryShowing {
             capture: Self.makeCapture(store: store, media: media),
             frontmostApp: system.frontmostApp,
             now: system.now,
-            passwordPolicy: { [passwords = settings.passwords] in passwords.policy }
+            passwordPolicy: { [passwords = settings.passwords] in passwords.policy },
+            isExcluded: { [excludedApps = settings.excludedApps] in excludedApps.excludes(bundleIdentifier: $0) }
         )
         // Only the monitor knows which pasteboard change a password was recorded at.
         pasteboardClearer.connect(to: monitor)
@@ -106,7 +108,8 @@ final class AppContainer: HistoryShowing {
             passwords: PasswordSettings(
                 history: history, defaults: defaults, now: services.system.now, pasteboardClearer: pasteboardClearer),
             storage: StorageUsage(history: history, memoryReader: services.memoryReader),
-            launchAtLogin: LaunchAtLoginSettings(service: services.loginItem)
+            launchAtLogin: LaunchAtLoginSettings(service: services.loginItem),
+            excludedApps: ExcludedApps(defaults: defaults, running: services.system.runningApps)
         )
     }
 
