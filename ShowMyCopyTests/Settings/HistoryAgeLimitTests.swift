@@ -86,7 +86,7 @@ struct HistoryAgeLimitTests {
             let eightHours = HistoryAgeLimit.after(.seconds(8 * 3600))
 
             let change = settings.propose(eightHours, for: .age)
-            #expect(change == LimitChange(limit: eightHours, removedCount: 1, freedBytes: 3))
+            #expect(change == LimitChange(limit: eightHours, removedCount: 1, freedBytes: 3, keptPinnedCount: 0))
             #expect(history.entries.count == 2)
 
             settings.apply(eightHours, for: .age)

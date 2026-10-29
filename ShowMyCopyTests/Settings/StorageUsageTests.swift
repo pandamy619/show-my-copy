@@ -102,7 +102,7 @@ struct StorageUsageTests {
 
         _ = usage.breakdown
         _ = usage.breakdown
-        _ = usage.clearForecast
+        _ = usage.clearForecast(keepingPinned: false)
         #expect(usage.breakdownComputationCount == 1)
 
         history.record(text: "two", sourceApp: nil, at: start + 1)
@@ -143,13 +143,13 @@ struct StorageUsageTests {
         history.record(text: "secret", sourceApp: nil, at: start + 1, concealed: true, expiresAt: start + 60)
         let usage = makeUsage(history: history)
 
-        let forecast = usage.clearForecast
+        let forecast = usage.clearForecast(keepingPinned: false)
         #expect(forecast == HistoryStats(count: 2, totalBytes: 1005))
 
-        let result = usage.clearHistory()
+        let result = usage.clearHistory(keepingPinned: false)
         #expect(result == ClearResult(removedCount: forecast.count, freedBytes: forecast.totalBytes))
         #expect(history.entries.isEmpty)
-        #expect(usage.clearForecast == HistoryStats(count: 0, totalBytes: 0))
+        #expect(usage.clearForecast(keepingPinned: false) == HistoryStats(count: 0, totalBytes: 0))
     }
 
     @Test func remembersTheLastClearUntilTheHistoryChanges() {
@@ -158,7 +158,7 @@ struct StorageUsageTests {
         let usage = makeUsage(history: history)
         #expect(usage.recentClear == nil)
 
-        usage.clearHistory()
+        usage.clearHistory(keepingPinned: false)
         #expect(usage.recentClear == ClearResult(removedCount: 1, freedBytes: 5))
 
         history.record(text: "new", sourceApp: nil, at: start + 1)
@@ -167,7 +167,7 @@ struct StorageUsageTests {
 
     @Test func clearingAnEmptyHistoryReportsNothing() {
         let usage = makeUsage(history: InMemoryHistoryStore())
-        usage.clearHistory()
+        usage.clearHistory(keepingPinned: false)
         #expect(usage.recentClear == nil)
     }
 
@@ -175,7 +175,7 @@ struct StorageUsageTests {
         let history = InMemoryHistoryStore()
         history.record(text: "hello", sourceApp: nil, at: start)
         let usage = makeUsage(history: history)
-        usage.clearHistory()
+        usage.clearHistory(keepingPinned: false)
 
         usage.forgetRecentClear()
 

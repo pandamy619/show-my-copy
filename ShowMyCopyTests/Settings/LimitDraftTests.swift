@@ -44,7 +44,7 @@ struct LimitDraftTests {
             let draft = LimitDraft(settings: settings, limit: .entries)
             draft.value = 10
             #expect(draft.value == 10)
-            #expect(draft.pending == LimitChange(limit: 10, removedCount: 5, freedBytes: 30))
+            #expect(draft.pending == LimitChange(limit: 10, removedCount: 5, freedBytes: 30, keptPinnedCount: 0))
             #expect(history.limit == 1000)
 
             draft.confirm()

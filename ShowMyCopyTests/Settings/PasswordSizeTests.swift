@@ -45,7 +45,8 @@ struct PasswordSizeTests {
 
         #expect(breakdown.parts.last == StorageBreakdown.Part(category: .passwords, count: 1, bytes: 1000))
         #expect(breakdown.totalBytes == 1005)
-        #expect(makeUsage(history: history).clearForecast == HistoryStats(count: 2, totalBytes: 1005))
+        let forecast = makeUsage(history: history).clearForecast(keepingPinned: false)
+        #expect(forecast == HistoryStats(count: 2, totalBytes: 1005))
     }
 
     /// The passwords' total is rounded, not each password, so many short passwords do not add up to kilobytes.
@@ -65,7 +66,7 @@ struct PasswordSizeTests {
         recordPassword("hunter2", in: history, at: 1)
         let usage = makeUsage(history: history)
 
-        let result = usage.clearHistory()
+        let result = usage.clearHistory(keepingPinned: false)
 
         #expect(result == ClearResult(removedCount: 2, freedBytes: 1005))
         #expect(usage.recentClear == ClearResult(removedCount: 2, freedBytes: 1005))
@@ -84,7 +85,9 @@ struct PasswordSizeTests {
             }
 
             // The oldest entry, the password, is the only one the limit of 10 removes.
-            #expect(settings.propose(10, for: .entries) == LimitChange(limit: 10, removedCount: 1, freedBytes: 1000))
+            #expect(
+                settings.propose(10, for: .entries)
+                    == LimitChange(limit: 10, removedCount: 1, freedBytes: 1000, keptPinnedCount: 0))
         }
     }
 

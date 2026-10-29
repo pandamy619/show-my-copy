@@ -187,7 +187,7 @@ struct HistorySizeLimitTests {
 
             let change = settings.propose(.megabytes100, for: .size)
 
-            #expect(change == LimitChange(limit: .megabytes100, removedCount: 0, freedBytes: 0))
+            #expect(change == LimitChange(limit: .megabytes100, removedCount: 0, freedBytes: 0, keptPinnedCount: 0))
             #expect(!change.needsConfirmation)
             // Proposing changes nothing.
             #expect(history.retention.byteLimit == 1_000_000_000)
@@ -213,7 +213,7 @@ struct HistorySizeLimitTests {
             let change = settings.forecast("small", under: history.retention.withByteLimit(20))
 
             // 20 bytes keep the 3 newest entries of 6 bytes.
-            #expect(change == LimitChange(limit: "small", removedCount: 7, freedBytes: 42))
+            #expect(change == LimitChange(limit: "small", removedCount: 7, freedBytes: 42, keptPinnedCount: 0))
             #expect(change.needsConfirmation)
             #expect(history.entries.count == 10)
         }
@@ -224,7 +224,7 @@ struct HistorySizeLimitTests {
             let history = InMemoryHistoryStore()
             let settings = makeSettings(history: history, defaults: defaults)
             let change = settings.forecast(1, under: history.retention.withByteLimit(0))
-            #expect(change == LimitChange(limit: 1, removedCount: 0, freedBytes: 0))
+            #expect(change == LimitChange(limit: 1, removedCount: 0, freedBytes: 0, keptPinnedCount: 0))
         }
     }
 }
