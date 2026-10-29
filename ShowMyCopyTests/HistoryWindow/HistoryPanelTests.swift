@@ -28,6 +28,9 @@ struct HistoryPanelTests {
         // Caps Lock on.
         #expect(HistoryPanel.commandKey(characters: "Z", modifiers: [.command, .capsLock]) == .undo)
         #expect(HistoryPanel.commandKey(characters: "\u{7F}", modifiers: [.command, .capsLock]) == .delete)
+        // Not Print: the history window pins with ⌘P.
+        #expect(HistoryPanel.commandKey(characters: "p", modifiers: .command) == .pin)
+        #expect(HistoryPanel.commandKey(characters: "P", modifiers: [.command, .capsLock]) == .pin)
     }
 
     private nonisolated static let otherKeys: [(String, NSEvent.ModifierFlags)] = [
@@ -37,6 +40,9 @@ struct HistoryPanelTests {
         ("\u{7F}", [.command, .option]),
         ("z", [.command, .shift]),
         ("z", [.command, .control]),
+        // ⇧⌘P, ⌥⌘P.
+        ("p", [.command, .shift]),
+        ("p", [.command, .option]),
         // Forward Delete.
         ("\u{F728}", .command),
         ("a", .command),
