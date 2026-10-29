@@ -249,6 +249,16 @@
         }
       }
     },
+    "Allow Show My Copy in Login Items in System Settings to open it at login." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешите Show My Copy в разделе «Объекты входа» Системных настроек, чтобы приложение открывалось при входе."
+          }
+        }
+      }
+    },
     "Also remove pinned entries" : {
       "localizations" : {
         "ru" : {
@@ -375,6 +385,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Освободится %@. Закреплённые записи останутся."
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Основные"
           }
         }
       }
@@ -646,6 +666,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Открыть историю буфера"
+          }
+        }
+      }
+    },
+    "Open Login Items…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть «Объекты входа»…"
+          }
+        }
+      }
+    },
+    "Open at login" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открывать при входе"
           }
         }
       }
@@ -972,6 +1012,26 @@
         }
       }
     },
+    "Show My Copy could not be added to Login Items." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось добавить Show My Copy в объекты входа."
+          }
+        }
+      }
+    },
+    "Show My Copy could not be removed from Login Items." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось убрать Show My Copy из объектов входа."
+          }
+        }
+      }
+    },
     "Show My Copy has no Dock or menu bar icon." : {
       "localizations" : {
         "ru" : {
@@ -1244,6 +1304,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Чтобы вернуться в настройки, снова откройте Show My Copy."
+          }
+        }
+      }
+    },
+    "Turn this on to keep recording your history from the moment you log in." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включите, чтобы история собиралась сразу после входа в систему."
           }
         }
       }

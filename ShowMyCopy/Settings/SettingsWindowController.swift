@@ -24,6 +24,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         Task { [usage = settings.storage] in
             await usage.refreshDiskBytes(recountingImages: true)
         }
+        // The user can change opening at login in System Settings at any time: ask macOS again.
+        Task { [launchAtLogin = settings.launchAtLogin] in
+            await launchAtLogin.settingsOpened()
+        }
         let window = self.window ?? makeWindow()
         self.window = window
         // Closing this window hides the app. Show its windows again.
@@ -39,12 +43,21 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// edits or an open confirmation.
     func windowWillClose(_ notification: Notification) {
         window?.contentViewController = makeContent()
+        settings.launchAtLogin.settingsClosed()
         // An app without a Dock icon keeps being active after its last window closes, so no window has focus.
         // Hiding the app returns focus to the app the user was in before. Not while another window is open.
         let closingWindow = window
         let otherWindowIsVisible = NSApplication.shared.windows.contains { $0 !== closingWindow && $0.isVisible }
         if !otherWindowIsVisible {
             NSApplication.shared.hide(nil)
+        }
+    }
+
+    /// Also when the user comes back from System Settings → Login Items: the app has no Dock icon and is not in the
+    /// app switcher, so they return by clicking this window. Read whether the app opens at login again.
+    func windowDidBecomeKey(_ notification: Notification) {
+        Task { [launchAtLogin = settings.launchAtLogin] in
+            await launchAtLogin.refresh()
         }
     }
 
