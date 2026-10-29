@@ -105,7 +105,8 @@ final class AppContainer: HistoryShowing {
             history: HistorySettings(history: history.store, defaults: defaults, now: services.system.now),
             passwords: PasswordSettings(
                 history: history, defaults: defaults, now: services.system.now, pasteboardClearer: pasteboardClearer),
-            storage: StorageUsage(history: history, memoryReader: services.memoryReader)
+            storage: StorageUsage(history: history, memoryReader: services.memoryReader),
+            launchAtLogin: LaunchAtLoginSettings(service: services.loginItem)
         )
     }
 
@@ -175,6 +176,13 @@ final class AppContainer: HistoryShowing {
     }
 
     func showSettings() {
+        settingsWindow.show()
+    }
+
+    /// Shows Settings on the first launch, offering once to open the app at login. The app never turns that on
+    /// by itself.
+    func showSettingsOnFirstLaunch() {
+        settings.launchAtLogin.suggestOnce()
         settingsWindow.show()
     }
 

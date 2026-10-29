@@ -3,8 +3,9 @@ import KeyboardShortcuts
 
 extension AppServices {
     /// The services the app runs on: the system pasteboard, clock, notifications and session state, ImageIO and
-    /// QuickLook for images and thumbnails, Mach calls for the app's memory, and the SwiftUI settings window with
-    /// the shortcut recorder. This file is the only place that names the macOS implementations the app runs on.
+    /// QuickLook for images and thumbnails, Mach calls for the app's memory, `SMAppService` for opening at login,
+    /// and the SwiftUI settings window with the shortcut recorder. This file is the only place that names the macOS
+    /// implementations the app runs on.
     @MainActor
     static func live(blobs: InFlightBlobStore?) -> AppServices {
         AppServices(
@@ -27,6 +28,7 @@ extension AppServices {
                 previewRichText: AppKitRichTextRenderer()
             ),
             memoryReader: TaskMemoryReader(),
+            loginItem: MainAppLoginItem(),
             makeSettingsWindow: { settings in
                 SettingsWindowController(settings: settings) {
                     KeyboardShortcuts.Recorder(for: .toggleHistoryWindow)

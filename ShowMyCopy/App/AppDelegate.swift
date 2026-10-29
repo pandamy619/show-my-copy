@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         historyRequests.connect(container)
 
         if firstLaunch.shouldShowSettings {
-            container.showSettings()
+            container.showSettingsOnFirstLaunch()
             firstLaunch.settingsWereShown()
         }
     }

@@ -56,6 +56,8 @@ struct AppServices {
     var media: Media
     /// Reads the app's memory for Settings → Storage.
     var memoryReader: any MemoryUsageReading
+    /// The app's login item, for Settings → General → Open at login.
+    var loginItem: any LoginItemService
     var makeSettingsWindow: SettingsWindowFactory
 }
 
@@ -70,4 +72,6 @@ struct AppSettings {
     /// What the history takes and whether saving it works. Lives as long as the app, so its caches and last
     /// readings survive closing the window.
     let storage: StorageUsage
+    /// Whether the app opens at login. Lives as long as the app, so the first launch's suggestion reaches the window.
+    let launchAtLogin: LaunchAtLoginSettings
 }

@@ -12,4 +12,7 @@ enum AppLogger {
 
     /// The encryption key of saved passwords. Log why it is unavailable, never the key or what it seals.
     static let security = Logger(subsystem: subsystem, category: "security")
+
+    /// The app itself, such as opening at login. Log what failed, never anything the user copied or typed.
+    static let app = Logger(subsystem: subsystem, category: "app")
 }
