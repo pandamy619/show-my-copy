@@ -100,7 +100,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
         if let change = entryLimit.pending {
             InlineConfirmation(
                 message: .removingOldestItems(change.removedCount),
-                detail: .freeing(bytes: change.freedBytes),
+                detail: .freeing(change),
                 confirmTitle: "Remove",
                 onConfirm: { entryLimit.confirm() },
                 onCancel: { entryLimit.cancel() }
@@ -118,13 +118,13 @@ struct SettingsView<ShortcutRecorder: View>: View {
             // Entries past the age limit are always the oldest ones that are not pinned.
             InlineConfirmation(
                 message: .removingOldestItems(change.removedCount),
-                detail: .freeing(bytes: change.freedBytes),
+                detail: .freeing(change),
                 confirmTitle: "Remove",
                 onConfirm: { ageLimit.confirm() },
                 onCancel: { ageLimit.cancel() }
             )
         } else {
-            Text("Entries older than this are removed automatically.")
+            Text("Entries older than this are removed automatically. Pinned entries are kept.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

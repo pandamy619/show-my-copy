@@ -10,6 +10,8 @@ struct LimitChange<Limit: Equatable & Sendable>: Equatable, Sendable {
     /// The total `byteSize` of those entries, with the size of passwords among them rounded up as Settings show it
     /// (`StorageBreakdown`).
     let freedBytes: Int
+    /// How many pinned entries the history holds: no limit removes them, and Settings say so.
+    let keptPinnedCount: Int
 
     /// True when applying the limit deletes entries, so the user should confirm first.
     var needsConfirmation: Bool { removedCount > 0 }
@@ -104,11 +106,14 @@ final class HistorySettings {
     }
 
     /// What applying `policy` to the history now would remove, reported as a change to `limit`. The freed size is
-    /// shown to the user, so it does not tell a password's length (`StorageBreakdown`).
+    /// shown to the user, so it does not tell a password's length (`StorageBreakdown`). Pinned entries are never
+    /// removed; the change counts them, so Settings can say they are kept.
     func forecast<Limit>(_ limit: Limit, under policy: RetentionPolicy) -> LimitChange<Limit> {
         let entries = history.entries
         let keptIDs = Set(policy.kept(entries, at: now()).map(\.id))
         let removed = StorageBreakdown(entries: entries.filter { !keptIDs.contains($0.id) })
-        return LimitChange(limit: limit, removedCount: removed.totalCount, freedBytes: removed.totalBytes)
+        return LimitChange(
+            limit: limit, removedCount: removed.totalCount, freedBytes: removed.totalBytes,
+            keptPinnedCount: entries.count(where: \.isPinned))
     }
 }

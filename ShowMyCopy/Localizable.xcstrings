@@ -249,6 +249,16 @@
         }
       }
     },
+    "Also remove pinned entries" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Также удалить закреплённые записи"
+          }
+        }
+      }
+    },
     "App memory" : {
       "localizations" : {
         "ru" : {
@@ -319,12 +329,12 @@
         }
       }
     },
-    "Entries older than this are removed automatically." : {
+    "Entries older than this are removed automatically. Pinned entries are kept." : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Записи старше этого срока удаляются автоматически."
+            "value" : "Записи старше этого срока удаляются автоматически. Закреплённые записи сохраняются."
           }
         }
       }
@@ -359,6 +369,16 @@
         }
       }
     },
+    "Frees %@. Pinned entries are kept." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Освободится %@. Закреплённые записи останутся."
+          }
+        }
+      }
+    },
     "Hide password" : {
       "localizations" : {
         "ru" : {
@@ -385,6 +405,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "История по типам"
+          }
+        }
+      }
+    },
+    "History can use up to %@, not counting pinned entries." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "История может занимать до %@, не считая закреплённых записей."
           }
         }
       }
@@ -1048,6 +1078,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сохранённую историю не удалось прочитать, поэтому начата новая."
+          }
+        }
+      }
+    },
+    "This removes %lld items from your history. Pinned entries are kept." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This removes %lld item from your history. Pinned entries are kept."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This removes %lld items from your history. Pinned entries are kept."
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из истории будут удалены %lld записи. Закреплённые записи останутся."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из истории будет удалено %lld записей. Закреплённые записи останутся."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из истории будет удалена %lld запись. Закреплённые записи останутся."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из истории будет удалено %lld записи. Закреплённые записи останутся."
+                }
+              }
+            }
           }
         }
       }

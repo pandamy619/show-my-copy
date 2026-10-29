@@ -39,4 +39,13 @@ extension Text {
     static func freeing(bytes: Int) -> Text {
         Text("Frees \(ByteCount.fileSize(bytes)).")
     }
+
+    /// The space a lower limit frees and, when the history has pinned entries, that the limit keeps them: they
+    /// count toward the history's size but no limit removes them.
+    static func freeing<Limit>(_ change: LimitChange<Limit>) -> Text {
+        guard change.keptPinnedCount > 0 else {
+            return freeing(bytes: change.freedBytes)
+        }
+        return Text("Frees \(ByteCount.fileSize(change.freedBytes)). Pinned entries are kept.")
+    }
 }

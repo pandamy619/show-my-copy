@@ -61,15 +61,27 @@ struct StorageBreakdown: Equatable, Sendable {
     let totalCount: Int
     /// The sum of the parts' `bytes`, so it includes the passwords rounded up.
     let totalBytes: Int
+    /// The pinned entries among them and their `byteSize`, counted in the parts too. Exact: a password is never
+    /// pinned.
+    let pinnedCount: Int
+    let pinnedBytes: Int
 
     init(entries: [ClipboardEntry]) {
         var counts: [StorageCategory: Int] = [:]
         var bytes: [StorageCategory: Int] = [:]
+        var pinnedCount = 0
+        var pinnedBytes = 0
         for entry in entries {
             let category = StorageCategory(of: entry)
             counts[category, default: 0] += 1
             bytes[category, default: 0] += entry.byteSize
+            if entry.isPinned {
+                pinnedCount += 1
+                pinnedBytes += entry.byteSize
+            }
         }
+        self.pinnedCount = pinnedCount
+        self.pinnedBytes = pinnedBytes
         parts = StorageCategory.allCases.compactMap { category in
             counts[category].map { count in
                 let exact = bytes[category, default: 0]
@@ -184,10 +196,17 @@ final class StorageUsage {
         return breakdown
     }
 
-    /// What clearing the history would remove now, with the passwords' size rounded up as in `breakdown`.
-    var clearForecast: HistoryStats {
+    /// What clearing the history would remove now, with the passwords' size rounded up as in `breakdown`: every
+    /// entry, or every entry that is not pinned with `keepingPinned`.
+    func clearForecast(keepingPinned: Bool) -> HistoryStats {
         let breakdown = breakdown
-        return HistoryStats(count: breakdown.totalCount, totalBytes: breakdown.totalBytes)
+        guard keepingPinned else {
+            return HistoryStats(count: breakdown.totalCount, totalBytes: breakdown.totalBytes)
+        }
+        // No password is pinned, so leaving the pinned entries out leaves the passwords' rounded size as it is.
+        return HistoryStats(
+            count: breakdown.totalCount - breakdown.pinnedCount,
+            totalBytes: breakdown.totalBytes - breakdown.pinnedBytes)
     }
 
     /// What the last clear removed, until the history changes again. Nil when nothing was removed.
@@ -207,12 +226,13 @@ final class StorageUsage {
         }
     }
 
-    /// Removes every entry and remembers what was freed, for a calm note in place of the button. The freed size is
-    /// the one `clearForecast` showed, with the passwords' size rounded up, not the history's exact count.
+    /// Removes every entry, or every entry that is not pinned with `keepingPinned`, and remembers what was freed,
+    /// for a calm note in place of the button. The freed size is the one `clearForecast` showed, with the passwords'
+    /// size rounded up, not the history's exact count.
     @discardableResult
-    func clearHistory() -> ClearResult {
-        let shownBytes = breakdown.totalBytes
-        let cleared = history.clear()
+    func clearHistory(keepingPinned: Bool) -> ClearResult {
+        let shownBytes = clearForecast(keepingPinned: keepingPinned).totalBytes
+        let cleared = history.clear(keepingPinned: keepingPinned)
         let result = ClearResult(removedCount: cleared.removedCount, freedBytes: shownBytes)
         lastClear = result.removedCount > 0 ? (result, history.revision) : nil
         clearToken &+= 1

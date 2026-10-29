@@ -80,7 +80,7 @@ struct StorageSection: View {
             if let change = sizeLimit.pending {
                 InlineConfirmation(
                     message: .removingOldestItems(change.removedCount),
-                    detail: .freeing(bytes: change.freedBytes),
+                    detail: .freeing(change),
                     confirmTitle: "Remove",
                     onConfirm: { sizeLimit.confirm() },
                     onCancel: { sizeLimit.cancel() }
@@ -116,10 +116,15 @@ struct StorageSection: View {
         }
     }
 
-    /// What the chosen limit allows. Raising it never removes anything, so this is all it says.
+    /// What the chosen limit allows. Raising it never removes anything, so this is all it says. Pinned entries count
+    /// toward the history size above but not toward the limit.
     private var sizeLimitNote: Text {
         if let byteLimit = settings.sizeLimit.byteLimit {
-            Text("History can use up to \(ByteCount.fileSize(byteLimit)).")
+            if usage.breakdown.pinnedCount > 0 {
+                Text("History can use up to \(ByteCount.fileSize(byteLimit)), not counting pinned entries.")
+            } else {
+                Text("History can use up to \(ByteCount.fileSize(byteLimit)).")
+            }
         } else {
             Text("Only the number of items limits the history.")
         }
@@ -135,36 +140,48 @@ struct StorageSection: View {
 }
 
 /// Settings → Clear History, with what it frees before and after.
+///
+/// Pinned entries are kept unless the user asks otherwise: pinning is how the user says "keep this", so clearing the
+/// rest is what they most likely want, and the confirmation offers to remove the pinned ones too, unchecked.
 struct ClearHistorySection: View {
     let usage: StorageUsage
 
     @State private var isConfirmingClear = false
+    /// "Also remove pinned entries" in the confirmation. Off each time it is shown.
+    @State private var removesPinned = false
 
     var body: some View {
         Section {
             content
                 .onChange(of: usage.history.revision) {
                     if usage.history.entries.isEmpty {
-                        isConfirmingClear = false
+                        closeConfirmation()
                     }
                 }
         }
     }
 
     @ViewBuilder private var content: some View {
-        let forecast = usage.clearForecast
+        let hasPinned = usage.breakdown.pinnedCount > 0
+        let keepsPinned = hasPinned && !removesPinned
+        let forecast = usage.clearForecast(keepingPinned: keepsPinned)
         if isConfirmingClear {
             InlineConfirmation(
                 // The catalog has plural variations, such as "This removes 1 item from your history." for one.
-                message: Text("This removes all \(forecast.count) items from your history."),
+                message: keepsPinned
+                    ? Text("This removes \(forecast.count) items from your history. Pinned entries are kept.")
+                    : Text("This removes all \(forecast.count) items from your history."),
                 detail: .freeing(bytes: forecast.totalBytes),
-                confirmTitle: "Remove All",
+                confirmTitle: keepsPinned ? "Remove" : "Remove All",
                 onConfirm: {
-                    usage.clearHistory()
-                    isConfirmingClear = false
+                    usage.clearHistory(keepingPinned: keepsPinned)
+                    closeConfirmation()
                 },
-                onCancel: { isConfirmingClear = false }
+                onCancel: { closeConfirmation() }
             )
+            if hasPinned {
+                Toggle("Also remove pinned entries", isOn: $removesPinned)
+            }
         } else if let cleared = usage.recentClear {
             // A calm note in place of the button until something new is copied.
             Text("History cleared, \(ByteCount.fileSize(cleared.freedBytes)) freed.")
@@ -172,6 +189,7 @@ struct ClearHistorySection: View {
         } else {
             HStack {
                 Button("Clear History…") {
+                    removesPinned = false
                     isConfirmingClear = true
                 }
                 // Also with no entries, when only a damaged copy of a history is left to delete.
@@ -189,6 +207,11 @@ struct ClearHistorySection: View {
                 }
             }
         }
+    }
+
+    private func closeConfirmation() {
+        isConfirmingClear = false
+        removesPinned = false
     }
 }
 
