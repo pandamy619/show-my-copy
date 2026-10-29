@@ -13,7 +13,8 @@ struct HistoryView: View {
     private let icons = WorkspaceFileIconProvider()
 
     var body: some View {
-        let items = model.items
+        let sections = model.sections
+        let items = sections.rows
         let selectedID = model.selectedIndex(in: items).map { items[$0].id }
         VStack(spacing: 0) {
             searchBar
@@ -24,7 +25,7 @@ struct HistoryView: View {
             } else {
                 let previewed = model.previewedEntry
                 // The list stays underneath the preview, so it keeps its scroll position.
-                list(items: items, selectedID: selectedID, now: Date())
+                list(sections: sections, selectedID: selectedID, now: Date())
                     .opacity(previewed == nil ? 1 : 0)
                     .allowsHitTesting(previewed == nil)
                     .accessibilityHidden(previewed != nil)
@@ -101,23 +102,31 @@ struct HistoryView: View {
         .frame(height: HistoryPanelPlacement.messageRowHeight)
     }
 
-    private func list(items: [ClipboardEntry], selectedID: ClipboardEntry.ID?, now: Date) -> some View {
-        // The current entry, when there is one, is the newest. After a skipped copy (a password, an image) nothing
-        // in the history is on the clipboard, so every entry is listed under "History".
-        let current = items.first.flatMap { $0.id == model.currentEntryID ? $0 : nil }
-        let rest = current == nil ? items[...] : items.dropFirst()
-        return ScrollViewReader { proxy in
+    private func list(sections: HistorySections, selectedID: ClipboardEntry.ID?, now: Date) -> some View {
+        // After a skipped copy (a password, an image) nothing in the history is on the clipboard, and a pinned entry
+        // on the clipboard stays among the pinned ones: then there is no "Current clipboard" row.
+        ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    if let current {
+                    if let current = sections.current {
                         sectionHeader("Current clipboard")
                         row(current, selectedID: selectedID, now: now)
                         Divider()
                             .padding(.vertical, 4)
                     }
-                    if !rest.isEmpty {
+                    if !sections.pinned.isEmpty {
+                        sectionHeader("Pinned")
+                        ForEach(sections.pinned) { entry in
+                            row(entry, selectedID: selectedID, now: now)
+                        }
+                        if !sections.history.isEmpty {
+                            Divider()
+                                .padding(.vertical, 4)
+                        }
+                    }
+                    if !sections.history.isEmpty {
                         sectionHeader("History")
-                        ForEach(rest) { entry in
+                        ForEach(sections.history) { entry in
                             row(entry, selectedID: selectedID, now: now)
                         }
                     }
@@ -130,7 +139,7 @@ struct HistoryView: View {
                 }
             }
             .onChange(of: model.presentationCount) {
-                if let first = items.first {
+                if let first = sections.rows.first {
                     proxy.scrollTo(first.id, anchor: .top)
                 }
             }
@@ -166,12 +175,24 @@ struct HistoryView: View {
                         model.showPreview(of: entry)
                     }
                 }
+                if entry.isPinned {
+                    Button("Unpin") {
+                        model.togglePin(entry)
+                    }
+                } else {
+                    // A password keeps its own expiry, which a pin would outlast.
+                    Button("Pin") {
+                        model.togglePin(entry)
+                    }
+                    .disabled(!HistoryWindowModel.canPin(entry))
+                }
                 // Also the current entry: deleting it empties the clipboard when it still holds it.
                 Button("Delete", role: .destructive) {
                     model.delete(entry)
                 }
             }
             .modifier(PreviewAccessibility(entry: entry, model: model))
+            .modifier(PinAccessibility(entry: entry, model: model))
             .accessibilityAction(named: Text("Delete")) {
                 model.delete(entry)
             }
@@ -331,7 +352,13 @@ private struct HistoryRow: View {
                     Text(verbatim: appName)
                 }
                 Spacer(minLength: 8)
-                Text(verbatim: EntryPreview.relativeTime(of: entry.date, now: now))
+                if entry.isPinned {
+                    // A pinned entry's date is when it was pinned, which says little: the mark says more.
+                    Image(systemName: "pin.fill")
+                        .accessibilityLabel(Text("Pinned entry"))
+                } else {
+                    Text(verbatim: EntryPreview.relativeTime(of: entry.date, now: now))
+                }
             }
             .font(.caption)
             .foregroundStyle(.secondary)

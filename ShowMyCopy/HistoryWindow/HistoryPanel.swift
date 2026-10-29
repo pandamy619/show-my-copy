@@ -5,8 +5,9 @@ import AppKit
 final class HistoryPanel: NSPanel {
     /// Called when the user presses Escape and no view handled it.
     var onCancel: (@MainActor () -> Void)?
-    /// Called with ⌘⌫ and ⌘Z (`commandKey(characters:modifiers:)`). Returns whether it handled the key; when it did
-    /// not, the key goes on as usual, for example to Undo in the Edit menu, which undoes typing in the search field.
+    /// Called with ⌘⌫, ⌘Z and ⌘P (`commandKey(characters:modifiers:)`). Returns whether it handled the key; when it
+    /// did not, the key goes on as usual, for example to Undo in the Edit menu, which undoes typing in the search
+    /// field.
     var onCommandKey: (@MainActor (HistoryWindowModel.Key) -> Bool)?
 
     convenience init(contentRect: NSRect) {
@@ -55,7 +56,7 @@ final class HistoryPanel: NSPanel {
     }
 
     /// Key presses with ⌘ come here before the search field gets them and before the main menu does, so ⌘Z can
-    /// bring back a deleted entry instead of undoing typing.
+    /// bring back a deleted entry instead of undoing typing, and ⌘P pins instead of printing.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard let key = Self.commandKey(characters: event.characters, modifiers: event.modifierFlags),
             onCommandKey?(key) == true
@@ -65,8 +66,8 @@ final class HistoryPanel: NSPanel {
         return true
     }
 
-    /// The history window's key for a key press with ⌘ and no other modifier: ⌘⌫ (Delete, not Forward Delete) and
-    /// ⌘Z. Nil for anything else, such as ⇧⌘Z or ⌥⌘⌫. `characters` are those the keyboard layout gives with ⌘,
+    /// The history window's key for a key press with ⌘ and no other modifier: ⌘⌫ (Delete, not Forward Delete), ⌘Z
+    /// and ⌘P. Nil for anything else, such as ⇧⌘Z or ⌥⌘⌫. `characters` are those the keyboard layout gives with ⌘,
     /// which are Latin letters also on layouts such as Russian, as for menu shortcuts.
     nonisolated static func commandKey(
         characters: String?,
@@ -80,6 +81,8 @@ final class HistoryPanel: NSPanel {
             return .delete
         case "z":
             return .undo
+        case "p":
+            return .pin
         default:
             return nil
         }

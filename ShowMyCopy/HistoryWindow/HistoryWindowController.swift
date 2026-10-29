@@ -101,9 +101,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         hide()
     }
 
-    /// ⌘⌫ and ⌘Z, which reach the panel as key equivalents before the search field or the Edit menu sees them.
+    /// ⌘⌫, ⌘Z and ⌘P, which reach the panel as key equivalents before the search field or the main menu sees them.
     /// Returns false for a key the model leaves to the search field, such as ⌘Z with nothing to bring back, which
-    /// then undoes typing.
+    /// then undoes typing. ⌘P is always handled while the window is open, so it never prints.
     func handleCommandKey(_ key: HistoryWindowModel.Key) -> Bool {
         guard isVisible else {
             return false

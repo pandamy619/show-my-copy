@@ -17,3 +17,21 @@ struct RevealButton: View {
         .padding(.trailing, 10)
     }
 }
+
+/// Offers VoiceOver users "Pin" or "Unpin" on a row. A password cannot be pinned, so its row has neither.
+struct PinAccessibility: ViewModifier {
+    let entry: ClipboardEntry
+    let model: HistoryWindowModel
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if HistoryWindowModel.canPin(entry) {
+            content
+                .accessibilityAction(named: entry.isPinned ? Text("Unpin") : Text("Pin")) {
+                    model.togglePin(entry)
+                }
+        } else {
+            content
+        }
+    }
+}

@@ -680,6 +680,36 @@
         }
       }
     },
+    "Pin" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрепить"
+          }
+        }
+      }
+    },
+    "Pinned" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закреплённые"
+          }
+        }
+      }
+    },
+    "Pinned entry" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закреплённая запись"
+          }
+        }
+      }
+    },
     "Press the shortcut above to show your history." : {
       "localizations" : {
         "ru" : {
@@ -1142,6 +1172,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Неизвестное приложение"
+          }
+        }
+      }
+    },
+    "Unpin" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открепить"
           }
         }
       }

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// State of the history window: the search query, the selected entry and its preview.
+/// State of the history window: the search query, the listed sections, the selected entry and its preview.
 @MainActor
 @Observable
 final class HistoryWindowModel {
@@ -22,6 +22,8 @@ final class HistoryWindowModel {
         case delete
         /// ⌘Z: brings back the entry deleted last, while there is one. Otherwise it undoes typing in the search field.
         case undo
+        /// ⌘P: pins or unpins the selected entry. Always handled, so it never reaches the search field or Print.
+        case pin
     }
 
     /// What the view does after the model handled a key.
@@ -55,7 +57,8 @@ final class HistoryWindowModel {
     }
 
     /// The selected entry. It is kept by ID, so the selection stays on the same entry when a copy arrives or an
-    /// entry moves to the top while the window is open. Read `selectedIndex`, which finds its row.
+    /// entry moves to the top or to another section while the window is open. Read `selectedIndex`, which finds its
+    /// row.
     private var selectedID: ClipboardEntry.ID?
 
     /// The row of the selected entry when it was selected. Used when there is no selected entry or it is gone,
@@ -76,49 +79,58 @@ final class HistoryWindowModel {
         fileAvailability = previews.fileAvailability
     }
 
-    /// What the cached search result was computed from. While it stays the same, so do the entries that match.
-    private struct SearchInput: Equatable {
+    /// What the cached sections were computed from. While it stays the same, so do the entries listed.
+    private struct ListInput: Equatable {
         let query: String
         let revision: Int
+        let currentEntryID: ClipboardEntry.ID?
         // Cheap extra checks, in case a store misses a revision.
         let count: Int
         let firstID: ClipboardEntry.ID?
         let lastID: ClipboardEntry.ID?
     }
 
-    /// The positions of the entries that matched the query, not copies of the entries, so an entry the history
-    /// removes (such as an expired password) is not kept alive here.
-    @ObservationIgnored private var cachedSearch: (input: SearchInput, matchingIndices: [Int])?
+    /// The positions of the listed entries, not copies of the entries, so an entry the history removes (such as an
+    /// expired password) is not kept alive here.
+    @ObservationIgnored private var cachedList: (input: ListInput, positions: HistorySections.Positions)?
 
     /// How often the history was searched. Tests read it to check that the search result is reused.
     @ObservationIgnored private(set) var filterCount = 0
 
-    /// Entries that match the query, newest first.
+    /// The entries that match the query, by section (`HistorySections`): the clipboard row, the pinned entries and
+    /// the rest. Search filters every section.
     ///
     /// The view reads this several times per update, and once per keystroke the query changes. The result is
-    /// reused until the query or the history's entries change. Matching uses the search keys made when the entries
-    /// were recorded, so only the query is folded.
-    var items: [ClipboardEntry] {
+    /// reused until the query, the history's entries or the current entry change. Matching uses the search keys made
+    /// when the entries were recorded, so only the query is folded.
+    var sections: HistorySections {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let entries = history.entries
-        guard !needle.isEmpty else {
-            return entries
-        }
-        let input = SearchInput(
+        let input = ListInput(
             query: needle,
             revision: history.revision,
+            currentEntryID: history.currentEntryID,
             count: entries.count,
             firstID: entries.first?.id,
             lastID: entries.last?.id
         )
-        if let cachedSearch, cachedSearch.input == input {
-            return cachedSearch.matchingIndices.map { entries[$0] }
+        if let cachedList, cachedList.input == input {
+            return cachedList.positions.sections(in: entries)
         }
-        filterCount += 1
-        let foldedQuery = SearchKey.fold(needle)
-        let matchingIndices = entries.indices.filter { Self.entry(entries[$0], matches: foldedQuery) }
-        cachedSearch = (input, matchingIndices)
-        return matchingIndices.map { entries[$0] }
+        var listed = Array(entries.indices)
+        if !needle.isEmpty {
+            filterCount += 1
+            let foldedQuery = SearchKey.fold(needle)
+            listed = listed.filter { Self.entry(entries[$0], matches: foldedQuery) }
+        }
+        let positions = HistorySections.Positions(of: entries, listed: listed, currentEntryID: input.currentEntryID)
+        cachedList = (input, positions)
+        return positions.sections(in: entries)
+    }
+
+    /// The listed entries in the order the window shows them: the arrow keys move through these.
+    var items: [ClipboardEntry] {
+        sections.rows
     }
 
     /// Whether the window lists any entries. False for an empty history and for a search with no matches: then
@@ -186,11 +198,11 @@ final class HistoryWindowModel {
     /// Up and Down Arrow move the selection, and the open preview follows it. Right Arrow opens the preview, like
     /// opening a folder in a column view; Left Arrow and Esc close it. Esc with no preview closes the window, and
     /// Return copies the selected entry back. ⌘⌫ deletes the selected entry and ⌘Z brings it back; with nothing to
-    /// delete or bring back they are left to the search field.
+    /// delete or bring back they are left to the search field. ⌘P pins or unpins the selected entry.
     func handleKey(_ key: Key, isCaretAtEnd: Bool) -> KeyResult {
         switch key {
-        case .delete, .undo:
-            return handleDeleteKey(key)
+        case .delete, .undo, .pin:
+            return handleCommandKey(key)
         case .up, .down:
             moveSelection(key == .up ? .up : .down)
             if preview.isOpen {
@@ -309,8 +321,14 @@ final class HistoryWindowModel {
 // MARK: - Deleting
 
 extension HistoryWindowModel {
-    /// ⌘⌫ and ⌘Z, left to the search field when there is nothing to delete or bring back.
-    fileprivate func handleDeleteKey(_ key: Key) -> KeyResult {
+    /// ⌘⌫ and ⌘Z, left to the search field when there is nothing to delete or bring back, and ⌘P, always handled.
+    fileprivate func handleCommandKey(_ key: Key) -> KeyResult {
+        if key == .pin {
+            if let entry = selectedEntry {
+                togglePin(entry)
+            }
+            return .handled
+        }
         if key == .undo {
             guard deleter.canUndoDelete else {
                 return .ignored
