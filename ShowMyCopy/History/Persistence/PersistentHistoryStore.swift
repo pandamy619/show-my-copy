@@ -221,22 +221,7 @@ final class PersistentHistoryStore: HistoryStore, HistoryStorage {
     /// nothing is saved in files. Measured off the main actor; saved images come from the blob store's running total
     /// (`MeasuredBlobStore`), or are counted again with `recountingBlobs`.
     func storedBytes(recountingBlobs: Bool) async -> Int64? {
-        await Self.measure(persistence, leftovers, blobs, recountingBlobs: recountingBlobs)
-    }
-
-    @concurrent
-    private static func measure(
-        _ persistence: any HistoryPersistence,
-        _ leftovers: (any HistoryLeftovers)?,
-        _ blobs: (any BlobStore)?,
-        recountingBlobs: Bool
-    ) async -> Int64? {
-        let stores = [persistence.storedBytes(), leftovers?.totalBytes()].compactMap { $0 }
-        guard !stores.isEmpty else {
-            return nil
-        }
-        let blobBytes = recountingBlobs ? blobs?.recountTotalBytes() : blobs?.totalBytes()
-        return stores.reduce(0, +) + (blobBytes ?? 0)
+        await SavedHistorySize.measure(persistence, leftovers, blobs, recountingBlobs: recountingBlobs)
     }
 
     // MARK: - Writing
