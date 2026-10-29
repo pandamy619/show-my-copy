@@ -99,6 +99,29 @@ struct HistoryStoreImageCompletionContractTests {
     }
 
     @Test(arguments: StoreKind.allCases)
+    func completingAnImageThatIsPinnedMakesThePinnedEntryCurrentWithoutMovingIt(store kind: StoreKind) throws {
+        let store = try makeStore(kind)
+        let earlier = try saved(1)
+        let pinnedID = store.record(.image(earlier), sourceApp: nil, at: start)
+        harness.now = start + 1
+        store.setPinned(true, id: pinnedID)
+        store.record(text: "between", sourceApp: nil, at: start + 2)
+        let pending = unsaved()
+        store.record(.image(pending), sourceApp: safari, at: start + 3)
+
+        store.completeImage(pending, with: earlier, keepsEarlierCopy: false)
+
+        #expect(store.entries.map(\.kind) == [.text, .image])
+        let entry = try #require(store.entries.last)
+        #expect(entry.id == pinnedID)
+        #expect(entry.isPinned)
+        #expect(entry.date == start + 1)
+        #expect(entry.sourceApp == nil)
+        #expect(store.currentEntryID == pinnedID)
+        #expect(blobs.allIDs() == Set(earlier.blobIDs))
+    }
+
+    @Test(arguments: StoreKind.allCases)
     func sameImageSavedTwiceKeepsTheNewerData(store kind: StoreKind) throws {
         let store = try makeStore(kind)
         let first = unsaved()

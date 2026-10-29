@@ -75,6 +75,25 @@ struct ClipboardMonitorClearedClipboardTests {
         #expect(history.entries.map(\.text) == ["written after the clear", "hunter2", "older"])
     }
 
+    @Test func clipboardClearedSoonAfterPinningKeepsThePinnedEntry() throws {
+        let history = InMemoryHistoryStore(now: { [environment] in environment.now })
+        environment.frontmostApp = safari
+        let monitor = environment.makeMonitor(pasteboard: pasteboard, history: history)
+        pasteboard.copy("snippet")
+        monitor.poll()
+        let id = try #require(history.currentEntryID)
+        environment.now += 30
+        history.setPinned(true, id: id)
+        environment.now += 30
+
+        clearAndConfirm(monitor)
+
+        // The user chose to keep it, and a password is never pinned.
+        #expect(history.entries.map(\.id) == [id])
+        #expect(history.entries.first?.isPinned == true)
+        #expect(history.entries.first?.isConcealed == false)
+    }
+
     @Test func clearedClipboardNeverRemovesFiles() {
         environment.frontmostApp = safari
         let monitor = environment.makeMonitor(pasteboard: pasteboard, history: history)
