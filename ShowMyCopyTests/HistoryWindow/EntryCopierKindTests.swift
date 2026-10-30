@@ -31,7 +31,7 @@ struct EntryCopierKindTests {
         history.record(text: "newer", sourceApp: nil, at: start + 1)
         let entry = try #require(history.entries.last)
 
-        #expect(makeCopier().copy(entry))
+        #expect(makeCopier().copy(entry) != nil)
         #expect(pasteboard.writtenPayloads == [.richText(rtf: ContentFixtures.rtf, plain: "styled")])
         #expect(history.entries.first?.id == entry.id)
         #expect(history.currentEntryID == entry.id)
@@ -42,7 +42,7 @@ struct EntryCopierKindTests {
         history.record(.image(image), sourceApp: nil, at: start)
         let entry = try #require(history.entries.first)
 
-        #expect(makeCopier().copy(entry))
+        #expect(makeCopier().copy(entry) != nil)
         #expect(pasteboard.writtenPayloads == [.image(Data([0x89, 1, 2]), typeIdentifier: "public.png")])
         #expect(history.currentEntryID == entry.id)
         #expect(history.entries.count == 1)
@@ -53,7 +53,7 @@ struct EntryCopierKindTests {
         history.record(content, sourceApp: nil, at: start)
         let entry = try #require(history.entries.first)
 
-        #expect(makeCopier().copy(entry))
+        #expect(makeCopier().copy(entry) != nil)
         #expect(
             pasteboard.writtenPayloads == [
                 .files([URL(filePath: "/Users/me/a.txt"), URL(filePath: "/Users/me/b.txt")])
@@ -68,7 +68,7 @@ struct EntryCopierKindTests {
         blobs.delete([image.blobID])
         let entriesBefore = history.entries
 
-        #expect(!makeCopier().copy(entry))
+        #expect(makeCopier().copy(entry) == nil)
         #expect(pasteboard.writtenPayloads.isEmpty)
         #expect(history.entries == entriesBefore)
     }
@@ -77,7 +77,7 @@ struct EntryCopierKindTests {
         let image = try ContentFixtures.storedImage(in: blobs)
         history.record(.image(image), sourceApp: nil, at: start)
         let entry = try #require(history.entries.first)
-        #expect(!makeCopier(blobs: nil).copy(entry))
+        #expect(makeCopier(blobs: nil).copy(entry) == nil)
         #expect(pasteboard.writtenPayloads.isEmpty)
     }
 
@@ -92,7 +92,7 @@ struct EntryCopierKindTests {
         let entry = try #require(history.entries.last)
         let copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor, blobs: blobs)
 
-        #expect(copier.copy(entry))
+        #expect(copier.copy(entry) != nil)
         monitor.poll()
         #expect(history.entries.map(\.kind) == [.image, .text])
         #expect(blobs.allIDs().count == 2)

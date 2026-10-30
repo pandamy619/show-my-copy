@@ -103,7 +103,7 @@ struct PasswordPasteboardClearerTests {
         let password = try #require(history.entries.first { $0.isConcealed })
         let copier = EntryCopier(
             history: history, pasteboard: pasteboard, monitor: monitor, now: { [environment] in environment.now })
-        #expect(copier.copy(password))
+        #expect(copier.copy(password) != nil)
         let copiedChange = pasteboard.changeCount
         #expect(pasteboard.writtenConcealed == [true])
 

@@ -10,7 +10,7 @@ struct HistoryContentFactoryTests {
         // The hidden title bar would otherwise push the search field down by its height.
         let view = HistoryContentFactory.makeView(
             model: HistoryWindowModel(history: InMemoryHistoryStore()),
-            onChoose: { _ in },
+            onChoose: { _, _ in },
             onClose: {},
             onOpenSettings: {}
         )

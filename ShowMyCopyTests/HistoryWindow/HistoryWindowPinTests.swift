@@ -225,6 +225,7 @@ struct HistoryWindowControllerPinTests {
         let controller = HistoryWindowController(
             model: HistoryWindowModel(history: history),
             copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
+            paster: EntryPasterSpy(),
             monitor: monitor,
             onOpenSettings: {}
         )

@@ -95,7 +95,7 @@ struct EntryDeleterTests {
         try copy("newer")
         let copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor)
         let entry = try #require(history.entries.first { $0.id == older })
-        #expect(copier.copy(entry))
+        #expect(copier.copy(entry) != nil)
 
         deleter.delete(older)
 

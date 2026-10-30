@@ -75,7 +75,7 @@ struct AppContainerPasswordClipboardTests {
             pasteboard.copy("plain")
             container.monitor.poll()
             let password = try #require(store.entries.first { $0.isConcealed })
-            #expect(container.copier.copy(password))
+            #expect(container.copier.copy(password) != nil)
             let copiedChange = pasteboard.changeCount
 
             clock.advance(by: 60)

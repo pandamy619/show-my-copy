@@ -26,6 +26,7 @@ struct HistoryWindowControllerTests {
         HistoryWindowController(
             model: HistoryWindowModel(history: history),
             copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
+            paster: EntryPasterSpy(),
             monitor: monitor,
             onOpenSettings: {}
         )
@@ -55,7 +56,7 @@ struct HistoryWindowControllerTests {
         controller.show()
         let older = try #require(controller.model.items.last)
 
-        controller.choose(older)
+        controller.choose(older, pastes: false)
 
         #expect(pasteboard.writtenTexts == ["older"])
         #expect(!controller.isVisible)
@@ -70,14 +71,14 @@ struct HistoryWindowControllerTests {
         let older = try #require(controller.model.items.last)
         pasteboard.writeFails = true
 
-        controller.choose(older)
+        controller.choose(older, pastes: false)
 
         // Nothing was copied, so the user can try again.
         #expect(controller.isVisible)
         #expect(pasteboard.string() == "newer")
 
         pasteboard.writeFails = false
-        controller.choose(older)
+        controller.choose(older, pastes: false)
         #expect(pasteboard.writtenTexts == ["older"])
         #expect(!controller.isVisible)
     }
@@ -85,23 +86,23 @@ struct HistoryWindowControllerTests {
     @Test func choosingUsesTheGivenCopier() throws {
         let copier = EntryCopierSpy()
         let controller = HistoryWindowController(
-            model: HistoryWindowModel(history: history), copier: copier, monitor: ChangeTrackerSpy(),
-            onOpenSettings: {})
+            model: HistoryWindowModel(history: history), copier: copier, paster: EntryPasterSpy(),
+            monitor: ChangeTrackerSpy(), onOpenSettings: {})
         history.record(text: "older", sourceApp: nil, at: start)
         let older = try #require(history.entries.first)
 
         // A Return that arrives after the window closed copies nothing.
-        controller.choose(older)
+        controller.choose(older, pastes: false)
         #expect(copier.copied.isEmpty)
 
         controller.show()
         copier.succeeds = false
-        controller.choose(older)
+        controller.choose(older, pastes: false)
         #expect(copier.copied == [older.id])
         #expect(controller.isVisible)
 
         copier.succeeds = true
-        controller.choose(older)
+        controller.choose(older, pastes: false)
         #expect(copier.copied == [older.id, older.id])
         #expect(!controller.isVisible)
         // The controller leaves the pasteboard to the copier.
@@ -261,6 +262,7 @@ struct HistoryWindowControllerTests {
         let controller = HistoryWindowController(
             model: HistoryWindowModel(history: history, deleter: deleter),
             copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
+            paster: EntryPasterSpy(),
             monitor: monitor,
             onOpenSettings: {}
         )
@@ -335,14 +337,16 @@ struct HistoryWindowControllerTests {
     }
 }
 
-/// Records which entries the history window asked to copy, and answers with `succeeds`.
+/// Records which entries the history window asked to copy, and answers with `changeCount` while `succeeds`.
 @MainActor
 final class EntryCopierSpy: EntryCopying {
     var succeeds = true
+    /// The change count a successful copy answers with.
+    var changeCount = 1
     private(set) var copied: [ClipboardEntry.ID] = []
 
-    func copy(_ entry: ClipboardEntry) -> Bool {
+    func copy(_ entry: ClipboardEntry) -> Int? {
         copied.append(entry.id)
-        return succeeds
+        return succeeds ? changeCount : nil
     }
 }

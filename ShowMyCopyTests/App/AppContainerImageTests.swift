@@ -95,7 +95,7 @@ struct AppContainerImageTests {
 
             pasteboard.copy("text")
             container.monitor.poll()
-            #expect(container.copier.copy(entry))
+            #expect(container.copier.copy(entry) != nil)
             #expect(pasteboard.writtenPayloads == [.image(Data([0x89, 0x50]), typeIdentifier: "public.png")])
         }
     }

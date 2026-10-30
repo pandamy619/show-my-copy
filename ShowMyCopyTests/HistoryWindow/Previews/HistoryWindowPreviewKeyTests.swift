@@ -82,9 +82,9 @@ struct HistoryWindowPreviewKeyTests {
     @Test func returnChoosesTheSelectedEntryWithOrWithoutPreview() throws {
         let model = makeModel()
         let selected = try #require(model.selectedEntry)
-        #expect(model.handleKey(.return, isCaretAtEnd: true) == .choose(selected))
+        #expect(model.handleKey(.return, isCaretAtEnd: true) == .choose(selected, pastes: false))
         _ = model.handleKey(.right, isCaretAtEnd: true)
-        #expect(model.handleKey(.return, isCaretAtEnd: true) == .choose(selected))
+        #expect(model.handleKey(.return, isCaretAtEnd: true) == .choose(selected, pastes: false))
 
         let empty = HistoryWindowModel(history: InMemoryHistoryStore())
         #expect(empty.handleKey(.return, isCaretAtEnd: true) == .handled)

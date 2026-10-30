@@ -16,6 +16,7 @@ struct HistoryWindowOpenRequestTests {
         HistoryWindowController(
             model: HistoryWindowModel(history: history),
             copier: EntryCopier(history: history, pasteboard: FakePasteboard(), monitor: monitor),
+            paster: EntryPasterSpy(),
             monitor: monitor,
             onOpenSettings: {}
         )

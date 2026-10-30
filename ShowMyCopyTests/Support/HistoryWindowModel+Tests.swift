@@ -40,8 +40,24 @@ final class EntryDeleterSpy: EntryDeleting {
 }
 
 extension HistoryWindowModel {
-    /// A model whose deletions only remove entries from `history`.
-    convenience init(history: any HistoryStore, previews: PreviewServices = PreviewServices()) {
-        self.init(history: history, deleter: EntryDeleterSpy(history: history), previews: previews)
+    /// A model whose deletions only remove entries from `history`. Return only copies unless `pastesAfterChoosing`
+    /// says otherwise.
+    convenience init(
+        history: any HistoryStore,
+        previews: PreviewServices = PreviewServices(),
+        pastesAfterChoosing: @escaping @MainActor () -> Bool = { false }
+    ) {
+        self.init(
+            history: history, deleter: EntryDeleterSpy(history: history), previews: previews,
+            pastesAfterChoosing: pastesAfterChoosing)
+    }
+
+    /// A model with `deleter`, in which Return only copies.
+    convenience init(
+        history: any HistoryStore,
+        deleter: any EntryDeleting,
+        previews: PreviewServices = PreviewServices()
+    ) {
+        self.init(history: history, deleter: deleter, previews: previews, pastesAfterChoosing: { false })
     }
 }

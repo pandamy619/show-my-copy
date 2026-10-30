@@ -197,7 +197,7 @@ struct ClipboardMonitorImageTests {
 
         let older = try #require(history.entries.last)
         let copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor, blobs: inFlight)
-        #expect(copier.copy(older))
+        #expect(copier.copy(older) != nil)
         gate.open()
         await monitor.finishEnriching()
 
@@ -220,7 +220,7 @@ struct ClipboardMonitorImageTests {
 
         let unsaved = try #require(history.entries.last)
         let copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor, blobs: inFlight)
-        #expect(copier.copy(unsaved))
+        #expect(copier.copy(unsaved) != nil)
         #expect(pasteboard.writtenPayloads == [.image(png, typeIdentifier: "public.png")])
         #expect(history.entries.first?.id == unsaved.id)
         #expect(history.currentEntryID == unsaved.id)

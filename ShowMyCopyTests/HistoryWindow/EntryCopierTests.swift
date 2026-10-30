@@ -106,7 +106,7 @@ struct EntryCopierTests {
 
         let copied = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older)
 
-        #expect(!copied)
+        #expect(copied == nil)
         #expect(history.entries.map(\.text) == ["newer", "older"])
         #expect(history.currentEntryID == currentID)
         // The monitor was not told about a write, so a copy made next is still recorded.
@@ -137,7 +137,7 @@ struct EntryCopierTests {
 
         let copier = EntryCopier(
             history: history, pasteboard: pasteboard, monitor: monitor, now: { [start] in start + 5 })
-        #expect(copier.copy(password))
+        #expect(copier.copy(password) != nil)
 
         #expect(pasteboard.writtenTexts == ["hunter2"])
         #expect(pasteboard.writtenConcealed == [true])
@@ -183,17 +183,22 @@ struct EntryCopierTests {
 
         let copier = EntryCopier(
             history: history, pasteboard: pasteboard, monitor: monitor, now: { [start] in start + 60 })
-        #expect(!copier.copy(password))
+        #expect(copier.copy(password) == nil)
         #expect(pasteboard.writtenTexts.isEmpty)
         #expect(history.entries.isEmpty)
     }
 
-    @Test func successfulCopyReturnsTrue() throws {
+    @Test func successfulCopyReturnsTheChangeCountOfItsWrite() throws {
         history.record(text: "older", sourceApp: notes, at: start)
         let monitor = makeMonitor()
         monitor.poll()
         let older = try #require(history.entries.first)
-        #expect(EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older))
+
+        let changeCount = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older)
+
+        // A paste afterwards checks that the pasteboard still has this change count.
+        #expect(changeCount == pasteboard.changeCount)
+        #expect(pasteboard.writtenTexts == ["older"])
     }
 
     @Test func pollsBeforeWritingAndAcknowledgesTheWrite() throws {
@@ -201,7 +206,7 @@ struct EntryCopierTests {
         let older = try #require(history.entries.first)
         let tracker = ChangeTrackerSpy()
 
-        #expect(EntryCopier(history: history, pasteboard: pasteboard, monitor: tracker).copy(older))
+        #expect(EntryCopier(history: history, pasteboard: pasteboard, monitor: tracker).copy(older) != nil)
 
         #expect(pasteboard.writtenTexts == ["older"])
         #expect(tracker.calls == [.poll, .acknowledge(changeCount: pasteboard.changeCount)])
@@ -213,7 +218,7 @@ struct EntryCopierTests {
         let tracker = ChangeTrackerSpy()
         pasteboard.writeFails = true
 
-        #expect(!EntryCopier(history: history, pasteboard: pasteboard, monitor: tracker).copy(older))
+        #expect(EntryCopier(history: history, pasteboard: pasteboard, monitor: tracker).copy(older) == nil)
         #expect(tracker.calls == [.poll])
     }
 
