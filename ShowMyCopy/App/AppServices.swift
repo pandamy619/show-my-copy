@@ -5,9 +5,10 @@ import Foundation
 typealias SettingsWindowFactory = @MainActor (AppSettings) -> any SettingsWindowShowing
 
 /// The services the app runs on that `AppContainer` does not pick itself: the system's clock, pasteboard,
-/// notifications and session state, and what needs a macOS-only framework (images, previews, memory, the shortcut
-/// recorder). The app passes the real ones (`AppServices.live`, next to the macOS implementations), tests pass fakes
-/// from the test target. A new service is a field here, in the group it belongs to, and is used in `AppContainer`.
+/// notifications and session state, and what needs a macOS-only framework (images, previews, memory, pasting into
+/// other apps, the shortcut recorder). The app passes the real ones (`AppServices.live`, next to the macOS
+/// implementations), tests pass fakes from the test target. A new service is a field here, in the group it belongs
+/// to, and is used in `AppContainer`.
 struct AppServices {
     /// The clock, the system's state and its notifications.
     struct System {
@@ -53,9 +54,21 @@ struct AppServices {
         }
     }
 
+    /// Pasting the chosen entry into the app in front (Settings → General → Paste after choosing an entry).
+    struct Paste {
+        /// Whether macOS lets the app post key events, and asking for it.
+        var access: any PasteAccessChecking
+        /// Sends ⌘V.
+        var keystrokes: any PasteKeystrokePosting
+        /// How the paster waits for the history window to give key focus back (`EntryPaster.focusDelay`): exactly,
+        /// unlike polling, which lets macOS delay its wakeups.
+        var sleep: @Sendable (Duration) async throws -> Void
+    }
+
     var pasteboard: any PasteboardReading & PasteboardWriting
     var system: System
     var media: Media
+    var paste: Paste
     /// Reads the app's memory for Settings → Storage.
     var memoryReader: any MemoryUsageReading
     /// The app's login item, for Settings → General → Open at login.
@@ -78,4 +91,7 @@ struct AppSettings {
     let launchAtLogin: LaunchAtLoginSettings
     /// The apps whose copies are never recorded. The clipboard monitor reads the same object.
     let excludedApps: ExcludedApps
+    /// Whether Return pastes the chosen entry, and whether macOS allows it. The history window and the paster read
+    /// the same object.
+    let paste: PasteSettings
 }

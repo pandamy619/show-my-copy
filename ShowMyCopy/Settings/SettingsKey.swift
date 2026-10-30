@@ -10,4 +10,8 @@ enum SettingsKey {
     static let passwordLifetime = "passwords.lifetime"
     /// The apps whose copies are never recorded: an array of dictionaries with a bundle identifier and a name.
     static let excludedApps = "capture.excludedApps"
+    /// Whether Return in the history window pastes the chosen entry after copying it.
+    static let pasteAfterChoosing = "paste.afterChoosing"
+    /// Whether the history window said once that a paste only copied. Removed while the app may paste again.
+    static let pasteDidShowFallbackHint = "paste.didShowFallbackHint"
 }

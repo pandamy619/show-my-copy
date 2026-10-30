@@ -33,22 +33,23 @@ final class EntryCopier: EntryCopying {
     /// A concealed entry is written with the concealed marker, so other clipboard managers skip it, and stays
     /// concealed with its original expiry. A password whose time is up is not copied.
     ///
-    /// Returns false when the content did not end up on the pasteboard. Then the history and the monitor are left as
-    /// they are: whatever is on the pasteboard now is recorded by the next poll as a normal copy.
+    /// Returns the pasteboard's change count after the write: while the pasteboard still has it, it holds this
+    /// entry. Returns nil when the content did not end up on the pasteboard. Then the history and the monitor are left
+    /// as they are: whatever is on the pasteboard now is recorded by the next poll as a normal copy.
     @discardableResult
-    func copy(_ entry: ClipboardEntry) -> Bool {
+    func copy(_ entry: ClipboardEntry) -> Int? {
         monitor.poll()
         let date = now()
         if entry.isConcealed, let expiresAt = entry.expiresAt, expiresAt <= date {
             AppLogger.clipboard.info("Did not copy a password whose time in the history is up")
-            return false
+            return nil
         }
         guard let payload = payload(for: entry.content) else {
-            return false
+            return nil
         }
         guard let changeCount = pasteboard.write(payload, concealed: entry.isConcealed) else {
             AppLogger.clipboard.info("Could not put the picked entry on the pasteboard")
-            return false
+            return nil
         }
         monitor.acknowledge(changeCount: changeCount)
         history.record(
@@ -58,7 +59,7 @@ final class EntryCopier: EntryCopying {
             concealed: entry.isConcealed,
             expiresAt: entry.expiresAt
         )
-        return true
+        return changeCount
     }
 
     /// What to put on the pasteboard for `content`: styled text with its plain text, an image in its original

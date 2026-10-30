@@ -7,6 +7,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     let model: HistoryWindowModel
     private let monitor: any PasteboardChangeTracking
     private let copier: any EntryCopying
+    private let paster: any EntryPasting
     private let onOpenSettings: @MainActor () -> Void
     /// Made when the window first opens and kept for the next time.
     private(set) var panel: HistoryPanel?
@@ -17,11 +18,13 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     init(
         model: HistoryWindowModel,
         copier: any EntryCopying,
+        paster: any EntryPasting,
         monitor: any PasteboardChangeTracking,
         onOpenSettings: @escaping @MainActor () -> Void
     ) {
         self.model = model
         self.copier = copier
+        self.paster = paster
         self.monitor = monitor
         self.onOpenSettings = onOpenSettings
         super.init()
@@ -38,6 +41,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         // and selected.
         monitor.poll()
         model.prepareForPresentation()
+        // A paste that only copied since the window was last open is told about once, now.
+        model.pasteHint = paster.takeFallbackHint()
         // Closing Settings hides the app to return focus to the previous app, and a hidden app shows no windows.
         // Unhide without activating, so the app the user copied from stays in front.
         NSApplication.shared.unhideWithoutActivation()
@@ -60,6 +65,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         model.preview.close()
         // Undo works only while the window is open: a deleted entry's files go now.
         model.finishDeleting()
+        model.pasteHint = nil
     }
 
     func toggle() {
@@ -88,17 +94,23 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         show()
     }
 
-    /// Copies the entry back to the clipboard and closes the window. When the copy fails, the window stays open,
-    /// so the user can try again or pick another entry.
-    func choose(_ entry: ClipboardEntry) {
+    /// Copies the entry back to the clipboard and closes the window, then, when `pastes` is true, pastes it into the
+    /// app in front (`EntryPasting`). When the copy fails, the window stays open, so the user can try again or pick
+    /// another entry, and nothing is pasted.
+    ///
+    /// The window closes before the paste: it has key focus, and ⌘V must reach the app the user was working in.
+    func choose(_ entry: ClipboardEntry, pastes: Bool) {
         // Return can arrive both as a key press and as a submit from the search field.
         guard isVisible else {
             return
         }
-        guard copier.copy(entry) else {
+        guard let changeCount = copier.copy(entry) else {
             return
         }
         hide()
+        if pastes {
+            paster.paste(copiedAt: changeCount)
+        }
     }
 
     /// ⌘⌫, ⌘Z and ⌘P, which reach the panel as key equivalents before the search field or the main menu sees them.
@@ -113,8 +125,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
             return true
         case .ignored:
             return false
-        case .choose(let entry):
-            choose(entry)
+        case .choose(let entry, let pastes):
+            choose(entry, pastes: pastes)
             return true
         case .close:
             hide()
@@ -195,8 +207,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
 
         let content = HistoryContentFactory.makeView(
             model: model,
-            onChoose: { [weak self] entry in
-                self?.choose(entry)
+            onChoose: { [weak self] entry, pastes in
+                self?.choose(entry, pastes: pastes)
             },
             onClose: { [weak self] in
                 self?.hide()

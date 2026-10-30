@@ -269,6 +269,16 @@
         }
       }
     },
+    "Allow it in Privacy & Security → Accessibility in System Settings." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешите это в Системных настройках: «Конфиденциальность и безопасность» → «Универсальный доступ»."
+          }
+        }
+      }
+    },
     "Also remove pinned entries" : {
       "localizations" : {
         "ru" : {
@@ -285,6 +295,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Память приложения"
+          }
+        }
+      }
+    },
+    "Ask macOS for Permission" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запросить разрешение у macOS"
           }
         }
       }
@@ -329,6 +349,26 @@
         }
       }
     },
+    "Copied, not pasted: Show My Copy could not paste into the app." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопировано, но не вставлено: Show My Copy не удалось вставить запись в приложение."
+          }
+        }
+      }
+    },
+    "Copied, not pasted: Show My Copy is not allowed to paste. Allow it in Settings." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопировано, но не вставлено: Show My Copy не разрешено вставлять. Разрешите это в настройках."
+          }
+        }
+      }
+    },
     "Copies from known password managers are skipped unless Save passwords is on." : {
       "localizations" : {
         "ru" : {
@@ -355,6 +395,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Удалить"
+          }
+        }
+      }
+    },
+    "Dismiss" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрыть"
           }
         }
       }
@@ -565,6 +615,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Она удаляется через неделю после того, как была отложена, или сразу кнопкой «Очистить историю»."
+          }
+        }
+      }
+    },
+    "It never reads what you type." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение никогда не читает то, что вы набираете."
           }
         }
       }
@@ -800,6 +860,16 @@
         }
       }
     },
+    "Paste after choosing an entry" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставлять после выбора"
+          }
+        }
+      }
+    },
     "Photo, %@" : {
       "localizations" : {
         "ru" : {
@@ -982,6 +1052,26 @@
         }
       }
     },
+    "Return copies the entry. ⌥Return also pastes it into the app you were using." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Return копирует запись. ⌥Return ещё и вставляет её в приложение, в котором вы работали."
+          }
+        }
+      }
+    },
+    "Return pastes the entry into the app you were using. ⌥Return only copies it." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Return вставляет запись в приложение, в котором вы работали. ⌥Return только копирует её."
+          }
+        }
+      }
+    },
     "Rich text" : {
       "localizations" : {
         "ru" : {
@@ -1108,6 +1198,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "У Show My Copy нет значка в Dock и в строке меню."
+          }
+        }
+      }
+    },
+    "Show My Copy is not allowed to paste, so Return only copies." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show My Copy не разрешено вставлять, поэтому Return только копирует."
+          }
+        }
+      }
+    },
+    "Show My Copy is still allowed to paste." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show My Copy по-прежнему разрешено вставлять."
+          }
+        }
+      }
+    },
+    "Show My Copy sends ⌘V only after you choose an entry and never reads what you type." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show My Copy отправляет ⌘V только после того, как вы выбрали запись, и никогда не читает то, что вы набираете."
           }
         }
       }
@@ -1368,12 +1488,32 @@
         }
       }
     },
+    "To paste, Show My Copy sends ⌘V to the app you were using after you choose an entry." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы вставить запись, Show My Copy после её выбора отправляет ⌘V в приложение, в котором вы работали."
+          }
+        }
+      }
+    },
     "To return to Settings, open Show My Copy again." : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Чтобы вернуться в настройки, снова откройте Show My Copy."
+          }
+        }
+      }
+    },
+    "To take that back, turn it off in Privacy & Security → Accessibility in System Settings." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы отозвать разрешение, выключите его в Системных настройках: «Конфиденциальность и безопасность» → «Универсальный доступ»."
           }
         }
       }

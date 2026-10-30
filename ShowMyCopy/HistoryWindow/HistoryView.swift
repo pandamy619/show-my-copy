@@ -4,7 +4,8 @@ import SwiftUI
 /// Search field and clipboard history list shown in the history panel.
 struct HistoryView: View {
     @Bindable var model: HistoryWindowModel
-    let onChoose: @MainActor (ClipboardEntry) -> Void
+    /// Copies the entry, and pastes it into the app in front when the flag is true.
+    let onChoose: @MainActor (ClipboardEntry, Bool) -> Void
     let onClose: @MainActor () -> Void
     let onOpenSettings: @MainActor () -> Void
 
@@ -23,6 +24,13 @@ struct HistoryView: View {
                 // The window controller shrinks the panel to exactly these rows.
                 emptyState
             } else {
+                if let hint = model.pasteHint {
+                    // Only above a list: the compact panel is exactly as tall as its message row.
+                    PasteHintRow(hint: hint, onOpenSettings: onOpenSettings) {
+                        model.pasteHint = nil
+                    }
+                    Divider()
+                }
                 let previewed = model.previewedEntry
                 // The list stays underneath the preview, so it keeps its scroll position.
                 list(sections: sections, selectedID: selectedID, now: Date())
@@ -163,7 +171,8 @@ struct HistoryView: View {
         // would also choose the entry.
         return HStack(spacing: 0) {
             Button {
-                onChoose(entry)
+                // ⌥-click does the other of what Return does, like ⌥Return.
+                onChoose(entry, model.choosingPastes(isAlternate: NSEvent.modifierFlags.contains(.option)))
             } label: {
                 HistoryRow(
                     entry: entry, isRevealed: isRevealed, isSelected: isSelected, now: now, model: model, icons: icons)
@@ -223,8 +232,8 @@ struct HistoryView: View {
             return .handled
         case .ignored:
             return .ignored
-        case .choose(let entry):
-            onChoose(entry)
+        case .choose(let entry, let pastes):
+            onChoose(entry, pastes)
             return .handled
         case .close:
             onClose()
@@ -247,7 +256,9 @@ struct HistoryView: View {
         case .rightArrow:
             return isEditing ? nil : .right
         case .return:
-            return .return
+            // ⌥Return does the other of what Return does. With ⌘ or ⌃ as well it is plain Return, as before.
+            let isOptionOnly = press.modifiers.intersection([.option, .command, .control]) == .option
+            return isOptionOnly ? .optionReturn : .return
         case .escape:
             return .escape
         default:
@@ -275,7 +286,7 @@ struct HistoryView: View {
 
     private func chooseSelected() {
         if let entry = model.selectedEntry {
-            onChoose(entry)
+            onChoose(entry, model.choosingPastes(isAlternate: false))
         }
     }
 }
@@ -372,7 +383,7 @@ enum HistoryContentFactory {
     @MainActor
     static func makeView(
         model: HistoryWindowModel,
-        onChoose: @escaping @MainActor (ClipboardEntry) -> Void,
+        onChoose: @escaping @MainActor (ClipboardEntry, Bool) -> Void,
         onClose: @escaping @MainActor () -> Void,
         onOpenSettings: @escaping @MainActor () -> Void
     ) -> NSView {

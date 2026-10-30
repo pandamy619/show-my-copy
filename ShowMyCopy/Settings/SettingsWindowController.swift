@@ -28,6 +28,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         Task { [launchAtLogin = settings.launchAtLogin] in
             await launchAtLogin.settingsOpened()
         }
+        // The same for permission to paste, which the user can take back in Privacy & Security at any time.
+        settings.paste.refresh()
         let window = self.window ?? makeWindow()
         self.window = window
         // Closing this window hides the app. Show its windows again.
@@ -53,12 +55,14 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Also when the user comes back from System Settings → Login Items: the app has no Dock icon and is not in the
-    /// app switcher, so they return by clicking this window. Read whether the app opens at login again.
+    /// Also when the user comes back from System Settings → Login Items or Privacy & Security: the app has no Dock
+    /// icon and is not in the app switcher, so they return by clicking this window. Read whether the app opens at
+    /// login and may paste again.
     func windowDidBecomeKey(_ notification: Notification) {
         Task { [launchAtLogin = settings.launchAtLogin] in
             await launchAtLogin.refresh()
         }
+        settings.paste.refresh()
     }
 
     private func makeContent() -> NSViewController {

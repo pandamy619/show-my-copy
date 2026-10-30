@@ -64,11 +64,10 @@ final class AppContainer: HistoryShowing {
         // back.
         let deleter = EntryDeleter(
             history: store, pasteboard: services.pasteboard, monitor: monitor, blobs: media.blobs, now: system.now)
-        // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.
-        let previews = PreviewServices(blobs: media.blobs, images: media.previewImages, richText: media.previewRichText)
         let historyWindow = HistoryWindowController(
-            model: HistoryWindowModel(history: store, deleter: deleter, previews: previews),
+            model: Self.makeHistoryModel(store: store, deleter: deleter, media: media, paste: settings.paste),
             copier: copier,
+            paster: Self.makePaster(services: services, settings: settings.paste),
             monitor: monitor,
             onOpenSettings: { [weak settingsWindow] in
                 settingsWindow?.show()
@@ -109,7 +108,33 @@ final class AppContainer: HistoryShowing {
                 history: history, defaults: defaults, now: services.system.now, pasteboardClearer: pasteboardClearer),
             storage: StorageUsage(history: history, memoryReader: services.memoryReader),
             launchAtLogin: LaunchAtLoginSettings(service: services.loginItem),
-            excludedApps: ExcludedApps(defaults: defaults, running: services.system.runningApps)
+            excludedApps: ExcludedApps(defaults: defaults, running: services.system.runningApps),
+            paste: PasteSettings(defaults: defaults, accessChecker: services.paste.access)
+        )
+    }
+
+    /// The history window's state. Return reads the paste setting each time it is pressed.
+    private static func makeHistoryModel(
+        store: any HistoryStore,
+        deleter: EntryDeleter,
+        media: AppServices.Media,
+        paste: PasteSettings
+    ) -> HistoryWindowModel {
+        // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.
+        let previews = PreviewServices(blobs: media.blobs, images: media.previewImages, richText: media.previewRichText)
+        return HistoryWindowModel(
+            history: store, deleter: deleter, previews: previews, pastesAfterChoosing: { paste.isOn })
+    }
+
+    /// Pastes into the app in front, never into this one.
+    private static func makePaster(services: AppServices, settings: PasteSettings) -> EntryPaster {
+        EntryPaster(
+            pasteboard: services.pasteboard,
+            keystrokes: services.paste.keystrokes,
+            settings: settings,
+            frontmostApp: services.system.frontmostApp,
+            ownBundleIdentifier: Bundle.main.bundleIdentifier,
+            sleep: services.paste.sleep
         )
     }
 

@@ -9,6 +9,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
     let usage: StorageUsage
     let launchAtLogin: LaunchAtLoginSettings
     let excludedApps: ExcludedApps
+    let paste: PasteSettings
     let shortcutRecorder: ShortcutRecorder
 
     /// The entry limit being picked. A lower limit that would delete entries is applied only after the user
@@ -25,6 +26,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
         self.usage = settings.storage
         self.launchAtLogin = settings.launchAtLogin
         self.excludedApps = settings.excludedApps
+        self.paste = settings.paste
         self.shortcutRecorder = shortcutRecorder()
         _entryLimit = State(initialValue: LimitDraft(settings: settings.history, limit: .entries))
         _ageLimit = State(initialValue: LimitDraft(settings: settings.history, limit: .age))
@@ -32,7 +34,7 @@ struct SettingsView<ShortcutRecorder: View>: View {
 
     var body: some View {
         Form {
-            GeneralSettingsSection(launchAtLogin: launchAtLogin)
+            GeneralSettingsSection(launchAtLogin: launchAtLogin, paste: paste)
             shortcutSection
             limitSection
             StorageSection(settings: settings, usage: usage)

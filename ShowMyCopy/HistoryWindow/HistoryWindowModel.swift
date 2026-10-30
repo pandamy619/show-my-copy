@@ -16,7 +16,11 @@ final class HistoryWindowModel {
         case down
         case left
         case right
+        /// Return: copies the selected entry, and pastes it too when Settings → General → Paste after choosing an
+        /// entry is on.
         case `return`
+        /// ⌥Return: the other way round from Return. It only copies while pasting is on, and pastes while it is off.
+        case optionReturn
         case escape
         /// ⌘⌫: deletes the selected entry. Delete without ⌘ edits the search text.
         case delete
@@ -32,8 +36,8 @@ final class HistoryWindowModel {
         case handled
         /// Not for the history window: the search field gets it, for example to move the caret.
         case ignored
-        /// Copy this entry back to the clipboard.
-        case choose(ClipboardEntry)
+        /// Copy this entry back to the clipboard, and paste it into the app in front when `pastes` is true.
+        case choose(ClipboardEntry, pastes: Bool)
         /// Close the history window.
         case close
     }
@@ -45,6 +49,12 @@ final class HistoryWindowModel {
     /// Thumbnails for image rows, loaded as rows appear.
     let thumbnails: ThumbnailProvider
     private let fileAvailability: any FileAvailabilityChecking
+    /// Settings → General → Paste after choosing an entry, read on every Return.
+    private let pastesAfterChoosing: @MainActor () -> Bool
+
+    /// Why the last paste only copied, told once in the window opening now (`EntryPasting.takeFallbackHint()`). The
+    /// view shows it above the list until the user dismisses it; opening or closing the window clears it.
+    var pasteHint: PasteFallback?
 
     var query = "" {
         didSet {
@@ -71,12 +81,18 @@ final class HistoryWindowModel {
     /// Concealed entries the user revealed with the eye button. Hidden again when the window closes or opens.
     private var revealedIDs: Set<ClipboardEntry.ID> = []
 
-    init(history: any HistoryStore, deleter: any EntryDeleting, previews: PreviewServices = PreviewServices()) {
+    init(
+        history: any HistoryStore,
+        deleter: any EntryDeleting,
+        previews: PreviewServices = PreviewServices(),
+        pastesAfterChoosing: @escaping @MainActor () -> Bool
+    ) {
         self.history = history
         self.deleter = deleter
         preview = EntryPreviewModel(services: previews)
         thumbnails = ThumbnailProvider(blobs: previews.blobs, decoder: previews.images)
         fileAvailability = previews.fileAvailability
+        self.pastesAfterChoosing = pastesAfterChoosing
     }
 
     /// What the cached sections were computed from. While it stays the same, so do the entries listed.
@@ -180,8 +196,8 @@ final class HistoryWindowModel {
         }
     }
 
-    /// Clears the search, hides revealed passwords, closes the preview and selects the first row. Called each time
-    /// the window is shown.
+    /// Clears the search, hides revealed passwords and the paste hint, closes the preview and selects the first row.
+    /// Called each time the window is shown.
     func prepareForPresentation() {
         // Undo works only in the window the entry was deleted in.
         deleter.finishDeleting()
@@ -189,7 +205,14 @@ final class HistoryWindowModel {
         concealAll()
         preview.close()
         selectFirst()
+        pasteHint = nil
         presentationCount += 1
+    }
+
+    /// Whether choosing an entry pastes it: as Settings say, or the other way round with ⌥ (`isAlternate`). For
+    /// Return and ⌥Return, and for a click or ⌥-click on a row.
+    func choosingPastes(isAlternate: Bool) -> Bool {
+        pastesAfterChoosing() != isAlternate
     }
 
     /// Handles a key press. `isCaretAtEnd` is false while the caret of the search field is not after its last
@@ -197,8 +220,9 @@ final class HistoryWindowModel {
     ///
     /// Up and Down Arrow move the selection, and the open preview follows it. Right Arrow opens the preview, like
     /// opening a folder in a column view; Left Arrow and Esc close it. Esc with no preview closes the window, and
-    /// Return copies the selected entry back. ⌘⌫ deletes the selected entry and ⌘Z brings it back; with nothing to
-    /// delete or bring back they are left to the search field. ⌘P pins or unpins the selected entry.
+    /// Return copies the selected entry back, and pastes it when Settings say so; ⌥Return does the other. ⌘⌫ deletes
+    /// the selected entry and ⌘Z brings it back; with nothing to delete or bring back they are left to the search
+    /// field. ⌘P pins or unpins the selected entry.
     func handleKey(_ key: Key, isCaretAtEnd: Bool) -> KeyResult {
         switch key {
         case .delete, .undo, .pin:
@@ -227,8 +251,9 @@ final class HistoryWindowModel {
             }
             preview.close()
             return .handled
-        case .return:
-            return selectedEntry.map { .choose($0) } ?? .handled
+        case .return, .optionReturn:
+            let pastes = choosingPastes(isAlternate: key == .optionReturn)
+            return selectedEntry.map { .choose($0, pastes: pastes) } ?? .handled
         }
     }
 
