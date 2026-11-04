@@ -582,6 +582,177 @@ class SignedAppTests(CheckerTestCase):
         self.assertFailsWith(errors, "codesign not found")
 
 
+class SettingsPaneTests(CheckerTestCase):
+    """The one file that may open something: fixed System Settings addresses, and nothing else."""
+
+    PANE = check_security.SETTINGS_PANE_FILE
+    CURRENT = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility"
+    LEGACY = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+    NOT_SETTINGS = "opens an address that does not start with x-apple.systempreferences:"
+    NOT_LITERAL = "opens a URL that is not a literal"
+    ONLY_WORKSPACE = "NSWorkspace may be used here only as"
+    GOOD = textwrap.dedent(
+        """\
+        import AppKit
+
+        /// Opens Privacy & Security → Accessibility with NSWorkspace, never a URL(string: "https://x") or .open(x).
+        @MainActor
+        final class SystemSettingsPane: AccessibilitySettingsOpening {
+            func openAccessibilityList() {
+                let opened: Bool
+                if #available(macOS 26, *) {
+                    opened = Self.showCurrentPane() || Self.showLegacyPane()
+                } else {
+                    opened = Self.showLegacyPane() || Self.showCurrentPane()
+                }
+                if !opened {
+                    AppLogger.app.error("System Settings could not be opened")
+                }
+            }
+
+            /* Both addresses are literals. */
+            private static func showCurrentPane() -> Bool {
+                URL(string: "%s")
+                    .map { NSWorkspace.shared.open($0) } ?? false
+            }
+
+            private static func showLegacyPane() -> Bool {
+                URL(
+                    string: "%s"
+                ).map {
+                    NSWorkspace.shared.open($0)
+                } ?? false
+            }
+        }
+        // Not code: URL(string: "https://x").map { NSWorkspace.shared.open($0) }
+        """
+    ) % (CURRENT, LEGACY)
+
+    def write(self, content: str, relative: str = PANE) -> None:
+        self.fixture.write(relative, content)
+
+    def changed(self, old: str, new: str) -> str:
+        self.assertEqual(self.GOOD.count(old), 1, old)
+        return self.GOOD.replace(old, new)
+
+    def test_allowed_file_passes(self) -> None:
+        self.write(self.GOOD)
+        self.assertEqual(self.fixture.errors(), [])
+
+    def test_same_code_in_another_file_fails(self) -> None:
+        for relative in (
+            "ShowMyCopy/Platform/Settings/OtherPane.swift",
+            "ShowMyCopy/Settings/SystemSettingsPane.swift",
+            "Other/ShowMyCopy/Platform/Settings/SystemSettingsPane.swift",
+            "ShowMyCopy/Platform/Settings/SystemSettingsPane.swift.swift",
+        ):
+            with self.subTest(relative):
+                path = self.fixture.write(relative, self.GOOD)
+                self.assertFailsWith(self.fixture.errors(), relative + ":21: NSWorkspace.shared.open")
+                os.remove(path)
+
+    def test_http_url_fails(self) -> None:
+        for address in ("https://example.com/collect", "file:///etc/passwd", "X-APPLE.SYSTEMPREFERENCES:x",
+                        " x-apple.systempreferences:x", "x-apple.systempreferences"):
+            with self.subTest(address):
+                self.write(self.changed(self.CURRENT, address))
+                self.assertFailsWith(self.fixture.errors(), self.PANE + ":20: " + self.NOT_SETTINGS)
+
+    def test_interpolated_or_built_url_fails(self) -> None:
+        for address in (
+            '"%s&q=\\(text)"' % self.CURRENT,
+            '"%s" + text' % self.CURRENT,
+            '"\\(base)"',
+            '"%s\\u{3F}x"' % self.CURRENT,
+        ):
+            with self.subTest(address):
+                self.write(self.changed('"%s"' % self.CURRENT, address))
+                self.assertFailsWith(self.fixture.errors(), self.PANE + ":20: " + self.NOT_LITERAL)
+
+    def test_url_from_a_variable_fails(self) -> None:
+        cases = {
+            "variable": ('URL(string: "%s")' % self.CURRENT, "URL(string: address)", ":20: " + self.NOT_LITERAL),
+            "constant": ('URL(string: "%s")' % self.CURRENT, "URL(string: Self.address)", ":20: " + self.NOT_LITERAL),
+            "made another way": (
+                'URL(string: "%s")' % self.CURRENT, "URL(fileURLWithPath: path) as URL?", ":20: " + self.NOT_LITERAL
+            ),
+            "changed afterwards": (
+                'URL(string: "%s")\n' % self.CURRENT,
+                'URL(string: "%s")?\n            .appendingPathComponent(text)\n' % self.CURRENT,
+                ":20: " + self.NOT_LITERAL,
+            ),
+            "bound name": (
+                'URL(string: "%s")\n            .map { NSWorkspace.shared.open($0) } ?? false' % self.CURRENT,
+                'guard let url = URL(string: "%s") else { return false }\n'
+                "        return NSWorkspace.shared.open(url)" % self.CURRENT,
+                ":21: " + self.ONLY_WORKSPACE,
+            ),
+            "other value": (
+                "NSWorkspace.shared.open($0) } ?? false", "NSWorkspace.shared.open(userURL) } ?? false",
+                ":21: " + self.ONLY_WORKSPACE,
+            ),
+            "raw string": ('"%s"' % self.CURRENT, '#"%s"#' % self.CURRENT, ": cannot check"),
+        }
+        for name, (old, new, fragment) in cases.items():
+            with self.subTest(name):
+                self.write(self.changed(old, new))
+                self.assertFailsWith(self.fixture.errors(), self.PANE + fragment)
+
+    def test_other_hand_off_api_fails(self) -> None:
+        before = "let opened: Bool"
+        cases = {
+            "openURL": (
+                "final class SystemSettingsPane: AccessibilitySettingsOpening {\n",
+                "final class SystemSettingsPane: AccessibilitySettingsOpening {\n"
+                "    @Environment(\\.openURL) private var openURL\n",
+                ":6: external hand-off API",
+            ),
+            "other NSWorkspace call": (
+                "if !opened {", 'if !NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "") {',
+                ":13: " + self.ONLY_WORKSPACE,
+            ),
+            "NSWorkspace kept aside": (
+                before, "let workspace = NSWorkspace.shared\n        " + before, ":7: " + self.ONLY_WORKSPACE
+            ),
+            "open with options": (
+                "NSWorkspace.shared.open($0) } ?? false",
+                "NSWorkspace.shared.open([$0], withApplicationAt: app, configuration: c) } ?? false",
+                ":21: " + self.ONLY_WORKSPACE,
+            ),
+            "other object": (
+                before, "_ = SharedFiles.current.openFile(path)\n        " + before,
+                ":7: opens something other than a fixed System Settings address",
+            ),
+            "Launch Services": (before, "LSOpenCFURLRef(address, nil)\n        " + before, ":7: Launch Services"),
+            "clipboard": (
+                before, "let text = NSPasteboard.general.string(forType: .string)\n        " + before,
+                ":7: clipboard data",
+            ),
+        }
+        for name, (old, new, fragment) in cases.items():
+            with self.subTest(name):
+                self.write(self.changed(old, new))
+                self.assertFailsWith(self.fixture.errors(), self.PANE + fragment)
+
+    def test_parameters_fail(self) -> None:
+        for old, new in (
+            ("func openAccessibilityList() {", "func openAccessibilityList(_ address: String) {"),
+            ("private static func showCurrentPane() -> Bool {", "private static func showCurrentPane(\n"
+             "        text: String\n    ) -> Bool {"),
+            ("let opened: Bool", "init(text: String) {}\n        let opened: Bool"),
+        ):
+            with self.subTest(new):
+                self.write(self.changed(old, new))
+                self.assertFailsWith(self.fixture.errors(), "takes parameters")
+
+    def test_unreadable_code_fails(self) -> None:
+        for old, new in (("/* Both addresses are literals. */", "/* not closed"),
+                         ('error("System Settings could not be opened")', 'error("not closed)')):
+            with self.subTest(new):
+                self.write(self.changed(old, new))
+                self.assertFailsWith(self.fixture.errors(), self.PANE + ": cannot check")
+
+
 class RealRepositoryTests(unittest.TestCase):
     def test_real_repository_passes(self) -> None:
         # Exactly what `make lint` runs, including the xcodebuild cross-check when Xcode is present.
