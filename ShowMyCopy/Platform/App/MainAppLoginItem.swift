@@ -22,7 +22,8 @@ struct MainAppLoginItem: LoginItemService {
 
     func unregister() async throws(LoginItemError) {
         do {
-            try SMAppService.mainApp.unregister()
+            // The macOS 27 SDK adds an async overload, which a call from an async function picks.
+            try await SMAppService.mainApp.unregister()
         } catch {
             throw .failed
         }
