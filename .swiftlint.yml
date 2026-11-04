@@ -36,6 +36,9 @@ custom_rules:
   # Keep in sync with SOURCE_PATTERNS in scripts/check_security.py.
   no_external_handoff:
     name: "No hand-off to other apps or processes"
+    # The one exception (SECURITY.md): this file opens System Settings at Privacy & Security -> Accessibility.
+    # scripts/check_security.py (SETTINGS_PANE_FILE) checks it instead: fixed System Settings addresses only.
+    excluded: '(^|/)ShowMyCopy/Platform/Settings/SystemSettingsPane\.swift$'
     regex: 'NSWorkspace\s*\.\s*shared\s*\.\s*open|(?<![A-Za-z0-9_])(openApplication|openURL|NSSharingService\w*|ShareLink|NSXPCConnection|CSSearchableIndex|NSUserActivity)(?![A-Za-z0-9_])|(?<![A-Za-z0-9_])Link\s*\(|(?<![A-Za-z0-9_.])[A-Z][A-Za-z0-9_]*\s*\(\s*contentsOf\s*:|\.init\s*\(\s*contentsOf\s*:|contentsOf\s*:\s*URL(?![A-Za-z0-9_])'
     message: "Clipboard data must not leave the app: no opening URLs or apps, sharing, XPC, Spotlight, Handoff or loading from URLs."
     severity: error

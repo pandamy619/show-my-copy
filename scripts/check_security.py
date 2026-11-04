@@ -39,6 +39,14 @@ ENTITLEMENT_ALLOWLIST: Dict[str, object] = {
 # Example: {"ENABLE_USER_SELECTED_FILES": "readonly"}
 ACCESS_SETTING_ALLOWLIST: Dict[str, str] = {}
 
+# The one file that may call NSWorkspace.shared.open (see SECURITY.md): it opens System Settings at Privacy &
+# Security -> Accessibility for the paste setting. Keep in sync with `excluded` of no_external_handoff in
+# .swiftlint.yml. The file may only open fixed SETTINGS_PANE_SCHEME addresses written as plain string literals, in
+# exactly the form `URL(string: "<literal>").map { NSWorkspace.shared.open($0) }`, and takes no parameters
+# (check_settings_pane). Every other file still fails on NSWorkspace.shared.open.
+SETTINGS_PANE_FILE = "ShowMyCopy/Platform/Settings/SystemSettingsPane.swift"
+SETTINGS_PANE_SCHEME = "x-apple.systempreferences:"
+
 # --------------------------------------------------------------------------------------------
 
 SANDBOX_KEY = "com.apple.security.app-sandbox"
@@ -67,13 +75,15 @@ ACCESS_SETTING = re.compile(r"^ENABLE_[A-Z0-9_]*ACCESS[A-Z0-9_]*$|^ENABLE_USER_S
 # Source scan. Boundaries are spelled out instead of \b so the meaning is the same everywhere.
 _B = r"(?<![A-Za-z0-9_])"
 _E = r"(?![A-Za-z0-9_])"
+# The only pattern SETTINGS_PANE_FILE is exempt from; check_settings_pane checks that file instead.
+HANDOFF_LABEL = "NSWorkspace.shared.open"
 SOURCE_PATTERNS: List[Tuple[str, str]] = [
     # Network access.
     (_B + r"(URLSession|URLRequest|NSURLConnection|NWConnection|NWListener|NWPathMonitor|NWBrowser"
      r"|CFSocket|CFStream|WKWebView|SFSafariViewController|getaddrinfo)" + _E, "network API"),
     (_B + r"import\s+(Network|WebKit|SafariServices|CFNetwork)" + _E, "network module import"),
     # Handing data to another process, app or the system (which may send it anywhere).
-    (r"NSWorkspace\s*\.\s*shared\s*\.\s*open", "NSWorkspace.shared.open"),
+    (r"NSWorkspace\s*\.\s*shared\s*\.\s*open", HANDOFF_LABEL),
     (_B + r"(openApplication|openURL|NSSharingService\w*|ShareLink|NSXPCConnection|CSSearchableIndex"
      r"|NSUserActivity)" + _E, "external hand-off API"),
     (_B + r"Link\s*\(", "SwiftUI Link"),
@@ -495,14 +505,149 @@ def check_sources(root: str) -> List[str]:
             continue
         try:
             with open(path, encoding="utf-8") as handle:
-                lines = handle.read().splitlines()
+                text = handle.read()
         except (OSError, UnicodeDecodeError) as error:
             errors.append("cannot read %s: %s" % (path, error))
             continue
-        for number, line in enumerate(lines, 1):
+        where = os.path.relpath(path, root).replace(os.sep, "/")
+        is_pane = where == SETTINGS_PANE_FILE
+        for number, line in enumerate(text.splitlines(), 1):
             for regex, label in compiled:
+                if is_pane and label == HANDOFF_LABEL:
+                    continue
                 if regex.search(line):
-                    errors.append("%s:%d: %s: %s" % (os.path.relpath(path, root), number, label, line.strip()))
+                    errors.append("%s:%d: %s: %s" % (where, number, label, line.strip()))
+        if is_pane:
+            errors.extend(check_settings_pane(text, where))
+    return errors
+
+
+# The only way SETTINGS_PANE_FILE may open something: a URL made from a plain string literal, opened at once. `$0` is
+# the URL just made; it cannot name anything else. Matched in the code without comments.
+_PANE_OPEN = re.compile(
+    r'URL\s*\(\s*string\s*:\s*"([^"\\\n]*)"\s*\)\s*\.\s*map\s*\{\s*'
+    r"NSWorkspace\s*\.\s*shared\s*\.\s*open\s*\(\s*\$0\s*\)\s*\}"
+)
+# Matched in the code without comments and string literals.
+_PANE_PARAMETERS = re.compile(
+    _B + r"(func\s+[^\s(<]+\s*(<[^>{]*>)?|init\s*[?!]?)\s*\((?!\s*\))|" + _B + r"subscript" + _E
+)
+_PANE_FORBIDDEN: List[Tuple[str, str]] = [
+    (_B + r"NSWorkspace" + _E, "NSWorkspace may be used here only as URL(string: \"%s...\").map "
+     "{ NSWorkspace.shared.open($0) }" % SETTINGS_PANE_SCHEME),
+    (_B + r"URL" + _E, "opens a URL that is not a literal: every URL here must be URL(string: \"<literal>\") "
+     "opened at once"),
+    (r"\.\s*open\w*\s*\(", "opens something other than a fixed System Settings address"),
+    (_B + r"LS[A-Z][A-Za-z]*" + _E, "Launch Services call"),
+    (_B + r"(NSAppleEventDescriptor|NSAppleEventManager|AESend\w*)" + _E, "Apple event"),
+    (_B + r"(NSPasteboard|UIPasteboard|Pasteboard\w*|Clipboard\w*)" + _E, "clipboard data"),
+]
+
+
+def _swift_code(text: str) -> Tuple[str, str]:
+    """`text` with comments blanked out, and the same with the contents of string literals blanked out too, so
+    positions stay the same. Fails on what it cannot follow: raw and multi-line strings, unclosed strings or
+    comments."""
+    code, bare = list(text), list(text)
+
+    def blank(chars: list, start: int, end: int) -> None:
+        for index in range(start, end):
+            if chars[index] != "\n":
+                chars[index] = " "
+
+    def line(index: int) -> int:
+        return text.count("\n", 0, index) + 1
+
+    interpolations: List[int] = []  # open parentheses inside each \( ... ) the scan is in
+    string_start = None
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if string_start is not None:
+            if text.startswith("\\(", index):
+                blank(bare, index, index + 2)
+                interpolations.append(0)
+                string_start = None
+                index += 2
+            elif char == "\\":
+                blank(bare, index, index + 2)
+                index += 2
+            elif char == '"':
+                string_start = None
+                index += 1
+            elif char == "\n":
+                raise ValueError("line %d: string not closed" % line(string_start))
+            else:
+                bare[index] = " "
+                index += 1
+            continue
+        if text.startswith("//", index):
+            end = text.find("\n", index)
+            end = len(text) if end < 0 else end
+            blank(code, index, end)
+            blank(bare, index, end)
+            index = end
+        elif text.startswith("/*", index):
+            depth, end = 1, index + 2
+            while depth and end < len(text):
+                if text.startswith("/*", end):
+                    depth, end = depth + 1, end + 2
+                elif text.startswith("*/", end):
+                    depth, end = depth - 1, end + 2
+                else:
+                    end += 1
+            if depth:
+                raise ValueError("line %d: comment not closed" % line(index))
+            blank(code, index, end)
+            blank(bare, index, end)
+            index = end
+        elif text.startswith('"""', index) or text.startswith('#"', index):
+            raise ValueError("line %d: raw and multi-line string literals are not allowed here" % line(index))
+        elif char == '"':
+            string_start = index
+            index += 1
+        else:
+            if interpolations and char == "(":
+                interpolations[-1] += 1
+            elif interpolations and char == ")":
+                if interpolations[-1] == 0:
+                    interpolations.pop()
+                    string_start = index  # back in the string the interpolation is part of
+                else:
+                    interpolations[-1] -= 1
+            index += 1
+    if string_start is not None or interpolations:
+        raise ValueError("string not closed")
+    return "".join(code), "".join(bare)
+
+
+def check_settings_pane(text: str, where: str) -> List[str]:
+    """SETTINGS_PANE_FILE may open only fixed System Settings addresses and take nothing from its callers."""
+    try:
+        code, bare = _swift_code(text)
+    except ValueError as error:
+        return ["%s: cannot check: %s" % (where, error)]
+
+    def line(index: int) -> int:
+        return text.count("\n", 0, index) + 1
+
+    errors = []
+    allowed = []
+    for match in _PANE_OPEN.finditer(code):
+        allowed.append((match.start(), match.end()))
+        if not match.group(1).startswith(SETTINGS_PANE_SCHEME):
+            errors.append("%s:%d: opens an address that does not start with %s: %s"
+                          % (where, line(match.start()), SETTINGS_PANE_SCHEME, match.group(1)))
+    for pattern, label in _PANE_FORBIDDEN:
+        for match in re.finditer(pattern, bare):
+            # Inside an allowed call, only its own `URL` and `NSWorkspace...open(` are fine.
+            if any(start <= match.start() < end for start, end in allowed):
+                continue
+            errors.append("%s:%d: %s" % (where, line(match.start()), label))
+    for match in _PANE_PARAMETERS.finditer(bare):
+        errors.append(
+            "%s:%d: takes parameters; this file must take nothing from its callers" % (where, line(match.start()))
+        )
     return errors
 
 
