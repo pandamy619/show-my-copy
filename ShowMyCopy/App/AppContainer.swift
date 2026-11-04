@@ -109,7 +109,11 @@ final class AppContainer: HistoryShowing {
             storage: StorageUsage(history: history, memoryReader: services.memoryReader),
             launchAtLogin: LaunchAtLoginSettings(service: services.loginItem),
             excludedApps: ExcludedApps(defaults: defaults, running: services.system.runningApps),
-            paste: PasteSettings(defaults: defaults, accessChecker: services.paste.access)
+            paste: PasteSettings(
+                defaults: defaults,
+                accessChecker: services.paste.access,
+                accessibilitySettings: services.paste.systemSettings
+            )
         )
     }
 

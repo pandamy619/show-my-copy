@@ -299,16 +299,6 @@
         }
       }
     },
-    "Ask macOS for Permission" : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Запросить разрешение у macOS"
-          }
-        }
-      }
-    },
     "Blank text" : {
       "localizations" : {
         "ru" : {
@@ -796,6 +786,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Открыть «Объекты входа»…"
+          }
+        }
+      }
+    },
+    "Open Privacy & Security…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть «Конфиденциальность и безопасность»…"
           }
         }
       }

@@ -13,9 +13,10 @@ enum PasteFallback: Equatable, Sendable {
 /// was working in, or only copies it.
 ///
 /// Off by default. Pasting needs the user to allow the app to post key events (`PasteAccessChecking`), and the app
-/// asks for that only when the user turns this on. The setting is saved; the privilege lives in macOS, where the user
-/// can take it back at any time, so it is read again every time Settings open or come to the front and before every
-/// paste, and never saved by the app.
+/// asks for that only when the user turns this on; later the button under the setting opens Privacy & Security →
+/// Accessibility in System Settings (`AccessibilitySettingsOpening`). The setting is saved; the privilege lives in
+/// macOS, where the user can take it back at any time, so it is read again every time Settings open or come to the
+/// front and before every paste, and never saved by the app.
 @MainActor
 @Observable
 final class PasteSettings {
@@ -27,6 +28,7 @@ final class PasteSettings {
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let accessChecker: any PasteAccessChecking
+    @ObservationIgnored private let accessibilitySettings: any AccessibilitySettingsOpening
     /// A paste that fell back to copying and that the history window has not told about yet. Kept in memory: after
     /// a relaunch the user has not just tried to paste.
     @ObservationIgnored private var pendingFallback: PasteFallback?
@@ -36,9 +38,14 @@ final class PasteSettings {
     /// What macOS said last; nil until the first read.
     private(set) var access: Access?
 
-    init(defaults: UserDefaults, accessChecker: any PasteAccessChecking) {
+    init(
+        defaults: UserDefaults,
+        accessChecker: any PasteAccessChecking,
+        accessibilitySettings: any AccessibilitySettingsOpening
+    ) {
         self.defaults = defaults
         self.accessChecker = accessChecker
+        self.accessibilitySettings = accessibilitySettings
         isOn = defaults.object(forKey: SettingsKey.pasteAfterChoosing) as? Bool ?? false
     }
 
@@ -69,9 +76,11 @@ final class PasteSettings {
         update(granted: accessChecker.isGranted())
     }
 
-    /// Asks macOS for the privilege again, for the button under the setting.
-    func requestAccess() {
-        update(granted: accessChecker.request())
+    /// Opens Privacy & Security → Accessibility in System Settings, for the button under the setting. It does not ask
+    /// macOS again: macOS shows its alert only once per app, so after that the user can allow the app only there.
+    /// What they choose shows when Settings come to the front again (`refresh()`).
+    func openAccessibilitySettings() {
+        accessibilitySettings.openAccessibilityList()
     }
 
     /// Whether macOS lets the app post key events now. The paster asks before every paste; the answer also updates

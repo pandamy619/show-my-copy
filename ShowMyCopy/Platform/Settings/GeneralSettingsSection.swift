@@ -45,7 +45,8 @@ struct GeneralSettingsSection: View {
     }
 
     /// The paste toggle and what macOS allows. Turning it on asks macOS for permission to post key events
-    /// (`PasteSettings.setOn(_:)`); the rows below say honestly whether the app has it now.
+    /// (`PasteSettings.setOn(_:)`); the rows below say honestly whether the app has it now, and without it offer to
+    /// open the Accessibility list in System Settings.
     @ViewBuilder private var pasteRows: some View {
         Toggle(
             "Paste after choosing an entry",
@@ -76,8 +77,10 @@ struct GeneralSettingsSection: View {
                 Text("To paste, Show My Copy sends ⌘V to the app you were using after you choose an entry.")
                 Text("It never reads what you type.")
             }
-            Button("Ask macOS for Permission") {
-                paste.requestAccess()
+            // macOS shows its own alert only the first time the app asks (turning the setting on); after that the user
+            // can allow the app only in this list.
+            Button("Open Privacy & Security…") {
+                paste.openAccessibilitySettings()
             }
         } else {
             captions {

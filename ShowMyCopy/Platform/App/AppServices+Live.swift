@@ -3,9 +3,10 @@ import KeyboardShortcuts
 
 extension AppServices {
     /// The services the app runs on: the system pasteboard, clock, notifications and session state, ImageIO and
-    /// QuickLook for images and thumbnails, Core Graphics events for pasting, Mach calls for the app's memory,
-    /// `SMAppService` for opening at login, the workspace's list of open apps, and the SwiftUI settings window with
-    /// the shortcut recorder. This file is the only place that names the macOS implementations the app runs on.
+    /// QuickLook for images and thumbnails, Core Graphics events for pasting and System Settings' Accessibility list
+    /// for allowing it, Mach calls for the app's memory, `SMAppService` for opening at login, the workspace's list of
+    /// open apps, and the SwiftUI settings window with the shortcut recorder. This file is the only place that names
+    /// the macOS implementations the app runs on.
     @MainActor
     static func live(blobs: InFlightBlobStore?) -> AppServices {
         let keystrokes = SystemPasteKeystrokes()
@@ -32,6 +33,7 @@ extension AppServices {
             paste: Paste(
                 access: keystrokes,
                 keystrokes: keystrokes,
+                systemSettings: SystemSettingsPane(),
                 sleep: { duration in
                     try await Task.sleep(for: duration)
                 }
