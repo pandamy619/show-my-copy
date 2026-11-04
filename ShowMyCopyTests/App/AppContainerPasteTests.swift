@@ -8,12 +8,14 @@ import Testing
 struct AppContainerPasteTests {
     private let pasteboard = FakePasteboard()
     private let keystrokes = FakePasteKeystrokes()
+    private let systemSettings = FakeAccessibilitySettings()
     private let textEdit = SourceApp(bundleIdentifier: "com.apple.TextEdit", name: "TextEdit")
 
     private func withContainer(_ body: (AppContainer) async throws -> Void) async throws {
         try await ContainerFactory.withDefaults { defaults in
             let services = ContainerFactory.services(
-                pasteboard: pasteboard, frontmostApp: { [textEdit] in textEdit }, paste: .fake(keystrokes))
+                pasteboard: pasteboard, frontmostApp: { [textEdit] in textEdit },
+                paste: .fake(keystrokes, systemSettings: systemSettings))
             // On the container's clock, so the age limit keeps entries recorded at its time.
             let store = InMemoryHistoryStore(now: { ContainerFactory.date })
             let container = AppContainer(history: .unsaved(store), services: services, defaults: defaults)
@@ -30,6 +32,20 @@ struct AppContainerPasteTests {
             #expect(!container.settings.paste.isOn)
             #expect(keystrokes.requestCount == 0)
             #expect(keystrokes.postCount == 0)
+            #expect(systemSettings.openCount == 0)
+        }
+    }
+
+    /// Settings → General opens the System Settings the services give, so the app opens the real Privacy & Security.
+    @Test func settingsOpenTheSystemSettingsOfTheServices() async throws {
+        try await withContainer { container in
+            container.start()
+            container.settings.paste.setOn(true)
+
+            container.settings.paste.openAccessibilitySettings()
+
+            #expect(systemSettings.openCount == 1)
+            #expect(keystrokes.requestCount == 1)
         }
     }
 

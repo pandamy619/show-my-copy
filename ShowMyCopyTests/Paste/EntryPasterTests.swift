@@ -40,7 +40,7 @@ struct EntryPasterTests {
         defaults: UserDefaults,
         front: Front
     ) -> (EntryPaster, PasteSettings) {
-        let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+        let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
         let paster = EntryPaster(
             pasteboard: pasteboard,
             keystrokes: keystrokes,

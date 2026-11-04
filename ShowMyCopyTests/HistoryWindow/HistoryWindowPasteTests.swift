@@ -188,7 +188,7 @@ struct HistoryWindowPasteTests {
     @Test func aPasswordIsPastedMarkedAsConcealed() async throws {
         try await ContainerFactory.withDefaults { defaults in
             let keystrokes = FakePasteKeystrokes(isAllowed: true)
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
             let textEdit = SourceApp(bundleIdentifier: "com.apple.TextEdit", name: "TextEdit")
             let paster = EntryPaster(
                 pasteboard: pasteboard, keystrokes: keystrokes, settings: settings, frontmostApp: { textEdit },

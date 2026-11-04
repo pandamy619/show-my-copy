@@ -9,7 +9,7 @@ struct PasteSettingsTests {
     @Test func offByDefaultWithoutAskingMacOS() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes()
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
 
             #expect(!settings.isOn)
             #expect(settings.access == nil)
@@ -22,7 +22,7 @@ struct PasteSettingsTests {
     @Test func turningOnAsksMacOSAndShowsTheAnswer() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes()
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
 
             settings.setOn(true)
 
@@ -38,7 +38,7 @@ struct PasteSettingsTests {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes()
             keystrokes.allowsWhenAsked = true
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
 
             settings.setOn(true)
 
@@ -50,7 +50,7 @@ struct PasteSettingsTests {
     @Test func turningOnWhenAlreadyAllowedDoesNotAsk() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes(isAllowed: true)
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
 
             settings.setOn(true)
 
@@ -63,7 +63,7 @@ struct PasteSettingsTests {
     @Test func turningOffNeverAsksAndKeepsShowingThePermission() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes(isAllowed: true)
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
             settings.setOn(true)
 
             settings.setOn(false)
@@ -77,7 +77,7 @@ struct PasteSettingsTests {
     @Test func neverAsksWhileOff() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes()
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
 
             settings.refresh()
             #expect(!settings.checkAccess())
@@ -93,9 +93,9 @@ struct PasteSettingsTests {
     @Test func choiceIsSavedForTheNextLaunch() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes(isAllowed: true)
-            PasteSettings(defaults: defaults, accessChecker: keystrokes).setOn(true)
+            PasteSettings.make(defaults: defaults, keystrokes: keystrokes).setOn(true)
 
-            let relaunched = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let relaunched = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
 
             #expect(relaunched.isOn)
             #expect(defaults.bool(forKey: SettingsKey.pasteAfterChoosing))
@@ -105,7 +105,7 @@ struct PasteSettingsTests {
     @Test func refreshShowsAPermissionTakenBackOrGivenInSystemSettings() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes(isAllowed: true)
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
             settings.setOn(true)
 
             keystrokes.isAllowed = false
@@ -119,24 +119,48 @@ struct PasteSettingsTests {
         }
     }
 
-    @Test func askingAgainShowsTheAnswer() throws {
+    /// macOS shows its own alert only the first time the app asks. After that the button under the setting opens
+    /// Privacy & Security → Accessibility, where the user allows the app, and asks macOS nothing.
+    @Test func theButtonOpensSystemSettingsWithoutAskingAgain() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes()
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let systemSettings = FakeAccessibilitySettings()
+            let settings = PasteSettings.make(
+                defaults: defaults, keystrokes: keystrokes, systemSettings: systemSettings)
             settings.setOn(true)
             #expect(settings.needsAccess)
 
-            keystrokes.allowsWhenAsked = true
-            settings.requestAccess()
+            settings.openAccessibilitySettings()
 
-            #expect(keystrokes.requestCount == 2)
-            #expect(settings.access == .granted)
+            #expect(systemSettings.openCount == 1)
+            #expect(keystrokes.requestCount == 1)
+            // The user allows the app there; Settings show it when they come to the front again.
+            keystrokes.isAllowed = true
+            settings.refresh()
+            #expect(!settings.needsAccess)
+            #expect(systemSettings.openCount == 1)
+        }
+    }
+
+    /// Turning the setting on leaves the first step to macOS's own alert: System Settings open only from the button.
+    @Test func turningOnDoesNotOpenSystemSettings() throws {
+        try TestDefaults.with { defaults in
+            let systemSettings = FakeAccessibilitySettings()
+            let settings = PasteSettings.make(
+                defaults: defaults, keystrokes: FakePasteKeystrokes(), systemSettings: systemSettings)
+
+            settings.setOn(true)
+            settings.refresh()
+            #expect(!settings.checkAccess())
+            settings.setOn(false)
+
+            #expect(systemSettings.openCount == 0)
         }
     }
 
     @Test func fallbackIsToldOnce() throws {
         try TestDefaults.with { defaults in
-            let settings = PasteSettings(defaults: defaults, accessChecker: FakePasteKeystrokes())
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: FakePasteKeystrokes())
 
             #expect(settings.takeFallbackHint() == nil)
             settings.pasteFellBack(.noAccess)
@@ -146,7 +170,7 @@ struct PasteSettingsTests {
             // Told once: later fallbacks, also after a relaunch, are not told again.
             settings.pasteFellBack(.couldNotPost)
             #expect(settings.takeFallbackHint() == nil)
-            let relaunched = PasteSettings(defaults: defaults, accessChecker: FakePasteKeystrokes())
+            let relaunched = PasteSettings.make(defaults: defaults, keystrokes: FakePasteKeystrokes())
             relaunched.pasteFellBack(.noAccess)
             #expect(relaunched.takeFallbackHint() == nil)
         }
@@ -156,7 +180,7 @@ struct PasteSettingsTests {
     @Test func fallbackIsToldAgainAfterTheAppCouldPaste() throws {
         try TestDefaults.with { defaults in
             let keystrokes = FakePasteKeystrokes()
-            let settings = PasteSettings(defaults: defaults, accessChecker: keystrokes)
+            let settings = PasteSettings.make(defaults: defaults, keystrokes: keystrokes)
             settings.pasteFellBack(.noAccess)
             _ = settings.takeFallbackHint()
 

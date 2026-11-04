@@ -1,3 +1,5 @@
+import Foundation
+
 @testable import ShowMyCopy
 
 /// Stands in for Core Graphics: keeps whether the app may post key events, as the user sets it in System Settings,
@@ -43,6 +45,28 @@ final class FakePasteKeystrokes: PasteAccessChecking, PasteKeystrokePosting {
     }
 }
 
+/// Stands in for System Settings: counts how often the app opened Privacy & Security → Accessibility.
+@MainActor
+final class FakeAccessibilitySettings: AccessibilitySettingsOpening {
+    private(set) var openCount = 0
+
+    func openAccessibilityList() {
+        openCount += 1
+    }
+}
+
+extension PasteSettings {
+    /// The paste setting over `keystrokes`, as the user sets it in System Settings, and `systemSettings`, which only
+    /// count how often they were opened.
+    static func make(
+        defaults: UserDefaults,
+        keystrokes: FakePasteKeystrokes,
+        systemSettings: FakeAccessibilitySettings = FakeAccessibilitySettings()
+    ) -> PasteSettings {
+        PasteSettings(defaults: defaults, accessChecker: keystrokes, accessibilitySettings: systemSettings)
+    }
+}
+
 /// Records what the history window asked to paste, without pasting.
 @MainActor
 final class EntryPasterSpy: EntryPasting {
@@ -62,10 +86,18 @@ final class EntryPasterSpy: EntryPasting {
 }
 
 extension AppServices.Paste {
-    /// Not allowed to paste unless `keystrokes` says so, posting nothing, waiting no time.
+    /// Not allowed to paste unless `keystrokes` says so, posting nothing, waiting no time, and System Settings that
+    /// only count how often they were opened.
     @MainActor
-    static func fake(_ keystrokes: FakePasteKeystrokes? = nil) -> AppServices.Paste {
+    static func fake(
+        _ keystrokes: FakePasteKeystrokes? = nil, systemSettings: FakeAccessibilitySettings? = nil
+    ) -> AppServices.Paste {
         let keystrokes = keystrokes ?? FakePasteKeystrokes()
-        return AppServices.Paste(access: keystrokes, keystrokes: keystrokes, sleep: { _ in })
+        return AppServices.Paste(
+            access: keystrokes,
+            keystrokes: keystrokes,
+            systemSettings: systemSettings ?? FakeAccessibilitySettings(),
+            sleep: { _ in }
+        )
     }
 }
