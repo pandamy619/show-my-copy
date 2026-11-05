@@ -43,9 +43,56 @@ ACCESS_SETTING_ALLOWLIST: Dict[str, str] = {}
 # Security -> Accessibility for the paste setting. Keep in sync with `excluded` of no_external_handoff in
 # .swiftlint.yml. The file may only open fixed SETTINGS_PANE_SCHEME addresses written as plain string literals, in
 # exactly the form `URL(string: "<literal>").map { NSWorkspace.shared.open($0) }`, and takes no parameters
-# (check_settings_pane). Every other file still fails on NSWorkspace.shared.open.
+# (check_settings_pane). Every other file is held to NSWORKSPACE_READ_ONLY and OPEN_ALLOWLIST below.
 SETTINGS_PANE_FILE = "ShowMyCopy/Platform/Settings/SystemSettingsPane.swift"
 SETTINGS_PANE_SCHEME = "x-apple.systempreferences:"
+
+# Outside SETTINGS_PANE_FILE, `NSWorkspace` may appear in code only as `NSWorkspace.shared.<member>` with one of these
+# members, or as one of its notification names (`NSWorkspace.<name>Notification`, a Notification.Name constant).
+# Anything else is an error: `NSWorkspace()`, `NSWorkspace.shared` kept in a variable, passed around or injected, the
+# type in a declaration, `NSWorkspace.shared.open...`, `.selectFile`, `.activateFileViewerSelecting`, and so on. With
+# no way to name the type there is no NSWorkspace value to call `open` on. Each member only reads.
+NSWORKSPACE_READ_ONLY: Dict[str, str] = {
+    "runningApplications": "the apps that are running, for Settings -> Excluded Apps (WorkspaceRunningApps)",
+    "frontmostApplication": "the app a copy came from (SourceApp+Frontmost)",
+    "notificationCenter": "the workspace's local notification center, observed for sleep, wake and app launches",
+    "icon": "an app's or file's icon for display, icon(forFile:) and icon(for:) (FileIconProvider, Excluded Apps)",
+    "urlForApplication": "where an excluded app is installed, to show its icon (ExcludedAppsSection)",
+}
+
+# Outside SETTINGS_PANE_FILE, every use of a name whose first camelCase word is `open` (`open`, `openURL`,
+# `openApplication`, `openFile`, `openDocument`, ...) is an error unless the name is listed here. A use is a member
+# (`x.openX`, with or without a call, so also `urls.map(w.open)` and `\.openURL`) or a call (`openX(...)`,
+# `openX { }`). Declaring one (`func openX(`) is not a use. Names that only start with the letters, such as `opened`,
+# `opening...`, `NSOpenPanel` or `sqlite3_open`, are not affected, nor is `open` as a modifier or a parameter label.
+# The names are the app's own. A system API of the same name is harmless or unreachable: the system `open` calls
+# the app may make are CryptoKit's AES.GCM.open (decrypt) and POSIX open (a local file, inside the sandbox), and the
+# one system type whose `open...` calls hand data to other apps is NSWorkspace, which cannot be named (see above).
+OPEN_ALLOWLIST: Dict[str, str] = {
+    "open": "decrypting (SecretSealing, AuthenticatedCipher, WaitingPasswords, StoredEntryCoder), opening the app's "
+            "own stores (HistoryStoreOpener, SwiftDataHistoryPersistence), reading an image (CheckedImageSource), "
+            "showing an entry's preview (EntryPreviewModel), test fakes and gates",
+    "openStore": "HistoryStoreOpener / SwiftDataHistoryPersistence: open the app's own store at a URL it chose",
+    "openDefault": "FileBlobStore / SwiftDataHistoryPersistence: open the app's own store in its container",
+    "openSaved": "InFlightBlobStore: read the app's own list of blobs in flight",
+    "openWaitingPasswords": "PersistentHistoryStore: decrypt saved passwords once the key is available",
+    "openFailed": "error cases of BlobStoreError and HistoryPersistenceError",
+    "openSystemSettings": "LoginItemService: MainAppLoginItem implements it with SMAppService (below)",
+    "openLoginItems": "LaunchAtLoginSettings: forwards to LoginItemService.openSystemSettings",
+    "openAccessibilityList": "AccessibilitySettingsOpening: implemented only by SETTINGS_PANE_FILE",
+    "openAccessibilitySettings": "PasteSettings: forwards to AccessibilitySettingsOpening.openAccessibilityList",
+    "openRequested": "HistoryWindowController: show the app's own history window (hotkey)",
+    "openSettings": "HistoryWindowController: show the app's own Settings window (SwiftUI's action of this name "
+                    "also only opens the app's own Settings scene)",
+    "openCount": "test fake FakePasting: how many times openAccessibilityList ran",
+    "openSystemSettingsCount": "test fake FakeLoginItem: how many times openSystemSettings ran",
+}
+# A system call allowed only on exactly this receiver, written `Receiver.name`: it takes no arguments, so it can carry
+# no data. SMAppService.openSystemSettingsLoginItems() opens System Settings -> General -> Login Items, the place to
+# approve the login item when it needs approval (MainAppLoginItem).
+OPEN_QUALIFIED_ALLOWLIST: Dict[Tuple[str, str], str] = {
+    ("SMAppService", "openSystemSettingsLoginItems"): "opens the fixed Login Items pane, takes no arguments",
+}
 
 # --------------------------------------------------------------------------------------------
 
@@ -75,17 +122,24 @@ ACCESS_SETTING = re.compile(r"^ENABLE_[A-Z0-9_]*ACCESS[A-Z0-9_]*$|^ENABLE_USER_S
 # Source scan. Boundaries are spelled out instead of \b so the meaning is the same everywhere.
 _B = r"(?<![A-Za-z0-9_])"
 _E = r"(?![A-Za-z0-9_])"
-# The only pattern SETTINGS_PANE_FILE is exempt from; check_settings_pane checks that file instead.
-HANDOFF_LABEL = "NSWorkspace.shared.open"
+# The checks SETTINGS_PANE_FILE is exempt from; check_settings_pane checks that file instead, more strictly.
+WORKSPACE_LABEL = "NSWorkspace beyond its read-only members (NSWORKSPACE_READ_ONLY)"
+OPEN_LABEL = "open call that is not in OPEN_ALLOWLIST"
+# Every pattern is matched in the code with comments and string literals blanked out, across line breaks.
 SOURCE_PATTERNS: List[Tuple[str, str]] = [
     # Network access.
     (_B + r"(URLSession|URLRequest|NSURLConnection|NWConnection|NWListener|NWPathMonitor|NWBrowser"
      r"|CFSocket|CFStream|WKWebView|SFSafariViewController|getaddrinfo)" + _E, "network API"),
     (_B + r"import\s+(Network|WebKit|SafariServices|CFNetwork)" + _E, "network module import"),
-    # Handing data to another process, app or the system (which may send it anywhere).
-    (r"NSWorkspace\s*\.\s*shared\s*\.\s*open", HANDOFF_LABEL),
+    # Handing data to another process, app or the system (which may send it anywhere). NSWorkspace and `open...`
+    # calls are checked by check_workspace_and_open_calls.
     (_B + r"(openApplication|openURL|NSSharingService\w*|ShareLink|NSXPCConnection|CSSearchableIndex"
-     r"|NSUserActivity)" + _E, "external hand-off API"),
+     r"|NSUserActivity|NSPerformService)" + _E, "external hand-off API"),
+    (_B + r"LS[A-Z][A-Za-z0-9_]*" + _E, "Launch Services call"),
+    (_B + r"(NSAppleEventDescriptor|NSAppleEventManager|AESend\w*)" + _E, "Apple event"),
+    # Looking up a class or method by a name the scan cannot see (it may be built from strings).
+    (_B + r"(NSClassFromString|NSSelectorFromString|objc_getClass|objc_lookUpClass|objc_msgSend\w*|dlopen|dlsym"
+     r"|NSInvocation)" + _E + r"|(?<![A-Za-z0-9_#])Selector\s*\(", "dynamic lookup"),
     (_B + r"Link\s*\(", "SwiftUI Link"),
     (_B + r"(Process\s*\(|Process\s*\.\s*run|NSTask|NSAppleScript|posix_spawn|system\s*\()", "process execution"),
     # Loading from a URL (may be remote): Data(contentsOf:), String(contentsOf:), contentsOf: URL(...).
@@ -511,15 +565,66 @@ def check_sources(root: str) -> List[str]:
             continue
         where = os.path.relpath(path, root).replace(os.sep, "/")
         is_pane = where == SETTINGS_PANE_FILE
-        for number, line in enumerate(text.splitlines(), 1):
-            for regex, label in compiled:
-                if is_pane and label == HANDOFF_LABEL:
-                    continue
-                if regex.search(line):
-                    errors.append("%s:%d: %s: %s" % (where, number, label, line.strip()))
         if is_pane:
+            # Stricter: fails on raw and multi-line strings too, and says why it cannot check the file.
             errors.extend(check_settings_pane(text, where))
+        try:
+            _, bare = _swift_code(text, strict=False)
+        except ValueError as error:
+            if not is_pane:
+                errors.append("%s: cannot scan: %s" % (where, error))
+            continue
+        found: List[Tuple[int, str]] = []
+        for regex, label in compiled:
+            found.extend((match.start(), label) for match in regex.finditer(bare))
+        if not is_pane:
+            found.extend(check_workspace_and_open_calls(bare))
+        lines = text.split("\n")  # the same line breaks as the line numbers
+        reported = set()
+        for offset, label in sorted(found):
+            number = text.count("\n", 0, offset) + 1
+            if (number, label) not in reported:
+                reported.add((number, label))
+                errors.append("%s:%d: %s: %s" % (where, number, label, lines[number - 1].strip()))
     return errors
+
+
+_WORKSPACE = re.compile(_B + r"NSWorkspace" + _E)
+_WORKSPACE_ALLOWED = re.compile(
+    r"NSWorkspace\s*\.\s*(?:shared\s*\.\s*(?P<member>[A-Za-z_][A-Za-z0-9_]*)|[a-z][A-Za-z0-9_]*Notification)" + _E
+)
+# A name whose first camelCase word is `open`.
+_OPEN_NAME = re.compile(_B + r"open(?:[A-Z0-9_][A-Za-z0-9_]*)?" + _E)
+_IDENTIFIER_BEFORE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*$")
+
+
+def check_workspace_and_open_calls(bare: str) -> List[Tuple[int, str]]:
+    """(offset, label) of every use of NSWorkspace beyond NSWORKSPACE_READ_ONLY and of every `open...` member or call
+    not in OPEN_ALLOWLIST / OPEN_QUALIFIED_ALLOWLIST, in code with comments and strings blanked out (`_swift_code`)."""
+    found = []
+    for match in _WORKSPACE.finditer(bare):
+        allowed = _WORKSPACE_ALLOWED.match(bare, match.start())
+        if allowed is None or (allowed.group("member") is not None
+                               and allowed.group("member") not in NSWORKSPACE_READ_ONLY):
+            found.append((match.start(), WORKSPACE_LABEL))
+    for match in _OPEN_NAME.finditer(bare):
+        name = match.group(0)
+        before = bare[max(0, match.start() - 200):match.start()].rstrip()
+        if before.endswith("."):
+            receiver = _IDENTIFIER_BEFORE.search(before[:-1])
+            if (
+                receiver is not None
+                and (receiver.group(1), name) in OPEN_QUALIFIED_ALLOWLIST
+                and not before[:receiver.start()].rstrip().endswith(".")
+            ):
+                continue
+        elif re.match(r"\s*[({]", bare[match.end():]) is None:
+            continue  # not a member and not a call: a parameter label, a local name or `open class`
+        elif re.search(_B + r"func$", before):
+            continue  # a declaration, not a use
+        if name not in OPEN_ALLOWLIST:
+            found.append((match.start(), OPEN_LABEL))
+    return found
 
 
 # The only way SETTINGS_PANE_FILE may open something: a URL made from a plain string literal, opened at once. `$0` is
@@ -544,42 +649,63 @@ _PANE_FORBIDDEN: List[Tuple[str, str]] = [
 ]
 
 
-def _swift_code(text: str) -> Tuple[str, str]:
+_STRING_OPEN = re.compile(r'(#*)("""|")')
+
+
+def _swift_code(text: str, strict: bool = True) -> Tuple[str, str]:
     """`text` with comments blanked out, and the same with the contents of string literals blanked out too, so
-    positions stay the same. Fails on what it cannot follow: raw and multi-line strings, unclosed strings or
-    comments."""
+    positions stay the same. Backticks around identifiers are blanked in both, so `` `open` `` reads as `open`.
+    Fails on what it cannot follow: unclosed strings or comments and, when `strict`, raw and multi-line strings.
+    Regex literals are not understood; one with a quote in it makes the scan fail, not pass."""
     code, bare = list(text), list(text)
 
     def blank(chars: list, start: int, end: int) -> None:
-        for index in range(start, end):
+        for index in range(start, min(end, len(chars))):
             if chars[index] != "\n":
                 chars[index] = " "
 
     def line(index: int) -> int:
         return text.count("\n", 0, index) + 1
 
-    interpolations: List[int] = []  # open parentheses inside each \( ... ) the scan is in
-    string_start = None
+    # For each \( ... ) the scan is in: the open parentheses inside it and the string to go back to.
+    interpolations: List[List[object]] = []
+    string: Optional[Tuple[int, bool]] = None  # (number of #, multi-line) while inside a string literal
+    string_start = 0
     index = 0
     while index < len(text):
         char = text[index]
-        if string_start is not None:
-            if text.startswith("\\(", index):
-                blank(bare, index, index + 2)
-                interpolations.append(0)
-                string_start = None
-                index += 2
-            elif char == "\\":
-                blank(bare, index, index + 2)
-                index += 2
-            elif char == '"':
-                string_start = None
-                index += 1
-            elif char == "\n":
+        if string is not None:
+            pounds = "#" * string[0]
+            close = ('"""' if string[1] else '"') + pounds
+            if text.startswith("\\" + pounds + "(", index):
+                blank(bare, index, index + len(pounds) + 2)
+                interpolations.append([0, string])
+                string = None
+                index += len(pounds) + 2
+            elif text.startswith("\\" + pounds, index):
+                blank(bare, index, index + len(pounds) + 2)
+                index += len(pounds) + 2
+            elif text.startswith(close, index):
+                string = None
+                index += len(close)
+            elif char == "\n" and not string[1]:
                 raise ValueError("line %d: string not closed" % line(string_start))
             else:
-                bare[index] = " "
+                blank(bare, index, index + 1)
                 index += 1
+            continue
+        opening = _STRING_OPEN.match(text, index)
+        if opening is not None:
+            if strict and (opening.group(1) or opening.group(2) == '"""'):
+                raise ValueError("line %d: raw and multi-line string literals are not allowed here" % line(index))
+            string = (len(opening.group(1)), opening.group(2) == '"""')
+            string_start = index
+            index = opening.end()
+            continue
+        if char == "`":
+            blank(code, index, index + 1)
+            blank(bare, index, index + 1)
+            index += 1
             continue
         if text.startswith("//", index):
             end = text.find("\n", index)
@@ -601,23 +727,19 @@ def _swift_code(text: str) -> Tuple[str, str]:
             blank(code, index, end)
             blank(bare, index, end)
             index = end
-        elif text.startswith('"""', index) or text.startswith('#"', index):
-            raise ValueError("line %d: raw and multi-line string literals are not allowed here" % line(index))
-        elif char == '"':
-            string_start = index
-            index += 1
         else:
             if interpolations and char == "(":
-                interpolations[-1] += 1
+                interpolations[-1][0] += 1
             elif interpolations and char == ")":
-                if interpolations[-1] == 0:
-                    interpolations.pop()
+                if interpolations[-1][0] == 0:
+                    string = interpolations.pop()[1]
                     string_start = index  # back in the string the interpolation is part of
+                    blank(bare, index, index + 1)
                 else:
-                    interpolations[-1] -= 1
+                    interpolations[-1][0] -= 1
             index += 1
-    if string_start is not None or interpolations:
-        raise ValueError("string not closed")
+    if string is not None or interpolations:
+        raise ValueError("line %d: string not closed" % line(string_start))
     return "".join(code), "".join(bare)
 
 
