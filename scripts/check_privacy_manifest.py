@@ -169,7 +169,7 @@ LOOKALIKES: List[Tuple[str, str, Set[str], str]] = [
     (
         _B + r"TIS[A-Z]\w*",
         "Text Input Sources",
-        {"ShowMyCopy/Platform/Paste/SystemPasteKeystrokes.swift"},
+        {"ShowMyCopy/Paste/SystemPasteKeystrokes.swift"},
         "reads the current keyboard layout to find the key that types V for the optional paste. Apple's active "
         "keyboards category lists only UIKit's activeInputModes, the list of enabled keyboards.",
     ),
