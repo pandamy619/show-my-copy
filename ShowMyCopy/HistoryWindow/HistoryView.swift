@@ -24,13 +24,8 @@ struct HistoryView: View {
                 // The window controller shrinks the panel to exactly these rows.
                 emptyState
             } else {
-                if let hint = model.pasteHint {
-                    // Only above a list: the compact panel is exactly as tall as its message row.
-                    PasteHintRow(hint: hint, onOpenSettings: onOpenSettings) {
-                        model.pasteHint = nil
-                    }
-                    Divider()
-                }
+                // Only above a list: the compact panel is exactly as tall as its message row.
+                HistoryNotices(model: model, onOpenSettings: onOpenSettings)
                 let previewed = model.previewedEntry
                 // The list stays underneath the preview, so it keeps its scroll position.
                 list(sections: sections, selectedID: selectedID, now: Date())
@@ -61,6 +56,8 @@ struct HistoryView: View {
         .defaultFocus($isSearchFocused, true)
         .onAppear { isSearchFocused = true }
         .onChange(of: model.presentationCount) { isSearchFocused = true }
+        // Focus stays in the search field, so VoiceOver is told the notice instead of being moved to it.
+        .onChange(of: model.pinLimitNoticeCount) { PinLimitNoticeRow.announce() }
         .onKeyPress(keys: Self.handledKeys) { handleKey($0) }
         .onExitCommand { onClose() }
     }

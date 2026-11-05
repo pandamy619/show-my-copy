@@ -940,6 +940,16 @@
         }
       }
     },
+    "Pinned entries don't count. Up to %lld can be pinned; one more unpins the oldest." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закреплённые записи не учитываются. Закреплённых может быть не больше %lld: новая открепляет самую старую."
+          }
+        }
+      }
+    },
     "Pinned entry" : {
       "localizations" : {
         "ru" : {
@@ -1604,6 +1614,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Открепить"
+          }
+        }
+      }
+    },
+    "Unpinned the oldest pinned entry to keep %lld." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откреплена самая старая запись: закреплённых не больше %lld."
           }
         }
       }

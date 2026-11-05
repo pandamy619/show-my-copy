@@ -113,6 +113,12 @@ struct SettingsView<ShortcutRecorder: View>: View {
                 onConfirm: { entryLimit.confirm() },
                 onCancel: { entryLimit.cancel() }
             )
+        } else {
+            let maximum = RetentionPolicy.maximumPinned
+            Text("Pinned entries don't count. Up to \(maximum) can be pinned; one more unpins the oldest.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

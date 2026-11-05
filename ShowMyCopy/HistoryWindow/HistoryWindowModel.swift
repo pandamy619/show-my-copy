@@ -19,6 +19,19 @@ final class HistoryWindowModel {
     /// view shows it above the list until the user dismisses it; opening or closing the window clears it.
     var pasteHint: PasteFallback?
 
+    /// Whether the last pin or Undo here unpinned the oldest pinned entry to keep `RetentionPolicy.maximumPinned`
+    /// (`noticingPinLimit`). The view shows one line above the list until the user dismisses it.
+    var showsPinLimitNotice = false {
+        didSet {
+            if showsPinLimitNotice {
+                pinLimitNoticeCount += 1
+            }
+        }
+    }
+
+    /// How often the notice was shown, also again while it is on screen, so VoiceOver announces every one.
+    private(set) var pinLimitNoticeCount = 0
+
     var query = "" {
         didSet {
             if query != oldValue {
@@ -169,6 +182,7 @@ final class HistoryWindowModel {
         preview.close()
         selectFirst()
         pasteHint = nil
+        showsPinLimitNotice = false
         presentationCount += 1
     }
 
@@ -346,7 +360,8 @@ extension HistoryWindowModel {
 
     /// Brings back the entry deleted last and selects it, for ⌘Z.
     func undoDelete() {
-        guard let id = deleter.undoDelete() else {
+        // A pinned entry brought back can make one too many pinned (`HistoryStore.restore(_:)`).
+        guard let id = noticingPinLimit(acting: nil, { deleter.undoDelete() }) else {
             return
         }
         let items = items
