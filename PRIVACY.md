@@ -64,4 +64,4 @@ Changes are published in this file, with the date above. Its full history is in 
 
 ## Contact
 
-Questions about privacy: open an issue at <https://github.com/pandamy619/ShowMyCopy/issues>. Please do not include anything you copied, or passwords. To report a security problem privately, see [SECURITY.md](SECURITY.md).
+Questions about privacy: open an issue at <https://github.com/pandamy619/show-my-copy/issues>. Please do not include anything you copied, or passwords. To report a security problem privately, see [SECURITY.md](SECURITY.md).

@@ -23,4 +23,4 @@ Off by default, per 2.4.5(iii). Settings > General > Open at login registers SMA
 KEYCHAIN
 Passwords are not saved by default. If the user turns on Settings > Passwords > Save passwords, they are encrypted with AES-GCM (CryptoKit) and the key is kept in the user's keychain. Nothing else uses the Keychain.
 
-Privacy policy: https://github.com/pandamy619/ShowMyCopy/blob/main/PRIVACY.md
+Privacy policy: https://github.com/pandamy619/show-my-copy/blob/main/PRIVACY.md

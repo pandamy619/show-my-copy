@@ -33,7 +33,7 @@ custom_rules:
     regex: '\b(URLSession|URLRequest|NSURLConnection|NWConnection|NWListener|NWPathMonitor|NWBrowser|CFSocket|CFStream|WKWebView|SFSafariViewController|getaddrinfo)\b|import\s+(Network|WebKit|SafariServices|CFNetwork)\b'
     message: "The app must not access the network."
     severity: error
-  # Mirrors the hand-off part of SOURCE_PATTERNS, NSWORKSPACE_READ_ONLY, OPEN_open|openStore|openDefault|openSaved|openWaitingPasswords|openFailed|openSystemSettings|openLoginItems|openAccessibilityList|openAccessibilitySettings|openRequested|openSettings|openCount|openSystemSettingsCountLIST and OPEN_QUALIFIED_open|openStore|openDefault|openSaved|openWaitingPasswords|openFailed|openSystemSettings|openLoginItems|openAccessibilityList|openAccessibilitySettings|openRequested|openSettings|openCount|openSystemSettingsCountLIST
+  # Mirrors the hand-off part of SOURCE_PATTERNS, NSWORKSPACE_READ_ONLY, OPEN_ALLOWLIST and OPEN_QUALIFIED_ALLOWLIST
   # in scripts/check_security.py; keep them in sync. That script is the one that decides: it reads the code with
   # comments and strings removed and fails on files it cannot read. This rule is the early warning in Xcode.
   no_external_handoff:

@@ -28,7 +28,7 @@ METADATA = os.path.join("AppStore", "metadata")
 REVIEW_NOTES = os.path.join("AppStore", "review-notes.md")
 LOCALES = ["en-US", "ru"]
 # The repository on GitHub: every URL in the metadata points into it, and a privacy policy URL names a file in it.
-REPOSITORY_URL = "https://github.com/pandamy619/ShowMyCopy"
+REPOSITORY_URL = "https://github.com/pandamy619/show-my-copy"
 
 CHARACTERS = "characters"
 BYTES = "bytes"

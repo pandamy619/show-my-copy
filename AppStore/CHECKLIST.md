@@ -22,7 +22,7 @@ look again before you submit, since they change.
 - [ ] Decide your **EU trader status** (Digital Services Act). Without it the app is not offered in the EU. A trader
       must publish an address, phone number and email on the product page.
       [Apple: DSA trader requirements](https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements)
-- [ ] Make sure the GitHub repository is **public** and its URL is `https://github.com/pandamy619/ShowMyCopy`.
+- [ ] Make sure the GitHub repository is **public** and its URL is `https://github.com/pandamy619/show-my-copy`.
       The support, marketing and privacy URLs in `AppStore/metadata` point there. If the name differs, change
       `REPOSITORY_URL` in `scripts/check_store_metadata.py`, the URL files, the contact links in `PRIVACY*.md` and
       the last line of `review-notes.md`; `make lint` finds any you miss.
