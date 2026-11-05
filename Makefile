@@ -6,6 +6,7 @@ lint:
 	swiftlint lint --strict --quiet
 	xcrun swift-format lint --strict --recursive $(SOURCES)
 	./scripts/check_security.sh
+	python3 -I scripts/check_privacy_manifest.py
 	python3 scripts/check_translations.py
 
 format:
@@ -17,12 +18,15 @@ test:
 	xcodebuild test -project ShowMyCopy.xcodeproj -scheme ShowMyCopy -destination 'platform=macOS,arch=arm64' \
 		-testLanguage en -testRegion US -resultBundlePath build/Tests.xcresult -quiet
 
-# Proves every check in check_security.py can fail (fixtures, fake codesign); runs on Linux too.
+# Proves every check in check_security.py and check_privacy_manifest.py can fail (fixtures, fake codesign); runs
+# on Linux too.
 security-selftest:
 	python3 -I scripts/test_check_security.py
+	python3 -I scripts/test_check_privacy_manifest.py
 
 security: build-release
 	./scripts/check_security.sh build/Build/Products/Release/ShowMyCopy.app
+	python3 -I scripts/check_privacy_manifest.py build/Build/Products/Release/ShowMyCopy.app
 
 build-release:
 	xcodebuild build -project ShowMyCopy.xcodeproj -scheme ShowMyCopy -configuration Release \
