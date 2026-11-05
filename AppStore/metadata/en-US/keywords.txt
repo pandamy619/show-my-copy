@@ -1,0 +1,1 @@
+clipboard,history,clipboard manager,paste,pasteboard,hotkey,offline,private,recent,images,files,pin

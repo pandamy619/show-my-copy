@@ -1,0 +1,34 @@
+Show My Copy keeps a history of what you copy on your Mac and brings it back with one shortcut. It has no network access, collects nothing and keeps your history only on this Mac.
+
+ONE HOTKEY AWAY
+Press Option-Command-V (or a shortcut you choose) and your recent copies open on top of any app. Type to search, use the arrow keys to move, press Return to copy an entry back and Escape to close. On macOS 26 and later you can also add a Clipboard History button to Control Center.
+
+TEXT, IMAGES AND FILES
+• Text up to 1 MB per copy, and styled text that keeps its formatting when you copy it back.
+• Images up to 20 MB, with thumbnails.
+• Copied files as references (path and name), never as copies, with thumbnails of photos and videos.
+• Each entry shows the app it came from.
+• Press the Right Arrow for a larger preview: the full image, styled text, or the files with their sizes.
+
+PASTE WHERE YOU WERE TYPING, IF YOU WANT
+Turn on "Paste after choosing an entry" and Return also pastes the entry into the app you were using. It is off by default. macOS asks you to allow it in Privacy & Security; the app then sends Command-V only after you choose an entry, and never reads what you type.
+
+KEEP WHAT MATTERS
+• Pin up to 50 entries: new copies never push them out.
+• Delete a single entry with Command-Delete, and undo with Command-Z.
+• Choose how many entries to keep (10 to 1000, 50 by default) and how much space the history may use.
+
+PRIVATE BY DESIGN
+• No network access: the app runs in the macOS sandbox without it, so it cannot connect anywhere.
+• No analytics, no tracking, no account.
+• History is kept only on this Mac, never synced, and left out of backups.
+• Old copies are removed after 8 hours by default (1 hour to 30 days, or off).
+• Passwords are skipped by default: items that password managers mark as concealed and anything copied from a known password manager. If you choose to keep them, they are hidden in the list, encrypted on disk and removed after 1 minute, 10 minutes or 1 hour.
+• Exclude apps whose copies should never be recorded.
+• Pauses while the Mac sleeps or the screen is locked.
+• Clear the whole history from Settings at any time.
+
+STAYS OUT OF THE WAY
+No Dock icon and no menu bar icon. Open it at login if you like; that is off by default too.
+
+Requires macOS 15 Sequoia or later. In English and Russian.
