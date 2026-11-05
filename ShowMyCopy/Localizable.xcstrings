@@ -609,6 +609,16 @@
         }
       }
     },
+    "Image %@ at %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изображение %@ в %@"
+          }
+        }
+      }
+    },
     "Image, %@" : {
       "localizations" : {
         "ru" : {

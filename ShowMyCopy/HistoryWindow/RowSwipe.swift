@@ -2,8 +2,8 @@ import Foundation
 import Observation
 
 /// Swipe to delete in the history window: a row slides left to show a Delete button, as in Mail. Fed by a two-finger
-/// horizontal scroll on a trackpad (`scroll(_:on:)`) or by dragging the row with the mouse (`drag(_:on:)`); the view
-/// only shows the offset and passes on the scroll events this leaves to the list.
+/// horizontal scroll on a trackpad (`scroll(_:on:)`); the view only shows the offset and passes on the scroll events
+/// this leaves to the list. Dragging a row with the mouse drags its entry out instead (`EntryDrag`).
 ///
 /// Each gesture first moves `axisLockDistance` undecided, then locks to one axis. A horizontal one slides its row, and
 /// the list does not see it or its momentum; a vertical one scrolls the list and closes the row that shows its
@@ -22,7 +22,7 @@ final class RowSwipe {
     static let fullSwipeThreshold: CGFloat = 200
     /// The row never slides further than this.
     static let maximumOffset: CGFloat = 320
-    /// How far the fingers or the mouse move before the gesture locks to swiping a row or scrolling the list.
+    /// How far the fingers move before the gesture locks to swiping a row or scrolling the list.
     static let axisLockDistance: CGFloat = 6
 
     /// A scroll event's gesture phase (`NSEvent.phase`).
@@ -79,7 +79,7 @@ final class RowSwipe {
     private(set) var rowID: ClipboardEntry.ID?
     /// How far `rowID` slid left.
     private(set) var offset: CGFloat = 0
-    /// Whether the fingers or the mouse still move `rowID`.
+    /// Whether the fingers still move `rowID`.
     private(set) var isTracking = false
     @ObservationIgnored private var gesture: Gesture?
     /// Whether the momentum after the last gesture belongs to a row swipe, so the list must not scroll with it.
@@ -94,7 +94,7 @@ final class RowSwipe {
         id == rowID ? offset : 0
     }
 
-    /// Whether the fingers or the mouse move this row now: then it follows them without animation.
+    /// Whether the fingers move this row now: then it follows them without animation.
     func isTracking(_ id: ClipboardEntry.ID) -> Bool {
         isTracking && id == rowID
     }
@@ -131,24 +131,6 @@ final class RowSwipe {
         case .cancelled:
             return end(deletes: false)
         }
-    }
-
-    /// The mouse dragged the row of `id` by `translation` since the button went down.
-    func drag(_ translation: CGSize, on id: ClipboardEntry.ID) {
-        if gesture?.rowID != id {
-            gesture = Gesture(rowID: id, startOffset: offset(of: id))
-        }
-        if let gesture {
-            _ = move(byX: translation.width - gesture.movedX, y: translation.height - gesture.movedY)
-        }
-    }
-
-    /// The mouse button went up after a drag. Returns the entry to delete after a full swipe.
-    func endDrag() -> ClipboardEntry.ID? {
-        if case .delete(let id) = end(deletes: true) {
-            return id
-        }
-        return nil
     }
 
     /// Slides the row back at once and drops the gesture in progress, if any.

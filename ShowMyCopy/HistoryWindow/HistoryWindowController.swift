@@ -14,6 +14,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     /// The resize scheduled by the last change of what the list shows. Tests await it instead of guessing when the
     /// main actor gets to it.
     private(set) var pendingResize: Task<Void, Never>?
+    /// Keeps the panel open while the user drags an entry out of it.
+    private var drag = PanelDragState()
 
     init(
         model: HistoryWindowModel,
@@ -35,6 +37,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     }
 
     func show() {
+        drag.reset()
         let panel = panel ?? makePanel()
         self.panel = panel
         // The monitor polls every half second. Catch up first, so a copy made just before the shortcut is listed
@@ -54,6 +57,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     }
 
     func hide() {
+        // A drag that ends after this leaves the next window alone.
+        drag.reset()
         let wasVisible = isVisible
         panel?.orderOut(nil)
         if wasVisible {
@@ -134,11 +139,35 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// A row is being dragged out of the window (`PanelDragState`). The panel stays open during the drag and closes
+    /// when the entry is dropped in another app, which then has it as if it were pasted there; the clipboard and the
+    /// history are left as they are. A cancelled drag leaves it open.
+    func rowDrag(_ event: RowDragEvent) {
+        switch event {
+        case .began:
+            model.swipe.close()
+            drag.began()
+        case .ended(let dropped):
+            switch drag.ended(dropped: dropped) {
+            case .close:
+                hide()
+            case .stayOpen(let restoresKey):
+                if restoresKey, isVisible {
+                    panel?.makeKeyAndOrderFront(nil)
+                }
+            case .ignore:
+                break
+            }
+        }
+    }
+
     // MARK: - NSWindowDelegate
 
     func windowDidResignKey(_ notification: Notification) {
-        // A click outside the panel or a switch to another app closes it.
-        hide()
+        // A click outside the panel or a switch to another app closes it, but not while the user drags an entry out.
+        if drag.panelResignedKey() {
+            hide()
+        }
     }
 
     // MARK: - Private
@@ -215,6 +244,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
             },
             onOpenSettings: { [weak self] in
                 self?.openSettings()
+            },
+            onDrag: { [weak self] event in
+                self?.rowDrag(event)
             }
         )
         content.frame = background.bounds

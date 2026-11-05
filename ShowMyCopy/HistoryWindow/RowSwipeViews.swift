@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Swipe to delete on a history row: the row slides left over a red Delete button, with a two-finger swipe on a
-/// trackpad or by dragging it with the mouse. `RowSwipe` decides everything; this only draws its state and feeds it
-/// events.
+/// Swipe to delete on a history row: the row slides left over a red Delete button with a two-finger swipe on a
+/// trackpad. `RowSwipe` decides everything; this only draws its state and feeds it events. A mouse drag drags the
+/// entry out of the window instead (`RowDragSource`).
 ///
 /// The Delete button is hidden from VoiceOver: the row already offers the same Delete as an action.
 struct RowSwipeModifier: ViewModifier {
@@ -11,9 +11,6 @@ struct RowSwipeModifier: ViewModifier {
     let model: HistoryWindowModel
 
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
-
-    /// Below this a mouse press stays a click on the row.
-    private static let dragMinimumDistance: CGFloat = 8
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -37,16 +34,6 @@ struct RowSwipeModifier: ViewModifier {
                 }
                 .accessibilityHidden(true)
             }
-            // A drag that moved takes over from the row's click; a press that did not move stays a click.
-            .highPriorityGesture(
-                DragGesture(minimumDistance: Self.dragMinimumDistance, coordinateSpace: .global)
-                    .onChanged { value in
-                        model.swipeDragged(value.translation, on: entry)
-                    }
-                    .onEnded { _ in
-                        model.swipeDragEnded()
-                    }
-            )
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .animation(animates ? .snappy(duration: 0.2) : nil, value: offset)
     }

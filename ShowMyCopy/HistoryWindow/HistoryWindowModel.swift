@@ -13,6 +13,9 @@ final class HistoryWindowModel {
     let thumbnails: ThumbnailProvider
     /// The row swiped to show its Delete button (`HistoryWindowModel+Swipe.swift`).
     let swipe = RowSwipe()
+    /// Where a dragged image is read from when the app it is dropped on asks for it (`EntryDrag`). Without it images
+    /// cannot be dragged.
+    let imageBlobs: (any BlobStore)?
     private let fileAvailability: any FileAvailabilityChecking
     /// Settings → General → Paste after choosing an entry, read on every Return.
     private let pastesAfterChoosing: @MainActor () -> Bool
@@ -71,6 +74,7 @@ final class HistoryWindowModel {
         self.deleter = deleter
         preview = EntryPreviewModel(services: previews)
         thumbnails = ThumbnailProvider(blobs: previews.blobs, decoder: previews.images)
+        imageBlobs = previews.blobs
         fileAvailability = previews.fileAvailability
         self.pastesAfterChoosing = pastesAfterChoosing
     }

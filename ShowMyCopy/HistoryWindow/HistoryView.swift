@@ -8,6 +8,8 @@ struct HistoryView: View {
     let onChoose: @MainActor (ClipboardEntry, Bool) -> Void
     let onClose: @MainActor () -> Void
     let onOpenSettings: @MainActor () -> Void
+    /// A row is being dragged into another app (`RowDragSource`).
+    let onDrag: @MainActor (RowDragEvent) -> Void
 
     @FocusState private var isSearchFocused: Bool
 
@@ -168,17 +170,18 @@ struct HistoryView: View {
         // would also choose the entry.
         return HStack(spacing: 0) {
             Button {
-                // While a row shows its Delete button, a click on any row only closes it, as in Mail.
-                guard !model.closeSwipedRow() else {
-                    return
-                }
-                // ⌥-click does the other of what Return does, like ⌥Return.
-                onChoose(entry, model.choosingPastes(isAlternate: NSEvent.modifierFlags.contains(.option)))
+                rowClicked(entry, isAlternate: NSEvent.modifierFlags.contains(.option))
             } label: {
                 HistoryRow(
                     entry: entry, isRevealed: isRevealed, isSelected: isSelected, now: now, model: model, icons: icons)
             }
             .buttonStyle(.plain)
+            // Dragging the row with the mouse drags its entry into another app.
+            .modifier(
+                RowDragModifier(entry: entry, model: model, onDrag: onDrag) { isAlternate in
+                    rowClicked(entry, isAlternate: isAlternate)
+                }
+            )
             .modifier(RowContextMenu(entry: entry, model: model))
             .modifier(PreviewAccessibility(entry: entry, model: model))
             .modifier(PinAccessibility(entry: entry, model: model))
@@ -201,6 +204,15 @@ struct HistoryView: View {
         // Swipe left to delete; the selection slides with the row.
         .modifier(RowSwipeModifier(entry: entry, model: model))
         .id(entry.id)
+    }
+
+    /// A click on the row of `entry` chooses it. ⌥-click (`isAlternate`) does the other of what Return does, like
+    /// ⌥Return. While a row shows its Delete button, a click on any row only closes it, as in Mail.
+    private func rowClicked(_ entry: ClipboardEntry, isAlternate: Bool) {
+        guard !model.closeSwipedRow() else {
+            return
+        }
+        onChoose(entry, model.choosingPastes(isAlternate: isAlternate))
     }
 
     private func handleKey(_ press: KeyPress) -> KeyPress.Result {
@@ -370,9 +382,11 @@ enum HistoryContentFactory {
         model: HistoryWindowModel,
         onChoose: @escaping @MainActor (ClipboardEntry, Bool) -> Void,
         onClose: @escaping @MainActor () -> Void,
-        onOpenSettings: @escaping @MainActor () -> Void
+        onOpenSettings: @escaping @MainActor () -> Void,
+        onDrag: @escaping @MainActor (RowDragEvent) -> Void
     ) -> NSView {
-        let view = HistoryView(model: model, onChoose: onChoose, onClose: onClose, onOpenSettings: onOpenSettings)
+        let view = HistoryView(
+            model: model, onChoose: onChoose, onClose: onClose, onOpenSettings: onOpenSettings, onDrag: onDrag)
         let hostingView = NSHostingView(rootView: view)
         // The panel sets the size, not the SwiftUI content: the window controller switches between the compact and
         // the full size, and the hosting view follows through its autoresizing mask.

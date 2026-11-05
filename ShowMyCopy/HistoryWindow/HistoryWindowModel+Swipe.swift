@@ -16,18 +16,6 @@ extension HistoryWindowModel {
         }
     }
 
-    /// The mouse dragged the row of `entry` by `translation` since the button went down.
-    func swipeDragged(_ translation: CGSize, on entry: ClipboardEntry) {
-        swipe.drag(translation, on: entry.id)
-    }
-
-    /// The mouse button went up after dragging a row. A full swipe deletes the entry, like ⌘⌫.
-    func swipeDragEnded() {
-        if let id = swipe.endDrag() {
-            deleteSwiped(id)
-        }
-    }
-
     /// Closes the row that shows its Delete button, for a click on any row: then the click does nothing else.
     /// Returns whether a listed row showed its button.
     @discardableResult
