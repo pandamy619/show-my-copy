@@ -35,3 +35,35 @@ struct PinAccessibility: ViewModifier {
         }
     }
 }
+
+/// The row's context menu: Show Preview, Pin or Unpin, and Delete.
+struct RowContextMenu: ViewModifier {
+    let entry: ClipboardEntry
+    let model: HistoryWindowModel
+
+    func body(content: Content) -> some View {
+        content
+            .contextMenu {
+                if EntryPreviewModel.canPreview(entry) {
+                    Button("Show Preview") {
+                        model.showPreview(of: entry)
+                    }
+                }
+                if entry.isPinned {
+                    Button("Unpin") {
+                        model.togglePin(entry)
+                    }
+                } else {
+                    // A password keeps its own expiry, which a pin would outlast.
+                    Button("Pin") {
+                        model.togglePin(entry)
+                    }
+                    .disabled(!HistoryWindowModel.canPin(entry))
+                }
+                // Also the current entry: deleting it empties the clipboard when it still holds it.
+                Button("Delete", role: .destructive) {
+                    model.delete(entry)
+                }
+            }
+    }
+}

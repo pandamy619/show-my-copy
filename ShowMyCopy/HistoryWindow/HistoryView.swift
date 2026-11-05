@@ -175,28 +175,7 @@ struct HistoryView: View {
                     entry: entry, isRevealed: isRevealed, isSelected: isSelected, now: now, model: model, icons: icons)
             }
             .buttonStyle(.plain)
-            .contextMenu {
-                if EntryPreviewModel.canPreview(entry) {
-                    Button("Show Preview") {
-                        model.showPreview(of: entry)
-                    }
-                }
-                if entry.isPinned {
-                    Button("Unpin") {
-                        model.togglePin(entry)
-                    }
-                } else {
-                    // A password keeps its own expiry, which a pin would outlast.
-                    Button("Pin") {
-                        model.togglePin(entry)
-                    }
-                    .disabled(!HistoryWindowModel.canPin(entry))
-                }
-                // Also the current entry: deleting it empties the clipboard when it still holds it.
-                Button("Delete", role: .destructive) {
-                    model.delete(entry)
-                }
-            }
+            .modifier(RowContextMenu(entry: entry, model: model))
             .modifier(PreviewAccessibility(entry: entry, model: model))
             .modifier(PinAccessibility(entry: entry, model: model))
             .accessibilityAction(named: Text("Delete")) {
