@@ -23,6 +23,8 @@ struct AppServices {
         var isSessionActive: @MainActor () -> Bool
         /// The apps open now, offered in Settings → Excluded apps.
         var runningApps: any RunningAppsListing
+        /// Picks any app for Settings → Excluded apps (an open panel).
+        var appChooser: any AppChoosing
     }
 
     /// Images, thumbnails and previews. Each is nil when it is not available: then images are not recorded, files

@@ -108,7 +108,12 @@ final class AppContainer: HistoryShowing {
                 history: history, defaults: defaults, now: services.system.now, pasteboardClearer: pasteboardClearer),
             storage: StorageUsage(history: history, memoryReader: services.memoryReader),
             launchAtLogin: LaunchAtLoginSettings(service: services.loginItem),
-            excludedApps: ExcludedApps(defaults: defaults, running: services.system.runningApps),
+            excludedApps: ExcludedApps(
+                defaults: defaults,
+                running: services.system.runningApps,
+                chooser: services.system.appChooser,
+                ownBundleIdentifier: Bundle.main.bundleIdentifier
+            ),
             paste: PasteSettings(
                 defaults: defaults,
                 accessChecker: services.paste.access,

@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ is excluded already." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ уже в списке исключённых."
+          }
+        }
+      }
+    },
     "%lld days" : {
       "localizations" : {
         "en" : {
@@ -319,6 +329,26 @@
         }
       }
     },
+    "Choose an App…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбрать приложение…"
+          }
+        }
+      }
+    },
+    "Choose an app whose copies are never recorded." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выберите приложение, копии из которого никогда не сохраняются."
+          }
+        }
+      }
+    },
     "Clear History…" : {
       "localizations" : {
         "ru" : {
@@ -405,6 +435,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Записи старше этого срока удаляются автоматически. Закреплённые записи сохраняются."
+          }
+        }
+      }
+    },
+    "Exclude" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Исключить"
           }
         }
       }
@@ -1172,6 +1212,16 @@
         }
       }
     },
+    "Show My Copy cannot be excluded." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show My Copy нельзя исключить."
+          }
+        }
+      }
+    },
     "Show My Copy could not be added to Login Items." : {
       "localizations" : {
         "ru" : {
@@ -1328,6 +1378,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сохранённую историю не удалось прочитать, поэтому начата новая."
+          }
+        }
+      }
+    },
+    "This app has no bundle identifier, so it cannot be excluded." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У этого приложения нет идентификатора пакета, поэтому его нельзя исключить."
           }
         }
       }

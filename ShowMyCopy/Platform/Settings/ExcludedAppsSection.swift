@@ -4,17 +4,16 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Settings → Excluded apps: the apps whose copies are never read or recorded, with their icons, a button to remove
-/// each and a menu of the apps open now to add one.
-///
-/// Apps are added from the apps that are open, not with an open panel: in the sandbox an open panel needs the
-/// user-selected files entitlement, which the app does not have. An app's copies only matter while it runs, so the
-/// apps open now are the ones worth adding.
+/// each, a menu of the apps open now to add one quickly, and Choose an App… for any installed app (an open panel,
+/// `ApplicationOpenPanel`).
 struct ExcludedAppsSection: View {
     let apps: ExcludedApps
 
     /// The open apps that can be added. Read again when the list changes and when an app launches or quits while
     /// Settings is open.
     @State private var addable: [ExcludedApp] = []
+    /// Why the app picked last was not added, until the next pick or the list changes.
+    @State private var chooseNote: ChosenAppOutcome?
 
     var body: some View {
         Section("Excluded apps") {
@@ -27,7 +26,16 @@ struct ExcludedAppsSection: View {
                     apps.remove(app)
                 }
             }
-            addMenu
+            HStack {
+                addMenu
+                chooseButton
+            }
+            if let chooseNote, let text = Self.note(for: chooseNote) {
+                text
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Nothing is read from the clipboard while one of these apps is in front.")
                 // The built-in list (`PasswordManager`) is not shown here; this matches the rule in Passwords above.
@@ -56,9 +64,36 @@ struct ExcludedAppsSection: View {
         .onAppear(perform: refreshAddable)
         .onChange(of: apps.apps) {
             refreshAddable()
+            chooseNote = nil
         }
         .onReceive(Self.runningAppsChanged) { _ in
             refreshAddable()
+        }
+    }
+
+    /// Any app, with an open panel. Disabled while the panel is open, so there is one at a time.
+    private var chooseButton: some View {
+        Button("Choose an App…") {
+            chooseNote = nil
+            Task {
+                chooseNote = await apps.chooseApp()
+            }
+        }
+        .fixedSize()
+        .disabled(apps.isChoosing)
+    }
+
+    /// Why the chosen app was not added; nothing when it was.
+    private static func note(for outcome: ChosenAppOutcome) -> Text? {
+        switch outcome {
+        case .added:
+            nil
+        case .alreadyExcluded(let app):
+            Text("\(app.name) is excluded already.")
+        case .noBundleIdentifier:
+            Text("This app has no bundle identifier, so it cannot be excluded.")
+        case .thisApp:
+            Text("Show My Copy cannot be excluded.")
         }
     }
 

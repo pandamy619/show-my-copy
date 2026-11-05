@@ -52,6 +52,9 @@ protocol RunningAppsListing {
 final class ExcludedApps {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let running: any RunningAppsListing
+    @ObservationIgnored private let chooser: any AppChoosing
+    /// This app's own bundle identifier: it cannot be added.
+    @ObservationIgnored private let ownBundleIdentifier: String?
 
     /// Sorted by name.
     private(set) var apps: [ExcludedApp] {
@@ -63,9 +66,16 @@ final class ExcludedApps {
     /// The lower-cased bundle identifiers of `apps`, so the check on every copy does not walk the list.
     @ObservationIgnored private var identifiers: Set<String>
 
-    init(defaults: UserDefaults, running: any RunningAppsListing) {
+    /// Whether the user is choosing an app with `chooseApp()`, so Settings show one chooser at a time.
+    private(set) var isChoosing = false
+
+    init(
+        defaults: UserDefaults, running: any RunningAppsListing, chooser: any AppChoosing, ownBundleIdentifier: String?
+    ) {
         self.defaults = defaults
         self.running = running
+        self.chooser = chooser
+        self.ownBundleIdentifier = ownBundleIdentifier
         let apps = Self.stored(in: defaults)
         self.apps = apps
         identifiers = Set(apps.map(\.id))
@@ -104,6 +114,35 @@ final class ExcludedApps {
         var seen = identifiers
         let addable = running.runningApps().compactMap(ExcludedApp.init).filter { seen.insert($0.id).inserted }
         return Self.sorted(addable)
+    }
+
+    /// Lets the user pick an app (an open panel) and adds it with `add(chosen:)`. Nil when they cancel, or while
+    /// a chooser is open already, which is left as it is.
+    func chooseApp() async -> ChosenAppOutcome? {
+        guard !isChoosing else {
+            return nil
+        }
+        isChoosing = true
+        defer { isChoosing = false }
+        guard let chosen = await chooser.chooseApp() else {
+            return nil
+        }
+        return add(chosen: chosen)
+    }
+
+    /// Adds the app the user picked, unless it has no bundle identifier, is this app or is in the list already.
+    func add(chosen: ChosenApp) -> ChosenAppOutcome {
+        guard let app = ExcludedApp(bundleIdentifier: chosen.bundleIdentifier, name: chosen.name) else {
+            return .noBundleIdentifier
+        }
+        if let ownBundleIdentifier, app.id == ownBundleIdentifier.lowercased() {
+            return .thisApp
+        }
+        if let existing = apps.first(where: { $0.id == app.id }) {
+            return .alreadyExcluded(existing)
+        }
+        add(app)
+        return .added(app)
     }
 
     // MARK: - Saved list

@@ -2,9 +2,10 @@ import Foundation
 
 /// A copied file or folder: where it was and what it was called, never its contents.
 ///
-/// The app is sandboxed and asks for no file access, so it keeps only what the pasteboard says: the file URL. It
-/// cannot keep a security-scoped bookmark (that needs the user to pick the file in an open panel and a bookmark
-/// entitlement), so it cannot follow a file that is moved. Copying the entry back puts the same file URL on the
+/// The app is sandboxed and asks for no access to copied files (its one file entitlement is for picking an app in
+/// Settings), so it keeps only what the pasteboard says: the file URL. It cannot keep a security-scoped bookmark
+/// (that needs the user to pick the file in an open panel and a bookmark entitlement), so it cannot follow a file
+/// that is moved. Copying the entry back puts the same file URL on the
 /// pasteboard; the app that pastes it, such as Finder, opens the file with its own rights.
 ///
 /// A photo or video may have a thumbnail, made once when it was copied (see `FileThumbnailIngestor`): after a
