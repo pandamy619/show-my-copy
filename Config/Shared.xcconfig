@@ -26,7 +26,9 @@ ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO
 // Xcode signs a build it cannot sign with a team "to run locally" and then adds com.apple.security.get-task-allow,
 // which lets a debugger attach. A Release build must never carry it (`make security` rejects it). Turning the
 // injection off also drops the entitlements Xcode builds from ENABLE_APP_SANDBOX, so the app's entitlements are
-// spelled out in Config/ShowMyCopy.entitlements (CODE_SIGN_ENTITLEMENTS on the app target).
+// spelled out in Config/ShowMyCopy.entitlements (CODE_SIGN_ENTITLEMENTS on the app target). The app target's own
+// ENABLE_USER_SELECTED_FILES = readonly says the same as that file, so Xcode shows what the app is signed with;
+// scripts/check_security.py checks that they agree and that no other target has it.
 CODE_SIGN_INJECT_BASE_ENTITLEMENTS[config=Release] = NO
 
 // One version for the app and everything it embeds: an app extension must match its app's version.

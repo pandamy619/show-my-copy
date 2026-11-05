@@ -28,16 +28,37 @@ PROJECT = "ShowMyCopy.xcodeproj"
 # --------------------------------------------------------------------------------------------
 
 # Every entitlement a signed app, extension, XPC service or entitlements file may carry, with
-# the exact value it must have. Anything else is an error. To allow e.g. user-selected read-only
-# files, add: "com.apple.security.files.user-selected.read-only": True
+# the exact value it must have. Anything else is an error.
 ENTITLEMENT_ALLOWLIST: Dict[str, object] = {
     "com.apple.security.app-sandbox": True,
 }
 
+# The app target, and the one entitlements file it signs with. Only these may carry APP_ENTITLEMENT_ALLOWLIST and
+# APP_ACCESS_SETTING_ALLOWLIST: no extension, XPC service, other target or other entitlements file.
+APP_TARGET = "ShowMyCopy"
+APP_ENTITLEMENTS_FILE = "Config/ShowMyCopy.entitlements"
+
+# Entitlements the app itself may carry on top of ENTITLEMENT_ALLOWLIST, with the exact value.
+APP_ENTITLEMENT_ALLOWLIST: Dict[str, object] = {
+    # Settings -> Excluded apps -> Choose an App... picks an app with NSOpenPanel and reads only its bundle
+    # identifier and name (SECURITY.md). Read-write stays forbidden.
+    "com.apple.security.files.user-selected.read-only": True,
+}
+
 # Build settings that grant file or resource access (ENABLE_*_ACCESS*, ENABLE_USER_SELECTED_FILES)
-# and the value they may have. Empty: the app needs no such access.
-# Example: {"ENABLE_USER_SELECTED_FILES": "readonly"}
+# and the value they may have in every target. Empty: no target needs such access.
 ACCESS_SETTING_ALLOWLIST: Dict[str, str] = {}
+
+# The same for the app target only. Each setting stands for an entitlement in APP_ENTITLEMENTS_FILE, and the two
+# must agree (APP_ACCESS_SETTING_ENTITLEMENTS): Xcode shows and, where it injects entitlements, signs what the
+# setting says, while the file is what Release is signed with (CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO).
+APP_ACCESS_SETTING_ALLOWLIST: Dict[str, str] = {
+    "ENABLE_USER_SELECTED_FILES": "readonly",
+}
+APP_ACCESS_SETTING_ENTITLEMENTS: Dict[str, Tuple[str, str]] = {
+    # setting: (value that grants it, entitlement it grants)
+    "ENABLE_USER_SELECTED_FILES": ("readonly", "com.apple.security.files.user-selected.read-only"),
+}
 
 # The one file that may call NSWorkspace.shared.open (see SECURITY.md): it opens System Settings at Privacy &
 # Security -> Accessibility for the paste setting. Keep in sync with `excluded` of no_external_handoff in
@@ -152,17 +173,22 @@ SKIP_DIRS = {".git", "build", ".build", "DerivedData"}
 # ------------------------------------------------------------------ entitlements
 
 
-def check_entitlements(ents: object, where: str, require_sandbox: bool) -> List[str]:
-    """Compare an entitlement dictionary against the exact allowlist."""
+def check_entitlements(ents: object, where: str, require_sandbox: bool, is_app: bool = False) -> List[str]:
+    """Compare an entitlement dictionary against the exact allowlist; is_app adds APP_ENTITLEMENT_ALLOWLIST."""
     if not isinstance(ents, dict):
         return ["%s: entitlements are not a dictionary" % where]
+    allowed = dict(ENTITLEMENT_ALLOWLIST, **APP_ENTITLEMENT_ALLOWLIST) if is_app else ENTITLEMENT_ALLOWLIST
     errors = []
     for key in sorted(ents):
         value = ents[key]
-        if key not in ENTITLEMENT_ALLOWLIST:
-            errors.append("%s: entitlement %s is not allowed" % (where, key))
-        elif not _same_value(value, ENTITLEMENT_ALLOWLIST[key]):
-            errors.append("%s: entitlement %s must be %r, found %r" % (where, key, ENTITLEMENT_ALLOWLIST[key], value))
+        if key not in allowed:
+            if key in APP_ENTITLEMENT_ALLOWLIST:
+                errors.append("%s: entitlement %s is not allowed (only the app %s may carry it, in %s)"
+                              % (where, key, APP_TARGET, APP_ENTITLEMENTS_FILE))
+            else:
+                errors.append("%s: entitlement %s is not allowed" % (where, key))
+        elif not _same_value(value, allowed[key]):
+            errors.append("%s: entitlement %s must be %r, found %r" % (where, key, allowed[key], value))
     if require_sandbox and ents.get(SANDBOX_KEY) is not True:
         errors.append("%s: %s must be boolean true" % (where, SANDBOX_KEY))
     return errors
@@ -173,13 +199,23 @@ def _same_value(actual: object, expected: object) -> bool:
     return type(actual) is type(expected) and actual == expected
 
 
-def check_entitlements_file(path: str, where: str) -> List[str]:
+def read_entitlements_file(path: str, where: str) -> Tuple[Optional[object], List[str]]:
     try:
         with open(path, "rb") as handle:
-            ents = plistlib.load(handle)
+            return plistlib.load(handle), []
     except (OSError, ValueError, plistlib.InvalidFileException) as error:
-        return ["%s: cannot read entitlements file %s (%s)" % (where, path, error)]
-    return check_entitlements(ents, where, require_sandbox=False)
+        return None, ["%s: cannot read entitlements file %s (%s)" % (where, path, error)]
+
+
+def check_entitlements_file(path: str, where: str, is_app: bool = False) -> List[str]:
+    ents, errors = read_entitlements_file(path, where)
+    if errors:
+        return errors
+    return check_entitlements(ents, where, require_sandbox=False, is_app=is_app)
+
+
+def _is_app_entitlements_file(root: str, path: str) -> bool:
+    return os.path.normpath(os.path.abspath(path)) == os.path.normpath(os.path.join(root, APP_ENTITLEMENTS_FILE))
 
 
 # ------------------------------------------------------------------ project.pbxproj
@@ -428,6 +464,7 @@ def check_target_settings(
     def values(key: str) -> List[str]:
         return by_key.get(key, [])
 
+    is_app = target == APP_TARGET and product_type == APPLICATION_PRODUCT_TYPE
     errors = []
     sandboxed = product_type not in LIBRARY_PRODUCT_TYPES
     if sandboxed:
@@ -451,24 +488,58 @@ def check_target_settings(
             errors.append("%s: %s weakens the hardened runtime" % (where, key))
         if ACCESS_SETTING.match(key):
             for value in found:
-                if value not in DISABLED_VALUES and ACCESS_SETTING_ALLOWLIST.get(key) != value:
-                    errors.append("%s: %s = %s grants access that is not allowlisted" % (where, key, value))
+                if value in DISABLED_VALUES or ACCESS_SETTING_ALLOWLIST.get(key) == value:
+                    continue
+                if is_app and APP_ACCESS_SETTING_ALLOWLIST.get(key) == value:
+                    continue
+                errors.append("%s: %s = %s grants access that is not allowlisted" % (where, key, value))
     for value in values("OTHER_CODE_SIGN_FLAGS"):
         if "--entitlements" in value:
             errors.append("%s: OTHER_CODE_SIGN_FLAGS must not pass --entitlements" % where)
     for value in values("CODE_SIGN_ENTITLEMENTS"):
         if value:
-            errors.extend(_check_entitlements_setting(root, where, value))
+            errors.extend(_check_entitlements_setting(root, where, value, values if is_app else None))
     return errors
 
 
-def _check_entitlements_setting(root: str, where: str, value: str) -> List[str]:
+def _check_entitlements_setting(root: str, where: str, value: str, app_values=None) -> List[str]:
+    """Check the file CODE_SIGN_ENTITLEMENTS names. app_values (the settings' values) is given for the app target:
+    then the file must agree with the app's access settings, and it may carry APP_ENTITLEMENT_ALLOWLIST if it is
+    APP_ENTITLEMENTS_FILE."""
     path = re.sub(r"^\$[({](SRCROOT|PROJECT_DIR|SOURCE_ROOT)[)}]/?", "", value)
     if "$" in path:
         return ["%s: CODE_SIGN_ENTITLEMENTS = %s cannot be resolved" % (where, value)]
     if not os.path.isabs(path):
         path = os.path.join(root, path)
-    return check_entitlements_file(path, "%s CODE_SIGN_ENTITLEMENTS" % where)
+    where_file = "%s CODE_SIGN_ENTITLEMENTS" % where
+    is_app = app_values is not None and _is_app_entitlements_file(root, path)
+    ents, errors = read_entitlements_file(path, where_file)
+    if errors:
+        return errors
+    errors = check_entitlements(ents, where_file, require_sandbox=False, is_app=is_app)
+    if app_values is not None and isinstance(ents, dict):
+        errors.extend(_check_access_settings_agree(where, ents, app_values))
+    return errors
+
+
+def _check_access_settings_agree(where: str, ents: dict, values) -> List[str]:
+    """The app's access settings and its entitlements file grant the same: one without the other means Xcode shows
+    (and in Debug signs) something else than what Release is signed with."""
+    errors = []
+    for key, (granting, entitlement) in sorted(APP_ACCESS_SETTING_ENTITLEMENTS.items()):
+        found = values(key)
+        if any("$" in value for value in found):
+            errors.append("%s: %s uses a build setting variable, which this checker does not resolve" % (where, key))
+            continue
+        setting_grants = bool(found) and all(value == granting for value in found)
+        file_grants = ents.get(entitlement) is True
+        if setting_grants != file_grants:
+            errors.append(
+                "%s: %s = %s and %s in %s disagree: set %s = %s exactly when the file carries it"
+                % (where, key, " / ".join(found) or "(not set)", entitlement,
+                   APP_ENTITLEMENTS_FILE, key, granting)
+            )
+    return errors
 
 
 def check_packages(objects: dict) -> List[str]:
@@ -547,7 +618,8 @@ def check_entitlement_files(root: str) -> List[str]:
     errors = []
     for path in _walk(root):
         if path.endswith(".entitlements"):
-            errors.extend(check_entitlements_file(path, os.path.relpath(path, root)))
+            where = os.path.relpath(path, root)
+            errors.extend(check_entitlements_file(path, where, is_app=_is_app_entitlements_file(root, path)))
     return errors
 
 
@@ -828,7 +900,8 @@ def check_signed_app(app: str) -> List[str]:
     if verify.returncode != 0:
         details = verify.stderr.decode(errors="replace").strip()
         errors.append("%s fails codesign --verify --strict --deep: %s" % (app, details))
-    for path, kind in [(app, "sandboxed")] + nested_code(app):
+    # Only the app's own signature may carry APP_ENTITLEMENT_ALLOWLIST, not the code it embeds.
+    for path, kind in [(app, "app")] + nested_code(app):
         where = os.path.relpath(path, os.path.dirname(os.path.abspath(app)))
         ents, problem = _signed_entitlements(path)
         if ents is None:
@@ -840,7 +913,7 @@ def check_signed_app(app: str) -> List[str]:
                     "%s: libraries and frameworks must not carry entitlements, found %s" % (where, sorted(ents))
                 )
             continue
-        errors.extend(check_entitlements(ents, where, require_sandbox=True))
+        errors.extend(check_entitlements(ents, where, require_sandbox=True, is_app=kind == "app"))
         if not _has_hardened_runtime(path):
             errors.append("%s: hardened runtime flag is not set" % where)
     return errors
