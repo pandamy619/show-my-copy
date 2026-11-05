@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     private var container: AppContainer?
+    /// What other copies of the app ask this one, once it knows it is the copy that runs.
+    private var runningCopySignals: RunningCopySignals?
     /// How the Control Center button reaches the container, which is made only once the history has loaded.
     private let historyRequests = HistoryRequests()
 
@@ -31,11 +33,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Before anything reads the clipboard or opens the history: two processes on one saved history would each
         // save every copy, and the next launch would list it twice.
-        if Self.anotherInstanceIsRunning() {
-            AppLogger.app.info("Another copy of the app is running; quitting this one")
-            NSApplication.shared.terminate(nil)
-            return
+        let duplicateLaunch = DuplicateLaunch(
+            anotherIsRunning: { Self.anotherInstanceIsRunning() },
+            signals: DistributedInstanceSignals(),
+            sleep: { duration in
+                try await Task.sleep(for: duration)
+            },
+            replacement: Self.debugBuildReplacement
+        )
+        Task {
+            guard await duplicateLaunch.resolve() == .keepRunning else {
+                NSApplication.shared.terminate(nil)
+                return
+            }
+            listenToOtherCopies()
+            launch()
         }
+    }
+
+    #if DEBUG
+        /// Debug builds only: a newer Debug build, such as the next run from Xcode at another place, asks this one to
+        /// quit and takes over. The name is not in Release builds, so they neither post nor observe it and no app
+        /// can quit them; `make security` fails if the Release app contains it (`DEBUG_ONLY_STRINGS`).
+        private static let debugBuildReplacement: DebugBuildReplacement? = DebugBuildReplacement(
+            quitRequest: Notification.Name("com.pandamy619.ShowMyCopy.debug.quitForNewerDebugBuild"))
+    #else
+        private static let debugBuildReplacement: DebugBuildReplacement? = nil
+    #endif
+
+    private func listenToOtherCopies() {
+        let signals = RunningCopySignals(notifications: DistributedNotificationObserver(), now: { .now })
+        signals.listen(
+            showSettings: { [weak self] in
+                self?.showSettings()
+            },
+            replacement: Self.debugBuildReplacement,
+            quit: {
+                NSApplication.shared.terminate(nil)
+            }
+        )
+        runningCopySignals = signals
+    }
+
+    private func launch() {
         let firstLaunch = FirstLaunch()
         // Before anything opens the history: development builds saved it in a format that is gone.
         if let applicationSupport = HistoryFolder.applicationSupport() {
