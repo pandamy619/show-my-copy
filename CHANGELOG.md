@@ -50,11 +50,12 @@ First version, 0.1.0. Not released yet. Requires macOS 15 Sequoia or later.
 ### App
 
 - No menu bar or Dock icon. Sandboxed without network access: the app itself makes no connections. Its only other entitlement, user-selected read-only files, is used by Choose an App… in Settings → Excluded apps; the Control Center extension does not have it.
-- Only one copy of the app runs at a time. The app has no icon that would show a copy already running, such as the installed app while a build from another folder starts, so a second one quits at launch before it reads the clipboard or the history; the one already running keeps going.
+- Only one copy of the app runs at a time. The app has no icon that would show a copy already running, such as the installed app while a build from another folder starts, so a second one quits at launch before it reads the clipboard or the history; the one already running keeps going and shows its Settings, so you can see it is there (at most once every 3 seconds). Opening the same app again from Finder, Spotlight or Launchpad shows its Settings too.
 - Settings open on first launch and explain how to open the history, with a button to quit the app.
 - Settings → General → Open at login, off by default: the app opens when you log in, as a login item macOS keeps for the app itself (`SMAppService`, no helper app). The app never turns it on by itself; the first launch's Settings offer it once, with a line next to the toggle. The toggle shows what macOS says each time Settings open or come back to the front, so turning the app off in System Settings → General → Login Items shows there too. When macOS wants your approval first, Settings say so, with a button that opens Login Items; a change that fails shows a short note.
 - English and Russian localization.
 
 ### Development builds
 
+- A Debug build replaces a Debug build that is already running, such as the next run from Xcode next to a Debug build from another folder: the running one quits and the new one keeps running. A Release copy, such as the installed app at login, never quits when asked; a Debug build started next to it quits after a few seconds, the installed app shows its Settings, and the log says to quit it with `pkill -x ShowMyCopy` first.
 - Saved history from development builds is reset. The saved format now has one layout for every kind of entry and no versions; the first launch of this build deletes the history that earlier development builds saved (the database with its side files, a damaged copy and the saved images) without reading it, and starts empty. The history now lives in `Application Support/ShowMyCopy/History`.

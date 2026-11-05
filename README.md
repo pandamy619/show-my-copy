@@ -57,10 +57,12 @@ Settings every target shares (Swift 6 with complete concurrency checking, warnin
 | `make test` | unit tests (Swift Testing) |
 | `make lint` | SwiftLint + swift-format, strict; security and translation checks |
 | `make format` | auto-format |
-| `make security` | build Release with ad-hoc signing and check its entitlements |
+| `make security` | build Release with ad-hoc signing and check its entitlements and that it has no Debug-only code |
 | `make security-selftest` | check that every security check can fail (runs on Linux too) |
 
 `make lint` needs SwiftLint: `brew install swiftlint`.
+
+Only one copy of the app runs at a time. A Debug build run from Xcode replaces a Debug build that is already running; next to a Release copy, such as the installed app at login, it quits after a few seconds and the installed app shows its Settings. Quit that copy first: `pkill -x ShowMyCopy`.
 
 ## License
 
