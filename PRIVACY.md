@@ -32,7 +32,7 @@ While the app runs it also holds the history in memory. Deleted entries can stay
 
 Nothing. The app has no network access, contains no analytics, advertising or crash-reporting code, and has no account or sign-in. Nothing you copy, no setting and no usage data is sent to the developer or to anyone else, and nothing is shared or sold.
 
-Some work is done for the app by macOS itself, outside the app's sandbox: macOS QuickLook draws the thumbnails of copied photos and videos (only for files stored on your Mac), and the system clipboard is shared by all apps. What macOS does is covered by [Apple's privacy policy](https://www.apple.com/legal/privacy/). If you download the app from the Mac App Store, Apple may collect information about the download under its own policy; the developer only sees what App Store Connect shows to every developer, such as download counts.
+Some work is done for the app by macOS itself, outside the app's sandbox: macOS QuickLook draws the thumbnails of copied photos and videos (only for files stored on your Mac), and the system clipboard is shared by all apps and, with Handoff on, by macOS with your other Apple devices (Universal Clipboard). A password the app copies back from its history is marked so that it is kept off Universal Clipboard. What macOS does is covered by [Apple's privacy policy](https://www.apple.com/legal/privacy/). If you download the app from the Mac App Store, Apple may collect information about the download under its own policy; the developer only sees what App Store Connect shows to every developer, such as download counts.
 
 ## Permissions
 
