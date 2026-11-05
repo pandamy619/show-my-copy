@@ -25,7 +25,9 @@ struct WorkspaceRunningAppsTests {
 
     @Test func finderCanBeAddedFromTheOpenApps() throws {
         try TestDefaults.with { defaults in
-            let apps = ExcludedApps(defaults: defaults, running: WorkspaceRunningApps())
+            let apps = ExcludedApps(
+                defaults: defaults, running: WorkspaceRunningApps(), chooser: FakeAppChooser(),
+                ownBundleIdentifier: Bundle.main.bundleIdentifier)
             let finder = try #require(apps.addableApps().first { $0.id == "com.apple.finder" })
 
             apps.add(finder)

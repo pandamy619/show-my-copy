@@ -6,6 +6,13 @@ import Testing
 @MainActor
 struct ExcludedAppsTests {
     private let running = FakeRunningApps()
+    private let chooser = FakeAppChooser()
+    private static let ownBundleIdentifier = "com.pandamy619.ShowMyCopy"
+
+    private func make(_ defaults: UserDefaults) -> ExcludedApps {
+        ExcludedApps(
+            defaults: defaults, running: running, chooser: chooser, ownBundleIdentifier: Self.ownBundleIdentifier)
+    }
 
     private func app(_ bundleIdentifier: String, _ name: String) throws -> ExcludedApp {
         try #require(ExcludedApp(bundleIdentifier: bundleIdentifier, name: name))
@@ -13,7 +20,7 @@ struct ExcludedAppsTests {
 
     @Test func nothingIsExcludedAtFirst() throws {
         try TestDefaults.with { defaults in
-            let apps = ExcludedApps(defaults: defaults, running: running)
+            let apps = make(defaults)
             #expect(apps.apps.isEmpty)
             #expect(!apps.excludes(bundleIdentifier: "com.apple.TextEdit"))
             #expect(!apps.excludes(bundleIdentifier: nil))
@@ -22,7 +29,7 @@ struct ExcludedAppsTests {
 
     @Test func addedAppIsExcludedWithoutRegardToLetterCase() throws {
         try TestDefaults.with { defaults in
-            let apps = ExcludedApps(defaults: defaults, running: running)
+            let apps = make(defaults)
             apps.add(try app("com.apple.TextEdit", "TextEdit"))
 
             #expect(apps.excludes(bundleIdentifier: "com.apple.TextEdit"))
@@ -33,11 +40,11 @@ struct ExcludedAppsTests {
 
     @Test func listSurvivesARelaunch() throws {
         try TestDefaults.with { defaults in
-            let apps = ExcludedApps(defaults: defaults, running: running)
+            let apps = make(defaults)
             apps.add(try app("com.apple.TextEdit", "TextEdit"))
             apps.add(try app("com.apple.Notes", "Notes"))
 
-            let relaunched = ExcludedApps(defaults: defaults, running: running)
+            let relaunched = make(defaults)
 
             #expect(relaunched.apps.map(\.name) == ["Notes", "TextEdit"])
             #expect(relaunched.apps.map(\.bundleIdentifier) == ["com.apple.Notes", "com.apple.TextEdit"])
@@ -47,7 +54,7 @@ struct ExcludedAppsTests {
 
     @Test func removedAppIsRecordedAgainAfterARelaunch() throws {
         try TestDefaults.with { defaults in
-            let apps = ExcludedApps(defaults: defaults, running: running)
+            let apps = make(defaults)
             let textEdit = try app("com.apple.TextEdit", "TextEdit")
             apps.add(textEdit)
             apps.add(try app("com.apple.Notes", "Notes"))
@@ -56,13 +63,13 @@ struct ExcludedAppsTests {
 
             #expect(!apps.excludes(bundleIdentifier: "com.apple.TextEdit"))
             #expect(apps.apps.map(\.name) == ["Notes"])
-            #expect(ExcludedApps(defaults: defaults, running: running).apps.map(\.name) == ["Notes"])
+            #expect(make(defaults).apps.map(\.name) == ["Notes"])
         }
     }
 
     @Test func addingAnAppTwiceKeepsOneEntry() throws {
         try TestDefaults.with { defaults in
-            let apps = ExcludedApps(defaults: defaults, running: running)
+            let apps = make(defaults)
             apps.add(try app("com.apple.TextEdit", "TextEdit"))
             apps.add(try app("COM.APPLE.TEXTEDIT", "Text Edit"))
 
@@ -72,7 +79,7 @@ struct ExcludedAppsTests {
 
     @Test func listIsSortedByName() throws {
         try TestDefaults.with { defaults in
-            let apps = ExcludedApps(defaults: defaults, running: running)
+            let apps = make(defaults)
             apps.add(try app("com.apple.TextEdit", "TextEdit"))
             apps.add(try app("com.example.zed", "zed"))
             apps.add(try app("com.apple.Notes", "notes"))
@@ -95,7 +102,7 @@ struct ExcludedAppsTests {
                 ] as [Any],
                 forKey: SettingsKey.excludedApps)
 
-            let apps = ExcludedApps(defaults: defaults, running: running)
+            let apps = make(defaults)
 
             #expect(apps.apps.map(\.name) == ["com.apple.Notes", "TextEdit"])
         }
@@ -104,7 +111,7 @@ struct ExcludedAppsTests {
     @Test func savedValueOfAnotherTypeMeansNoApps() throws {
         try TestDefaults.with { defaults in
             defaults.set("com.apple.TextEdit", forKey: SettingsKey.excludedApps)
-            #expect(ExcludedApps(defaults: defaults, running: running).apps.isEmpty)
+            #expect(make(defaults).apps.isEmpty)
         }
     }
 
@@ -137,7 +144,7 @@ struct ExcludedAppsTests {
                 SourceApp(bundleIdentifier: "com.apple.safari", name: "Safari again"),
                 SourceApp(bundleIdentifier: "com.apple.Notes", name: "Notes"),
             ]
-            let apps = ExcludedApps(defaults: defaults, running: running)
+            let apps = make(defaults)
             apps.add(try app("com.apple.TextEdit", "TextEdit"))
 
             #expect(apps.addableApps().map(\.name) == ["Notes", "Safari"])

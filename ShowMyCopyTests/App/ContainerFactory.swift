@@ -31,6 +31,7 @@ enum ContainerFactory {
         distributed: any NotificationObserving = FakeNotifications(),
         isScreenLocked: @escaping @MainActor () -> Bool = { false },
         runningApps: any RunningAppsListing = FakeRunningApps(),
+        appChooser: any AppChoosing = FakeAppChooser(),
         media: AppServices.Media = .none,
         settingsWindow: SettingsWindowSpy = SettingsWindowSpy(),
         loginItem: FakeLoginItem = FakeLoginItem(),
@@ -47,7 +48,8 @@ enum ContainerFactory {
                 distributedNotifications: distributed,
                 isScreenLocked: isScreenLocked,
                 isSessionActive: { true },
-                runningApps: runningApps
+                runningApps: runningApps,
+                appChooser: appChooser
             ),
             media: media,
             paste: paste,

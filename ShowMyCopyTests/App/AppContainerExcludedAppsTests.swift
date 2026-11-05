@@ -13,6 +13,7 @@ struct AppContainerExcludedAppsTests {
         now: { ContainerFactory.date })
     private let front = FrontApp()
     private let running = FakeRunningApps()
+    private let chooser = FakeAppChooser()
     private let textEdit = SourceApp(bundleIdentifier: "com.apple.TextEdit", name: "TextEdit")
 
     /// The app a test puts in front.
@@ -23,7 +24,7 @@ struct AppContainerExcludedAppsTests {
 
     private func withContainer(defaults: UserDefaults, _ body: (AppContainer) throws -> Void) rethrows {
         let services = ContainerFactory.services(
-            pasteboard: pasteboard, frontmostApp: { [front] in front.app }, runningApps: running)
+            pasteboard: pasteboard, frontmostApp: { [front] in front.app }, runningApps: running, appChooser: chooser)
         let container = AppContainer(history: .unsaved(store), services: services, defaults: defaults)
         defer { container.monitor.stop() }
         container.start()
@@ -45,6 +46,28 @@ struct AppContainerExcludedAppsTests {
                 #expect(store.entries.map(\.text) == ["recorded"])
                 #expect(store.currentEntryID == nil)
             }
+        }
+    }
+
+    @Test func appChosenInSettingsIsSkippedFromTheNextCopy() async throws {
+        try await ContainerFactory.withDefaults { defaults in
+            let services = ContainerFactory.services(
+                pasteboard: pasteboard, frontmostApp: { [front] in front.app }, runningApps: running,
+                appChooser: chooser)
+            let container = AppContainer(history: .unsaved(store), services: services, defaults: defaults)
+            defer { container.monitor.stop() }
+            container.start()
+            front.app = textEdit
+            pasteboard.copy("recorded")
+            container.monitor.poll()
+
+            chooser.chosen = ChosenApp(bundleIdentifier: "com.apple.TextEdit", name: "TextEdit")
+            #expect(await container.settings.excludedApps.chooseApp() != nil)
+            pasteboard.copy("private note")
+            container.monitor.poll()
+
+            #expect(store.entries.map(\.text) == ["recorded"])
+            #expect(chooser.count == 1)
         }
     }
 
