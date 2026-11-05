@@ -3,8 +3,9 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// Swipe to delete in the history window deletes like ⌘⌫, also pinned entries and passwords, and the swiped row
-/// closes when the user types, presses a key, changes the selection or clicks a row.
+/// Swiping a row in the history window opens it as wide as its action buttons; a full swipe deletes like ⌘⌫, also
+/// pinned entries and passwords, and the swiped row closes when the user types, presses a key, changes the selection
+/// or clicks a row.
 @MainActor
 struct HistoryWindowSwipeTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
@@ -25,6 +26,9 @@ struct HistoryWindowSwipeTests {
         return model
     }
 
+    /// How far a full swipe goes on a row with Show Preview, Pin and Delete.
+    private let fullSwipe = RowSwipe.fullSwipeThreshold(actionsWidth: RowSwipe.actionsWidth(buttonCount: 3))
+
     private func entry(_ text: String, in model: HistoryWindowModel) throws -> ClipboardEntry {
         try #require(model.items.first { $0.text == text })
     }
@@ -42,7 +46,7 @@ struct HistoryWindowSwipeTests {
         let model = makeModel()
         let third = try entry("third", in: model)
 
-        swipeLeft(RowSwipe.fullSwipeThreshold, on: third, in: model)
+        swipeLeft(fullSwipe, on: third, in: model)
 
         #expect(deleter.deletedIDs == [third.id])
         #expect(model.items.map(\.text) == ["fourth", "second", "first"])
@@ -50,14 +54,24 @@ struct HistoryWindowSwipeTests {
         #expect(model.swipe.swipedRowID == nil)
     }
 
-    @Test func aShorterSwipeOnlyShowsTheButton() throws {
+    @Test func aShorterSwipeOnlyOpensTheRow() throws {
         let model = makeModel()
         let third = try entry("third", in: model)
 
-        swipeLeft(RowSwipe.fullSwipeThreshold - 1, on: third, in: model)
+        swipeLeft(fullSwipe - 1, on: third, in: model)
 
         #expect(deleter.deletedIDs.isEmpty)
         #expect(model.swipe.swipedRowID == third.id)
+    }
+
+    @Test func aSwipeOpensTheRowAsWideAsItsButtons() throws {
+        let model = makeModel()
+        let third = try entry("third", in: model)
+
+        swipeLeft(RowSwipe.holdThreshold, on: third, in: model)
+
+        #expect(
+            model.swipe.offset(of: third.id) == RowSwipe.actionsWidth(buttonCount: RowAction.offers(for: third).count))
     }
 
     @Test func theButtonDeletesTheSwipedEntryAndClosesTheRow() throws {
@@ -65,8 +79,8 @@ struct HistoryWindowSwipeTests {
         let third = try entry("third", in: model)
         swipeLeft(RowSwipe.holdThreshold, on: third, in: model)
 
-        // The Delete button calls the same delete as ⌘⌫ and the context menu.
-        model.delete(third)
+        // The Delete button runs the same action as the context menu, which deletes like ⌘⌫.
+        model.perform(.delete, on: third)
 
         #expect(deleter.deletedIDs == [third.id])
         #expect(model.swipe.swipedRowID == nil)
@@ -75,7 +89,7 @@ struct HistoryWindowSwipeTests {
     @Test func commandZBringsBackASwipedEntry() throws {
         let model = makeModel()
         let third = try entry("third", in: model)
-        swipeLeft(RowSwipe.fullSwipeThreshold, on: third, in: model)
+        swipeLeft(fullSwipe, on: third, in: model)
 
         #expect(model.handleKey(.undo, isCaretAtEnd: true) == .handled)
 
@@ -89,7 +103,7 @@ struct HistoryWindowSwipeTests {
         model.togglePin(second)
         let pinned = try #require(model.sections.pinned.first)
 
-        swipeLeft(RowSwipe.fullSwipeThreshold, on: pinned, in: model)
+        swipeLeft(fullSwipe, on: pinned, in: model)
         #expect(model.sections.pinned.isEmpty)
         #expect(!model.items.contains { $0.id == second.id })
 
@@ -106,8 +120,11 @@ struct HistoryWindowSwipeTests {
         swipeLeft(RowSwipe.holdThreshold, on: password, in: model)
         #expect(model.swipe.swipedRowID == id)
         #expect(!model.isRevealed(id))
+        // Pin and Delete: a password has no preview.
+        #expect(model.swipe.offset(of: id) == RowSwipe.actionsWidth(buttonCount: 2))
 
-        swipeLeft(RowSwipe.fullSwipeThreshold, on: password, in: model)
+        swipeLeft(
+            RowSwipe.fullSwipeThreshold(actionsWidth: RowSwipe.actionsWidth(buttonCount: 2)), on: password, in: model)
         #expect(deleter.deletedIDs == [id])
         #expect(model.items.isEmpty)
     }
@@ -127,7 +144,7 @@ struct HistoryWindowSwipeTests {
         model.prepareForPresentation()
         let current = try #require(model.sections.current)
 
-        swipeLeft(RowSwipe.fullSwipeThreshold, on: current, in: model)
+        swipeLeft(fullSwipe, on: current, in: model)
 
         #expect(model.items.map(\.text) == ["older"])
         #expect(pasteboard.text == nil)
