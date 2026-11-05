@@ -615,7 +615,7 @@ class WorkspaceAndOpenTests(CheckerTestCase):
                 os.remove(path)
 
     def test_also_in_tests_and_new_folders(self) -> None:
-        for relative in ("ShowMyCopyTests/MacOnly/OpenTests.swift", "NewTarget/Opener.swift"):
+        for relative in ("ShowMyCopyTests/Settings/OpenTests.swift", "NewTarget/Opener.swift"):
             with self.subTest(relative):
                 path = self.fixture.write(relative, "let w = NSWorkspace.shared\n")
                 self.assertFailsWith(self.fixture.errors(), "%s:1: %s" % (relative, self.WORKSPACE))
@@ -1135,6 +1135,31 @@ class RealRepositoryTests(unittest.TestCase):
             with self.subTest(marker):
                 with open(os.path.join(REPO, "ShowMyCopy/App/AppDelegate.swift"), encoding="utf-8") as handle:
                     self.assertIn('"%s"' % marker, handle.read())
+
+    def test_configured_files_exist(self) -> None:
+        # A moved or renamed file would leave its check pointing at nothing: the pane's stricter check and the
+        # app's entitlements would no longer be looked at where the code now is.
+        for relative in (check_security.SETTINGS_PANE_FILE, check_security.APP_ENTITLEMENTS_FILE):
+            with self.subTest(relative):
+                self.assertTrue(os.path.isfile(os.path.join(REPO, relative)), relative)
+
+    def test_swiftlint_excludes_exactly_the_settings_pane(self) -> None:
+        # The SwiftLint mirror of SETTINGS_PANE_FILE (no_external_handoff `excluded`) names the same file and no
+        # other, so a move cannot leave the early warning off for some other file or on for the pane.
+        with open(os.path.join(REPO, ".swiftlint.yml"), encoding="utf-8") as handle:
+            config = handle.read()
+        rule = config[config.index("\n  no_external_handoff:\n"):]
+        found = re.search(r"^    excluded: '([^']*)'$", rule, re.M)
+        self.assertIsNotNone(found, "no_external_handoff has no excluded path")
+        assert found is not None
+        excluded = re.compile(found.group(1))
+        matching = []
+        for folder, _, names in os.walk(REPO):
+            for name in names:
+                relative = os.path.relpath(os.path.join(folder, name), REPO).replace(os.sep, "/")
+                if name.endswith(".swift") and excluded.search(relative):
+                    matching.append(relative)
+        self.assertEqual(matching, [check_security.SETTINGS_PANE_FILE])
 
     def test_real_repository_passes(self) -> None:
         # Exactly what `make lint` runs, including the xcodebuild cross-check when Xcode is present.

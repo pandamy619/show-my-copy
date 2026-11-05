@@ -103,6 +103,30 @@ class RealRepositoryTests(unittest.TestCase):
     def test_extension_has_no_manifest_while_it_uses_no_category(self) -> None:
         self.assertFalse(os.path.exists(os.path.join(REPO, EXTENSION_MANIFEST)))
 
+    def test_lookalike_files_exist(self) -> None:
+        # A moved file would leave its LOOKALIKES entry pointing at nothing: the reviewed exception would no longer
+        # name the file it was reviewed in.
+        for _, label, files, _ in checker.LOOKALIKES:
+            for relative in sorted(files):
+                with self.subTest(label=label, file=relative):
+                    self.assertTrue(os.path.isfile(os.path.join(REPO, relative)), relative)
+
+    def test_membership_exceptions_exist(self) -> None:
+        # A membership exception for a file that is no longer there drops it from its target, and from this scan,
+        # without an error: the Control Center extension would build, and be checked, without it.
+        objects, _ = checker._objects(REPO)
+        groups = [obj for obj in objects.values()
+                  if isinstance(obj, dict) and obj.get("isa") == "PBXFileSystemSynchronizedRootGroup"]
+        checked = 0
+        for group in groups:
+            for ref in group.get("exceptions", []):
+                for item in objects[ref].get("membershipExceptions", []):
+                    relative = os.path.join(group["path"], item)
+                    with self.subTest(relative):
+                        self.assertTrue(os.path.exists(os.path.join(REPO, relative)), relative)
+                    checked += 1
+        self.assertGreater(checked, 0)
+
 
 class ManifestPresenceTests(CheckerTestCase):
     def test_fixture_passes(self) -> None:
