@@ -115,6 +115,17 @@ OPEN_QUALIFIED_ALLOWLIST: Dict[Tuple[str, str], str] = {
     ("SMAppService", "openSystemSettingsLoginItems"): "opens the fixed Login Items pane, takes no arguments",
 }
 
+# Strings only Debug builds may contain. In app sources (everything but ShowMyCopyTests/) each may appear only in an
+# `#if DEBUG` branch (check_debug_only_strings), and the app given to this script, the Release build `make security`
+# makes, must not contain it in any file (check_signed_app). Not an allowlist: these keep Debug-only behaviour out
+# of the app users run.
+DEBUG_ONLY_STRINGS: Dict[str, str] = {
+    "com.pandamy619.ShowMyCopy.debug.quitForNewerDebugBuild": "the request a newer Debug build posts so an older "
+    "Debug build quits (AppDelegate.debugBuildReplacement). A Release build must not observe it: any app could post "
+    "it and quit the app (SECURITY.md)",
+}
+TESTS_FOLDER = "ShowMyCopyTests/"
+
 # --------------------------------------------------------------------------------------------
 
 SANDBOX_KEY = "com.apple.security.app-sandbox"
@@ -641,11 +652,13 @@ def check_sources(root: str) -> List[str]:
             # Stricter: fails on raw and multi-line strings too, and says why it cannot check the file.
             errors.extend(check_settings_pane(text, where))
         try:
-            _, bare = _swift_code(text, strict=False)
+            code, bare = _swift_code(text, strict=False)
         except ValueError as error:
             if not is_pane:
                 errors.append("%s: cannot scan: %s" % (where, error))
             continue
+        if not where.startswith(TESTS_FOLDER):
+            errors.extend(check_debug_only_strings(code, where))
         found: List[Tuple[int, str]] = []
         for regex, label in compiled:
             found.extend((match.start(), label) for match in regex.finditer(bare))
@@ -658,6 +671,45 @@ def check_sources(root: str) -> List[str]:
             if (number, label) not in reported:
                 reported.add((number, label))
                 errors.append("%s:%d: %s: %s" % (where, number, label, lines[number - 1].strip()))
+    return errors
+
+
+_CONDITION = re.compile(r"^[ \t]*#(if|elseif|else|endif)(?![A-Za-z0-9_])[ \t]*([^\n]*?)[ \t]*$", re.M)
+
+
+def check_debug_only_strings(code: str, where: str) -> List[str]:
+    """Every DEBUG_ONLY_STRINGS string in `code` (comments blanked out, `_swift_code`) must be in a branch whose
+    condition is exactly `DEBUG`, or nested in one. Fails on `#else`, `#elseif` or `#endif` without an `#if`."""
+    if not any(marker in code for marker in DEBUG_ONLY_STRINGS):
+        return []
+    errors = []
+    # For each open #if: whether the branch the scan is in now is a DEBUG branch.
+    stack: List[bool] = []
+    events = [(match.start(), "condition", match) for match in _CONDITION.finditer(code)]
+    for marker in DEBUG_ONLY_STRINGS:
+        start = code.find(marker)
+        while start >= 0:
+            events.append((start, "marker", marker))
+            start = code.find(marker, start + 1)
+    for offset, kind, item in sorted(events, key=lambda event: event[0]):
+        number = code.count("\n", 0, offset) + 1
+        if kind == "marker":
+            if not any(stack):
+                errors.append("%s:%d: Debug-only string %r outside an #if DEBUG branch (DEBUG_ONLY_STRINGS)"
+                              % (where, number, item))
+            continue
+        directive, condition = item.group(1), item.group(2)
+        if directive == "if":
+            stack.append(condition == "DEBUG")
+        elif not stack:
+            errors.append("%s:%d: #%s without #if" % (where, number, directive))
+            return errors
+        elif directive == "elseif":
+            stack[-1] = condition == "DEBUG"
+        elif directive == "else":
+            stack[-1] = False
+        else:
+            stack.pop()
     return errors
 
 
@@ -916,6 +968,29 @@ def check_signed_app(app: str) -> List[str]:
         errors.extend(check_entitlements(ents, where, require_sandbox=True, is_app=kind == "app"))
         if not _has_hardened_runtime(path):
             errors.append("%s: hardened runtime flag is not set" % where)
+    errors.extend(check_app_has_no_debug_only_strings(app))
+    return errors
+
+
+def check_app_has_no_debug_only_strings(app: str) -> List[str]:
+    """No file in the app bundle, executables and nested code included, contains a DEBUG_ONLY_STRINGS string."""
+    errors = []
+    markers = [(marker, marker.encode("utf-8")) for marker in DEBUG_ONLY_STRINGS]
+    top = os.path.dirname(os.path.abspath(app))
+    for path in _walk(app):
+        where = os.path.relpath(path, top)
+        if os.path.islink(path):
+            continue  # what it points to inside the bundle is read as a file of its own
+        try:
+            with open(path, "rb") as handle:
+                data = handle.read()
+        except OSError as error:
+            errors.append("%s: cannot read: %s" % (where, error))
+            continue
+        for marker, raw in markers:
+            if raw in data:
+                errors.append("%s: contains the Debug-only string %r; check a Release build (DEBUG_ONLY_STRINGS)"
+                              % (where, marker))
     return errors
 
 
