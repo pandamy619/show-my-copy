@@ -1,11 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// Swipe to delete on a history row: the row slides left over a red Delete button with a two-finger swipe on a
-/// trackpad. `RowSwipe` decides everything; this only draws its state and feeds it events. A mouse drag drags the
-/// entry out of the window instead (`RowDragSource`).
+/// Swiping a history row: the row slides left over a button for each of its actions (`RowAction`), with a two-finger
+/// swipe on a trackpad. `RowSwipe` decides everything; this only draws its state and feeds it events. A mouse drag
+/// drags the entry out of the window instead (`RowDragSource`).
 ///
-/// The Delete button is hidden from VoiceOver: the row already offers the same Delete as an action.
+/// The buttons are hidden from VoiceOver: the row offers the same actions as accessibility actions, from the same
+/// list.
 struct RowSwipeModifier: ViewModifier {
     let entry: ClipboardEntry
     let model: HistoryWindowModel
@@ -16,18 +17,19 @@ struct RowSwipeModifier: ViewModifier {
     func body(content: Content) -> some View {
         let swipe = model.swipe
         let offset = swipe.displayedOffset(of: entry.id, reducesMotion: reducesMotion)
-        // The row follows the fingers as they move, and slides into place when they let go. Not with Reduce Motion.
+        // The row follows the fingers as they move, and slides into place when they let go. Not with Reduce Motion:
+        // then the buttons just appear.
         let animates = !reducesMotion && !swipe.isTracking(entry.id)
         content
             .offset(x: -offset)
             .background(alignment: .trailing) {
                 if offset > 0 {
-                    DeleteSwipeButton(width: offset) {
-                        model.delete(entry)
+                    SwipeActionButtons(offers: RowAction.offers(for: entry), offset: offset) { action in
+                        model.perform(action, on: entry)
                     }
                 }
             }
-            // Over the whole row, but only scroll events stop there: clicks reach the row and the button.
+            // Over the whole row, but only scroll events stop there: clicks reach the row and the buttons.
             .overlay {
                 RowSwipeScrollReader { scroll in
                     model.swipeScrolled(scroll, on: entry)
@@ -39,8 +41,32 @@ struct RowSwipeModifier: ViewModifier {
     }
 }
 
-/// The red button an open row shows at its trailing edge. As wide as the row slid, so it grows with the swipe.
-private struct DeleteSwipeButton: View {
+/// The buttons an open row shows at its trailing edge, in the order of `offers`, Delete last at the edge. They share
+/// the width the row slid, so they grow with the swipe; past their full width only Delete grows, toward a full swipe.
+private struct SwipeActionButtons: View {
+    let offers: [RowAction.Offer]
+    let offset: CGFloat
+    let perform: @MainActor (RowAction) -> Void
+
+    var body: some View {
+        let count = CGFloat(max(offers.count, 1))
+        let shared = min(offset, RowSwipe.actionsWidth(buttonCount: offers.count)) / count
+        HStack(spacing: 0) {
+            ForEach(offers, id: \.action) { offer in
+                let isLast = offer.action == offers.last?.action
+                SwipeActionButton(
+                    offer: offer, width: isLast ? max(offset - shared * (count - 1), 0) : shared
+                ) {
+                    perform(offer.action)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct SwipeActionButton: View {
+    let offer: RowAction.Offer
     let width: CGFloat
     let action: @MainActor () -> Void
 
@@ -48,18 +74,24 @@ private struct DeleteSwipeButton: View {
         Button {
             action()
         } label: {
-            Text("Delete")
-                .font(.callout.weight(.medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .fixedSize()
-                .frame(width: width)
-                .frame(maxHeight: .infinity)
-                .background(Color.red)
-                .contentShape(Rectangle())
+            VStack(spacing: 3) {
+                Image(systemName: offer.action.systemImage)
+                    .imageScale(.medium)
+                Text(offer.action.buttonTitle)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(.white)
+            .frame(width: RowSwipe.buttonWidth)
+            .frame(width: width)
+            .frame(maxHeight: .infinity)
+            .background(offer.isEnabled ? offer.action.swipeColor : Color.gray)
+            .clipped()
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityHidden(true)
+        .disabled(!offer.isEnabled)
     }
 }
 

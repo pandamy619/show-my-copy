@@ -18,25 +18,8 @@ struct RevealButton: View {
     }
 }
 
-/// Offers VoiceOver users "Pin" or "Unpin" on a row. A password cannot be pinned, so its row has neither.
-struct PinAccessibility: ViewModifier {
-    let entry: ClipboardEntry
-    let model: HistoryWindowModel
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if HistoryWindowModel.canPin(entry) {
-            content
-                .accessibilityAction(named: entry.isPinned ? Text("Unpin") : Text("Pin")) {
-                    model.togglePin(entry)
-                }
-        } else {
-            content
-        }
-    }
-}
-
-/// The row's context menu: Show Preview, Pin or Unpin, and Delete.
+/// The row's context menu, built from its actions (`RowAction.offers(for:)`): Show Preview, Pin or Unpin, and
+/// Delete. A dimmed item does nothing.
 struct RowContextMenu: ViewModifier {
     let entry: ClipboardEntry
     let model: HistoryWindowModel
@@ -44,26 +27,86 @@ struct RowContextMenu: ViewModifier {
     func body(content: Content) -> some View {
         content
             .contextMenu {
-                if EntryPreviewModel.canPreview(entry) {
-                    Button("Show Preview") {
-                        model.showPreview(of: entry)
+                ForEach(RowAction.offers(for: entry), id: \.action) { offer in
+                    Button(offer.action.menuTitle, role: offer.action.isDestructive ? .destructive : nil) {
+                        model.perform(offer.action, on: entry)
                     }
-                }
-                if entry.isPinned {
-                    Button("Unpin") {
-                        model.togglePin(entry)
-                    }
-                } else {
-                    // A password keeps its own expiry, which a pin would outlast.
-                    Button("Pin") {
-                        model.togglePin(entry)
-                    }
-                    .disabled(!HistoryWindowModel.canPin(entry))
-                }
-                // Also the current entry: deleting it empties the clipboard when it still holds it.
-                Button("Delete", role: .destructive) {
-                    model.delete(entry)
+                    .disabled(!offer.isEnabled)
                 }
             }
+    }
+}
+
+/// Offers VoiceOver users the row's actions that can be used now, from the same list as the context menu and the
+/// swipe buttons, so every swipe button is also an action. A password's row has no Pin.
+struct RowActionsAccessibility: ViewModifier {
+    let entry: ClipboardEntry
+    let model: HistoryWindowModel
+
+    func body(content: Content) -> some View {
+        content
+            .accessibilityActions {
+                ForEach(RowAction.offers(for: entry).filter(\.isEnabled), id: \.action) { offer in
+                    Button(offer.action.menuTitle) {
+                        model.perform(offer.action, on: entry)
+                    }
+                }
+            }
+    }
+}
+
+/// How each action looks in the context menu, as a VoiceOver action and as a swipe button.
+extension RowAction {
+    /// The context menu item and the VoiceOver action.
+    var menuTitle: LocalizedStringKey {
+        switch self {
+        case .showPreview:
+            "Show Preview"
+        case .pin:
+            "Pin"
+        case .unpin:
+            "Unpin"
+        case .delete:
+            "Delete"
+        }
+    }
+
+    /// The short label under a swipe button's symbol.
+    var buttonTitle: LocalizedStringKey {
+        switch self {
+        case .showPreview:
+            "Preview"
+        case .pin:
+            "Pin"
+        case .unpin:
+            "Unpin"
+        case .delete:
+            "Delete"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .showPreview:
+            "eye"
+        case .pin:
+            "pin"
+        case .unpin:
+            "pin.slash"
+        case .delete:
+            "trash"
+        }
+    }
+
+    /// Delete is red; the others are not, so it stands out at the edge.
+    var swipeColor: Color {
+        switch self {
+        case .showPreview:
+            .blue
+        case .pin, .unpin:
+            .orange
+        case .delete:
+            .red
+        }
     }
 }

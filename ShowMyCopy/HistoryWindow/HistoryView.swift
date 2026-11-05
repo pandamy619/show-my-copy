@@ -183,11 +183,8 @@ struct HistoryView: View {
                 }
             )
             .modifier(RowContextMenu(entry: entry, model: model))
-            .modifier(PreviewAccessibility(entry: entry, model: model))
-            .modifier(PinAccessibility(entry: entry, model: model))
-            .accessibilityAction(named: Text("Delete")) {
-                model.delete(entry)
-            }
+            .modifier(PreviewAccessibilityHint(entry: entry))
+            .modifier(RowActionsAccessibility(entry: entry, model: model))
             if entry.isConcealed {
                 RevealButton(isRevealed: isRevealed) {
                     guard !model.closeSwipedRow() else {
@@ -201,13 +198,13 @@ struct HistoryView: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.clear)
         )
-        // Swipe left to delete; the selection slides with the row.
+        // Swipe left to show the row's actions; the selection slides with the row.
         .modifier(RowSwipeModifier(entry: entry, model: model))
         .id(entry.id)
     }
 
     /// A click on the row of `entry` chooses it. ⌥-click (`isAlternate`) does the other of what Return does, like
-    /// ⌥Return. While a row shows its Delete button, a click on any row only closes it, as in Mail.
+    /// ⌥Return. While a row is swiped open, a click on any row only closes it, as in Mail.
     private func rowClicked(_ entry: ClipboardEntry, isAlternate: Bool) {
         guard !model.closeSwipedRow() else {
             return

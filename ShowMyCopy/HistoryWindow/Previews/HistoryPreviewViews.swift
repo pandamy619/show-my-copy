@@ -114,19 +114,16 @@ struct FileRowTitle: View {
     }
 }
 
-/// VoiceOver: a hint and an action to open the preview of an entry that has one.
-struct PreviewAccessibility: ViewModifier {
+/// Tells VoiceOver users that Right Arrow previews the row's entry. The Show Preview action itself is one of the
+/// row's actions (`RowActionsAccessibility`).
+struct PreviewAccessibilityHint: ViewModifier {
     let entry: ClipboardEntry
-    let model: HistoryWindowModel
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if EntryPreviewModel.canPreview(entry) {
             content
                 .accessibilityHint(Text("Right Arrow shows a preview."))
-                .accessibilityAction(named: Text("Show Preview")) {
-                    model.showPreview(of: entry)
-                }
         } else {
             content
         }

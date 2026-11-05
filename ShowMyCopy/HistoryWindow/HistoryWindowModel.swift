@@ -11,7 +11,7 @@ final class HistoryWindowModel {
     let preview: EntryPreviewModel
     /// Thumbnails for image rows, loaded as rows appear.
     let thumbnails: ThumbnailProvider
-    /// The row swiped to show its Delete button (`HistoryWindowModel+Swipe.swift`).
+    /// The row swiped open to show the buttons of its actions (`HistoryWindowModel+Swipe.swift`).
     let swipe = RowSwipe()
     /// Where a dragged image is read from when the app it is dropped on asks for it (`EntryDrag`). Without it images
     /// cannot be dragged.

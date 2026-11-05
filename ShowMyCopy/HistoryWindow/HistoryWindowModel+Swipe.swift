@@ -1,11 +1,13 @@
 import Foundation
 
-/// Swipe to delete (`RowSwipe`): what the history window's rows ask of the model.
+/// Swiping a row (`RowSwipe`): what the history window's rows ask of the model.
 extension HistoryWindowModel {
     /// A scroll event over the row of `entry`. Returns whether the row took it; the list scrolls with any other.
-    /// A full swipe deletes the entry, like ⌘⌫.
+    /// The row opens as wide as the buttons of its actions (`RowAction.offers(for:)`). A full swipe deletes the
+    /// entry, like ⌘⌫.
     func swipeScrolled(_ scroll: RowSwipe.Scroll, on entry: ClipboardEntry) -> Bool {
-        switch swipe.scroll(scroll, on: entry.id) {
+        let actionsWidth = RowSwipe.actionsWidth(buttonCount: RowAction.offers(for: entry).count)
+        switch swipe.scroll(scroll, on: entry.id, actionsWidth: actionsWidth) {
         case .pass:
             return false
         case .consume:
@@ -16,8 +18,8 @@ extension HistoryWindowModel {
         }
     }
 
-    /// Closes the row that shows its Delete button, for a click on any row: then the click does nothing else.
-    /// Returns whether a listed row showed its button.
+    /// Closes the open row, for a click on any row: then the click does nothing else. Returns whether a listed row
+    /// was open.
     @discardableResult
     func closeSwipedRow() -> Bool {
         let wasShown = swipe.swipedRowID.map { id in items.contains { $0.id == id } } ?? false
