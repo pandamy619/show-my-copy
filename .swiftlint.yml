@@ -33,14 +33,48 @@ custom_rules:
     regex: '\b(URLSession|URLRequest|NSURLConnection|NWConnection|NWListener|NWPathMonitor|NWBrowser|CFSocket|CFStream|WKWebView|SFSafariViewController|getaddrinfo)\b|import\s+(Network|WebKit|SafariServices|CFNetwork)\b'
     message: "The app must not access the network."
     severity: error
-  # Keep in sync with SOURCE_PATTERNS in scripts/check_security.py.
+  # Mirrors the hand-off part of SOURCE_PATTERNS, NSWORKSPACE_READ_ONLY, OPEN_open|openStore|openDefault|openSaved|openWaitingPasswords|openFailed|openSystemSettings|openLoginItems|openAccessibilityList|openAccessibilitySettings|openRequested|openSettings|openCount|openSystemSettingsCountLIST and OPEN_QUALIFIED_open|openStore|openDefault|openSaved|openWaitingPasswords|openFailed|openSystemSettings|openLoginItems|openAccessibilityList|openAccessibilitySettings|openRequested|openSettings|openCount|openSystemSettingsCountLIST
+  # in scripts/check_security.py; keep them in sync. That script is the one that decides: it reads the code with
+  # comments and strings removed and fails on files it cannot read. This rule is the early warning in Xcode.
   no_external_handoff:
     name: "No hand-off to other apps or processes"
     # The one exception (SECURITY.md): this file opens System Settings at Privacy & Security -> Accessibility.
     # scripts/check_security.py (SETTINGS_PANE_FILE) checks it instead: fixed System Settings addresses only.
     excluded: '(^|/)ShowMyCopy/Platform/Settings/SystemSettingsPane\.swift$'
-    regex: 'NSWorkspace\s*\.\s*shared\s*\.\s*open|(?<![A-Za-z0-9_])(openApplication|openURL|NSSharingService\w*|ShareLink|NSXPCConnection|CSSearchableIndex|NSUserActivity)(?![A-Za-z0-9_])|(?<![A-Za-z0-9_])Link\s*\(|(?<![A-Za-z0-9_.])[A-Z][A-Za-z0-9_]*\s*\(\s*contentsOf\s*:|\.init\s*\(\s*contentsOf\s*:|contentsOf\s*:\s*URL(?![A-Za-z0-9_])'
-    message: "Clipboard data must not leave the app: no opening URLs or apps, sharing, XPC, Spotlight, Handoff or loading from URLs."
+    # Names in comments and string literals are not code.
+    excluded_match_kinds:
+      - comment
+      - comment.mark
+      - comment.url
+      - doccomment
+      - doccomment.field
+      - string
+    # Free-spacing mode: white space and line breaks in the pattern are ignored.
+    regex: |-
+      (?x)
+      (?<![A-Za-z0-9_])(openApplication|openURL|NSSharingService\w*|ShareLink|NSXPCConnection|CSSearchableIndex
+        |NSUserActivity|NSPerformService)(?![A-Za-z0-9_])
+      | (?<![A-Za-z0-9_])LS[A-Z][A-Za-z0-9_]*(?![A-Za-z0-9_])
+      | (?<![A-Za-z0-9_])(NSAppleEventDescriptor|NSAppleEventManager|AESend\w*)(?![A-Za-z0-9_])
+      | (?<![A-Za-z0-9_])(NSClassFromString|NSSelectorFromString|objc_getClass|objc_lookUpClass|objc_msgSend\w*
+        |dlopen|dlsym|NSInvocation)(?![A-Za-z0-9_])
+      | (?<![A-Za-z0-9_])Selector\s*\(
+      | (?<![A-Za-z0-9_])Link\s*\(
+      | (?<![A-Za-z0-9_.])[A-Z][A-Za-z0-9_]*\s*\(\s*contentsOf\s*:
+      | \.init\s*\(\s*contentsOf\s*:
+      | contentsOf\s*:\s*URL(?![A-Za-z0-9_])
+      # NSWorkspace only as NSWorkspace.shared.<read-only member> or NSWorkspace.<name>Notification.
+      | (?<![A-Za-z0-9_])NSWorkspace(?![A-Za-z0-9_])
+        (?!\s*\.\s*(shared\s*\.\s*(runningApplications|frontmostApplication|notificationCenter|icon|urlForApplication)
+        |[a-z][A-Za-z0-9_]*Notification)(?![A-Za-z0-9_]))
+      # A member or call whose first word is `open`, unless it is one of the app's own names.
+      | \.\s*`?(?!(open|openStore|openDefault|openSaved|openWaitingPasswords|openFailed|openSystemSettings|openLoginItems|openAccessibilityList|openAccessibilitySettings|openRequested|openSettings|openCount|openSystemSettingsCount)(?![A-Za-z0-9_]))
+        (?!(?<=[^.A-Za-z0-9_]SMAppService\s{0,40}\.\s{0,40})openSystemSettingsLoginItems(?![A-Za-z0-9_]))
+        open([A-Z0-9_][A-Za-z0-9_]*)?(?![A-Za-z0-9_])
+      | (?<![A-Za-z0-9_.`])(?<!func\s{1,8})`?(?!(open|openStore|openDefault|openSaved|openWaitingPasswords|openFailed|openSystemSettings|openLoginItems|openAccessibilityList|openAccessibilitySettings|openRequested|openSettings|openCount|openSystemSettingsCount)(?![A-Za-z0-9_]))
+        open([A-Z0-9_][A-Za-z0-9_]*)?`?\s*[({]
+    message: "Clipboard data must not leave the app: no opening URLs, files or apps, NSWorkspace beyond its read-only
+      members, sharing, XPC, Spotlight, Handoff, Apple events, Launch Services, lookups by name or loading from URLs."
     severity: error
   no_print:
     name: "No print"
