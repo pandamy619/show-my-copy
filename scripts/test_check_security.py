@@ -88,6 +88,7 @@ WIDGET_FILE = "Config/ShowMyCopyControl.entitlements"
 WIDGET = "ShowMyCopyControlExtension"
 WIDGET_XCCONFIG = "Config/Widget.xcconfig"
 APP_READ_ONLY_SETTING = "ENABLE_USER_SELECTED_FILES = readonly;"
+DEBUG_MARKER = "com.pandamy619.ShowMyCopy.debug.quitForNewerDebugBuild"
 
 
 class Fixture:
@@ -729,6 +730,10 @@ class SignedAppTests(CheckerTestCase):
         os.chmod(codesign, os.stat(codesign).st_mode | stat.S_IXUSR)
         self.app = os.path.join(self.tmp, "ShowMyCopy.app")
         self.bundle(self.app, SANDBOX_ONLY)
+        self.executable = self.nested("MacOS/ShowMyCopy")
+        os.makedirs(os.path.dirname(self.executable))
+        with open(self.executable, "wb") as out:
+            out.write(b"\xcf\xfa\xed\xfecom.pandamy619.ShowMyCopy.anotherCopyStarted\x00")
 
     def bundle(self, path: str, ents, *markers: str) -> None:
         meta = path + ".fake" if path.endswith(".dylib") else os.path.join(path, "_fake")
@@ -846,6 +851,30 @@ class SignedAppTests(CheckerTestCase):
         self.bundle(self.nested("Frameworks/libEvil.dylib"), {"com.apple.security.get-task-allow": True})
         self.assertFailsWith(self.errors(), "libEvil.dylib: libraries and frameworks must not carry entitlements")
 
+    def test_debug_only_string_in_the_executable_fails(self) -> None:
+        with open(self.executable, "ab") as out:
+            out.write(DEBUG_MARKER.encode() + b"\x00")
+        self.assertFailsWith(self.errors(), "MacOS/ShowMyCopy: contains the Debug-only string %r" % DEBUG_MARKER)
+
+    def test_debug_only_string_in_nested_code_fails(self) -> None:
+        for relative in ("MacOS/ShowMyCopy.debug.dylib", "PlugIns/Share.appex/Contents/MacOS/Share"):
+            with self.subTest(relative):
+                path = self.nested(relative)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "wb") as out:
+                    out.write(b"\x00" + DEBUG_MARKER.encode())
+                if relative.startswith("PlugIns"):
+                    self.bundle(self.nested("PlugIns/Share.appex"), SANDBOX_ONLY)
+                self.assertFailsWith(self.errors(), "%s: contains the Debug-only string" % relative)
+                os.remove(path)
+
+    def test_unreadable_file_in_the_app_fails(self) -> None:
+        if os.geteuid() == 0:
+            self.skipTest("root reads every file")
+        os.chmod(self.executable, 0)
+        self.addCleanup(os.chmod, self.executable, stat.S_IRUSR | stat.S_IWUSR)
+        self.assertFailsWith(self.errors(), "MacOS/ShowMyCopy: cannot read")
+
     def test_without_codesign(self) -> None:
         old = os.environ.get("PATH", "")
         os.environ["PATH"] = os.path.join(self.tmp, "empty")
@@ -854,6 +883,77 @@ class SignedAppTests(CheckerTestCase):
         finally:
             os.environ["PATH"] = old
         self.assertFailsWith(errors, "codesign not found")
+
+
+class DebugOnlyStringTests(CheckerTestCase):
+    """DEBUG_ONLY_STRINGS appear in app sources only in an `#if DEBUG` branch."""
+
+    FILE = "ShowMyCopy/App/AppDelegate.swift"
+
+    def errors_for(self, code: str, relative: str = FILE) -> list:
+        self.fixture.write(relative, textwrap.dedent(code))
+        return self.fixture.errors()
+
+    def test_in_a_debug_branch_passes(self) -> None:
+        cases = {
+            "plain": """\
+                #if DEBUG
+                    let name = "%s"
+                #else
+                    let name: String? = nil
+                #endif
+                """,
+            "nested": """\
+                #if DEBUG
+                    #if os(macOS)
+                        let name = "%s"
+                    #else
+                        let name = "%s"
+                    #endif
+                #endif
+                """,
+            "elseif": """\
+                #if os(iOS)
+                    let name = ""
+                #elseif DEBUG
+                    let name = "%s"
+                #endif
+                """,
+        }
+        for name, code in cases.items():
+            with self.subTest(name):
+                self.assertEqual(self.errors_for(code.replace("%s", DEBUG_MARKER)), [])
+
+    def test_outside_a_debug_branch_fails(self) -> None:
+        cases = {
+            "no condition": 'let name = "%s"\n',
+            "else": '#if DEBUG\nlet a = 1\n#else\nlet name = "%s"\n#endif\n',
+            "not debug": '#if !DEBUG\nlet name = "%s"\n#endif\n',
+            "another condition": '#if os(macOS)\nlet name = "%s"\n#endif\n',
+            "debug and more": '#if DEBUG && os(macOS)\nlet name = "%s"\n#endif\n',
+            "after the branch": '#if DEBUG\nlet a = 1\n#endif\nlet name = "%s"\n',
+            "elseif after debug": '#if DEBUG\nlet a = 1\n#elseif os(macOS)\nlet name = "%s"\n#endif\n',
+            "debug in a comment": '#if os(macOS) // DEBUG\nlet name = "%s"\n#endif\n',
+        }
+        for name, code in cases.items():
+            with self.subTest(name):
+                self.assertFailsWith(
+                    self.errors_for(code.replace("%s", DEBUG_MARKER)),
+                    "%s:%d: Debug-only string" % (self.FILE, code.count("\n", 0, code.index("%s")) + 1),
+                )
+
+    def test_in_any_app_folder_and_the_extension_fails(self) -> None:
+        for relative in ("ShowMyCopy/New/Thing.swift", "ShowMyCopyControl/Control.swift"):
+            with self.subTest(relative):
+                self.assertFailsWith(self.errors_for('let name = "%s"\n' % DEBUG_MARKER, relative), relative)
+                os.remove(os.path.join(self.fixture.root, relative))
+
+    def test_unbalanced_conditions_fail(self) -> None:
+        self.assertFailsWith(self.errors_for('#endif\nlet name = "%s"\n' % DEBUG_MARKER), "#endif without #if")
+
+    def test_in_a_comment_or_in_tests_passes(self) -> None:
+        self.assertEqual(self.errors_for("// %s\nlet a = 1\n" % DEBUG_MARKER), [])
+        self.assertEqual(self.errors_for('let name = "%s"\n' % DEBUG_MARKER, "ShowMyCopyTests/App/T.swift"), [])
 
 
 class SettingsPaneTests(CheckerTestCase):
@@ -1028,6 +1128,14 @@ class SettingsPaneTests(CheckerTestCase):
 
 
 class RealRepositoryTests(unittest.TestCase):
+    def test_debug_only_strings_are_in_the_app(self) -> None:
+        # Keeps DEBUG_ONLY_STRINGS in step with the code: a renamed string would no longer be looked for.
+        self.assertIn(DEBUG_MARKER, check_security.DEBUG_ONLY_STRINGS)
+        for marker in check_security.DEBUG_ONLY_STRINGS:
+            with self.subTest(marker):
+                with open(os.path.join(REPO, "ShowMyCopy/App/AppDelegate.swift"), encoding="utf-8") as handle:
+                    self.assertIn('"%s"' % marker, handle.read())
+
     def test_real_repository_passes(self) -> None:
         # Exactly what `make lint` runs, including the xcodebuild cross-check when Xcode is present.
         result = subprocess.run(
