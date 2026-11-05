@@ -7,6 +7,8 @@ struct FoundRecords: Sendable {
     var unreadable: [UUID] = []
     /// Passwords that are expired or no longer saved: deleted unopened.
     var unwanted: [UUID] = []
+    /// Records whose content another loaded record holds too (`SavedRecords.removeDuplicates`): deleted.
+    var duplicates: [UUID] = []
     /// Passwords whose key cannot be used now: kept on disk unopened, and opened once it can.
     var unopened: [StoredEntryRecord] = []
 }
@@ -67,6 +69,7 @@ struct LoadedHistory: Sendable {
     ) -> LoadedHistory {
         var found = SavedRecords.sort(
             read.records, coder: coder, savesPasswords: savesPasswords, at: now, blobs: blobs)
+        SavedRecords.removeDuplicates(from: &found)
         // Each copy moves its entry to the top with the copy's date, so newest first is by date.
         found.entries.sort { $0.date > $1.date }
         let blobsByRecord = Dictionary(
@@ -145,6 +148,48 @@ enum SavedRecords {
             }
         }
         return found
+    }
+
+    /// Keeps one entry per content hash. The history never holds two, but the disk can: two processes of the app
+    /// (a build started from Xcode while the installed one runs, which has no Dock or menu bar icon) each record every
+    /// copy under its own ID in the same store, and neither sees the other's records until the next launch. The
+    /// entry kept is the one a copy of the content would keep (`HistoryStore.record`): a pinned one, else a concealed
+    /// one, so a password is not shown in plain, else the newest. The others go to `duplicates`. Hashes are made
+    /// again from the decoded content, as for every loaded entry, not read from the records: a concealed record
+    /// has none, and the hash must match what a copy now gives. A record listed twice under one ID is loaded once and
+    /// not deleted, since deleting its ID would delete the one kept too.
+    static func removeDuplicates(from found: inout FoundRecords) {
+        var kept: [ClipboardEntry] = []
+        var keptIndex: [ContentHash: Int] = [:]
+        var ids: Set<UUID> = []
+        for entry in found.entries where ids.insert(entry.id).inserted {
+            guard let index = keptIndex[entry.contentHash] else {
+                keptIndex[entry.contentHash] = kept.count
+                kept.append(entry)
+                continue
+            }
+            if isPreferred(entry, over: kept[index]) {
+                found.duplicates.append(kept[index].id)
+                kept[index] = entry
+            } else {
+                found.duplicates.append(entry.id)
+            }
+        }
+        let count = found.duplicates.count
+        if count > 0 {
+            AppLogger.history.info("Deleting \(count, privacy: .public) saved copies of other entries")
+        }
+        found.entries = kept
+    }
+
+    private static func isPreferred(_ entry: ClipboardEntry, over other: ClipboardEntry) -> Bool {
+        if entry.isPinned != other.isPinned {
+            return entry.isPinned
+        }
+        if entry.isConcealed != other.isConcealed {
+            return entry.isConcealed
+        }
+        return entry.date > other.date
     }
 
     /// Deletes the blobs that no record references.
