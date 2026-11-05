@@ -12,7 +12,8 @@ struct HistoryContentFactoryTests {
             model: HistoryWindowModel(history: InMemoryHistoryStore()),
             onChoose: { _, _ in },
             onClose: {},
-            onOpenSettings: {}
+            onOpenSettings: {},
+            onDrag: { _ in }
         )
         let hostingView = try #require(view as? NSHostingView<HistoryView>)
         #expect(hostingView.safeAreaRegions.isEmpty)

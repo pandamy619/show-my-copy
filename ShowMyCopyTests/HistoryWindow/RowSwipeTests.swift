@@ -3,8 +3,9 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// A row slides left with a horizontal trackpad swipe or a mouse drag, keeps showing its Delete button past the hold
-/// threshold and is deleted past the full-swipe threshold; vertical scrolling goes to the list.
+/// A row slides left with a horizontal trackpad swipe, keeps showing its Delete button past the hold threshold and is
+/// deleted past the full-swipe threshold; vertical scrolling goes to the list. A mouse drag does not swipe: it drags
+/// the entry out (`EntryDragTests`).
 @MainActor
 struct RowSwipeTests {
     private let swipe = RowSwipe()
@@ -243,35 +244,6 @@ struct RowSwipeTests {
         #expect(!swipe.isTracking(row))
         #expect(swipe.scroll(RowSwipe.Scroll(phase: .changed, deltaX: -100), on: row) == .pass)
         #expect(swipe.scroll(RowSwipe.Scroll(phase: .ended), on: row) == .pass)
-        #expect(swipe.swipedRowID == nil)
-    }
-
-    // MARK: - Mouse
-
-    @Test func aMouseDragSlidesTheRow() {
-        swipe.drag(CGSize(width: -30, height: 1), on: row)
-        swipe.drag(CGSize(width: -60, height: 2), on: row)
-        #expect(swipe.offset(of: row) == 60)
-        #expect(swipe.isTracking(row))
-
-        #expect(swipe.endDrag() == nil)
-        #expect(swipe.swipedRowID == row)
-        #expect(swipe.offset(of: row) == RowSwipe.buttonWidth)
-    }
-
-    @Test func aLongMouseDragDeletes() {
-        swipe.drag(CGSize(width: -RowSwipe.fullSwipeThreshold - 1, height: 0), on: row)
-
-        #expect(swipe.endDrag() == row)
-        #expect(swipe.swipedRowID == nil)
-    }
-
-    @Test func aVerticalMouseDragDoesNothing() {
-        swipe.drag(CGSize(width: -2, height: 30), on: row)
-        swipe.drag(CGSize(width: -80, height: 30), on: row)
-
-        #expect(swipe.offset(of: row) == 0)
-        #expect(swipe.endDrag() == nil)
         #expect(swipe.swipedRowID == nil)
     }
 

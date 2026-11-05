@@ -112,28 +112,6 @@ struct HistoryWindowSwipeTests {
         #expect(model.items.isEmpty)
     }
 
-    @Test func aLongMouseDragDeletes() throws {
-        let model = makeModel()
-        let second = try entry("second", in: model)
-
-        model.swipeDragged(CGSize(width: -40, height: 0), on: second)
-        model.swipeDragged(CGSize(width: -RowSwipe.fullSwipeThreshold, height: 3), on: second)
-        model.swipeDragEnded()
-
-        #expect(deleter.deletedIDs == [second.id])
-    }
-
-    @Test func aShortMouseDragShowsTheButton() throws {
-        let model = makeModel()
-        let second = try entry("second", in: model)
-
-        model.swipeDragged(CGSize(width: -60, height: 0), on: second)
-        model.swipeDragEnded()
-
-        #expect(deleter.deletedIDs.isEmpty)
-        #expect(model.swipe.swipedRowID == second.id)
-    }
-
     /// The real deleter empties the clipboard that holds the swiped entry, as for ⌘⌫.
     @Test func swipingTheCurrentEntryEmptiesTheClipboard() throws {
         let pasteboard = FakePasteboard()
