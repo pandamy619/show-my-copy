@@ -79,6 +79,15 @@ def plist(ents: dict) -> bytes:
 
 
 SANDBOX_ONLY = {"com.apple.security.app-sandbox": True}
+READ_ONLY = "com.apple.security.files.user-selected.read-only"
+READ_WRITE = "com.apple.security.files.user-selected.read-write"
+# What the app is signed with: Settings -> Excluded apps picks an app with an open panel.
+APP_ENTITLEMENTS = dict(SANDBOX_ONLY, **{READ_ONLY: True})
+APP_FILE = "Config/ShowMyCopy.entitlements"
+WIDGET_FILE = "Config/ShowMyCopyControl.entitlements"
+WIDGET = "ShowMyCopyControlExtension"
+WIDGET_XCCONFIG = "Config/Widget.xcconfig"
+APP_READ_ONLY_SETTING = "ENABLE_USER_SELECTED_FILES = readonly;"
 
 
 class Fixture:
@@ -270,8 +279,28 @@ class ProjectFixtureTests(CheckerTestCase):
         self.assertFailsWith(self.fixture.errors(), "ENABLE_RESOURCE_ACCESS_CAMERA = YES grants access")
 
     def test_file_access(self) -> None:
-        self.fixture.add_app_setting("ENABLE_USER_SELECTED_FILES = readwrite;")
+        self.fixture.replace(APP_READ_ONLY_SETTING, "ENABLE_USER_SELECTED_FILES = readwrite;", count=2)
         self.assertFailsWith(self.fixture.errors(), "ENABLE_USER_SELECTED_FILES = readwrite grants access")
+
+    def test_conditional_read_write_cannot_hide_behind_read_only(self) -> None:
+        conditional = "ENABLE_USER_SELECTED_FILES[config=Debug] = readwrite\n"
+        self.fixture.edit(SHARED, "SWIFT_VERSION = 6.0\n", "SWIFT_VERSION = 6.0\n" + conditional)
+        self.assertFailsWith(
+            self.fixture.errors(), "target ShowMyCopy (Debug): ENABLE_USER_SELECTED_FILES = readwrite grants access"
+        )
+
+    def test_read_only_setting_in_the_widget_fails(self) -> None:
+        self.fixture.edit(WIDGET_XCCONFIG, "MACOSX_DEPLOYMENT_TARGET = 26.0\n",
+                          "MACOSX_DEPLOYMENT_TARGET = 26.0\nENABLE_USER_SELECTED_FILES = readonly\n")
+        self.assertFailsWith(
+            self.fixture.errors(), "target %s (Release): ENABLE_USER_SELECTED_FILES = readonly grants access" % WIDGET
+        )
+
+    def test_read_only_setting_for_every_target_fails_in_the_widget(self) -> None:
+        self.fixture.edit(SHARED, "SWIFT_VERSION = 6.0\n", "SWIFT_VERSION = 6.0\n" + APP_READ_ONLY_SETTING[:-1] + "\n")
+        errors = self.fixture.errors()
+        self.assertFailsWith(errors, "target %s (Debug): ENABLE_USER_SELECTED_FILES = readonly grants access" % WIDGET)
+        self.assertFalse([error for error in errors if "target ShowMyCopy (" in error], errors)
 
     def test_other_code_sign_flags_entitlements(self) -> None:
         self.fixture.add_app_setting('OTHER_CODE_SIGN_FLAGS = ("--entitlements", "x.plist");')
@@ -295,9 +324,73 @@ class ProjectFixtureTests(CheckerTestCase):
         self.assertFailsWith(self.fixture.errors(), "cannot read entitlements file")
 
     def test_allowed_entitlements_file_passes(self) -> None:
-        self.fixture.write("ShowMyCopy/App.entitlements", plist(SANDBOX_ONLY))
-        self.fixture.add_app_setting("CODE_SIGN_ENTITLEMENTS = ShowMyCopy/App.entitlements;")
+        # The app's own file with user-selected read-only files, and the build setting that says the same.
+        self.fixture.write(APP_FILE, plist(APP_ENTITLEMENTS))
+        self.fixture.add_app_setting("CODE_SIGN_ENTITLEMENTS = %s;" % APP_FILE)
+        self.assertIn(APP_READ_ONLY_SETTING, self.fixture.pbxproj)
         self.assertEqual(self.fixture.errors(), [])
+
+    def test_app_read_only_must_be_exactly_true(self) -> None:
+        self.fixture.add_app_setting("CODE_SIGN_ENTITLEMENTS = %s;" % APP_FILE)
+        for value in (False, 1, "true", "YES"):
+            with self.subTest(value=value):
+                self.fixture.write(APP_FILE, plist(dict(SANDBOX_ONLY, **{READ_ONLY: value})))
+                self.assertFailsWith(self.fixture.errors(), "entitlement %s must be True" % READ_ONLY)
+
+    def test_app_read_write_fails(self) -> None:
+        self.fixture.add_app_setting("CODE_SIGN_ENTITLEMENTS = %s;" % APP_FILE)
+        for ents in (dict(SANDBOX_ONLY, **{READ_WRITE: True}), dict(APP_ENTITLEMENTS, **{READ_WRITE: True})):
+            with self.subTest(ents=sorted(ents)):
+                self.fixture.write(APP_FILE, plist(ents))
+                self.assertFailsWith(
+                    self.fixture.errors(), "CODE_SIGN_ENTITLEMENTS: entitlement %s is not allowed" % READ_WRITE
+                )
+
+    def test_app_read_only_without_the_build_setting_fails(self) -> None:
+        self.fixture.replace("\t\t\t\t" + APP_READ_ONLY_SETTING + "\n", "", count=2)
+        self.fixture.write(APP_FILE, plist(APP_ENTITLEMENTS))
+        self.fixture.add_app_setting("CODE_SIGN_ENTITLEMENTS = %s;" % APP_FILE)
+        self.assertFailsWith(
+            self.fixture.errors(),
+            "ENABLE_USER_SELECTED_FILES = (not set) and %s in %s disagree" % (READ_ONLY, APP_FILE),
+        )
+
+    def test_build_setting_without_the_app_read_only_entitlement_fails(self) -> None:
+        self.fixture.write(APP_FILE, plist(SANDBOX_ONLY))
+        self.fixture.add_app_setting("CODE_SIGN_ENTITLEMENTS = %s;" % APP_FILE)
+        self.assertFailsWith(
+            self.fixture.errors(), "ENABLE_USER_SELECTED_FILES = readonly and %s in %s disagree" % (READ_ONLY, APP_FILE)
+        )
+
+    def test_read_only_build_setting_through_a_variable_is_not_trusted(self) -> None:
+        self.fixture.replace(APP_READ_ONLY_SETTING, 'ENABLE_USER_SELECTED_FILES = "$(FILES)";', count=2)
+        self.fixture.write(APP_FILE, plist(APP_ENTITLEMENTS))
+        self.fixture.add_app_setting("CODE_SIGN_ENTITLEMENTS = %s;" % APP_FILE)
+        errors = self.fixture.errors()
+        self.assertFailsWith(errors, "ENABLE_USER_SELECTED_FILES uses a build setting variable")
+        self.assertFailsWith(errors, "ENABLE_USER_SELECTED_FILES = $(FILES) grants access")
+
+    def test_app_read_only_in_another_file_fails(self) -> None:
+        self.fixture.write("ShowMyCopy/App.entitlements", plist(APP_ENTITLEMENTS))
+        self.fixture.add_app_setting("CODE_SIGN_ENTITLEMENTS = ShowMyCopy/App.entitlements;")
+        errors = self.fixture.errors()
+        self.assertFailsWith(errors, "CODE_SIGN_ENTITLEMENTS: entitlement %s is not allowed (only the app" % READ_ONLY)
+        self.assertFailsWith(errors, "ShowMyCopy/App.entitlements: entitlement %s is not allowed" % READ_ONLY)
+
+    def test_read_only_in_the_widget_file_fails(self) -> None:
+        self.fixture.write(WIDGET_FILE, plist(APP_ENTITLEMENTS))
+        self.assertFailsWith(
+            self.fixture.errors(), "%s: entitlement %s is not allowed (only the app" % (WIDGET_FILE, READ_ONLY)
+        )
+
+    def test_widget_signed_with_the_app_file_fails(self) -> None:
+        self.fixture.write(APP_FILE, plist(APP_ENTITLEMENTS))
+        self.fixture.edit(WIDGET_XCCONFIG, "MACOSX_DEPLOYMENT_TARGET = 26.0\n",
+                          "MACOSX_DEPLOYMENT_TARGET = 26.0\nCODE_SIGN_ENTITLEMENTS = %s\n" % APP_FILE)
+        self.assertFailsWith(
+            self.fixture.errors(),
+            "target %s (Release) CODE_SIGN_ENTITLEMENTS: entitlement %s is not allowed" % (WIDGET, READ_ONLY),
+        )
 
     def test_stray_entitlements_file(self) -> None:
         self.fixture.write(
@@ -603,6 +696,21 @@ class XcodebuildTests(CheckerTestCase):
             self.errors(), "xcodebuild: target ShowMyCopy (Debug): ENABLE_OUTGOING_NETWORK_CONNECTIONS must not be YES"
         )
 
+    def test_widget_read_only_resolved(self) -> None:
+        self.settings[(WIDGET, "Release")]["ENABLE_USER_SELECTED_FILES"] = "readonly"
+        self.assertFailsWith(
+            self.errors(),
+            "xcodebuild: target %s (Release): ENABLE_USER_SELECTED_FILES = readonly grants access" % WIDGET,
+        )
+
+    def test_app_read_write_resolved(self) -> None:
+        self.assertEqual(self.settings[("ShowMyCopy", "Release")]["ENABLE_USER_SELECTED_FILES"], "readonly")
+        self.resolve("Release", "ENABLE_USER_SELECTED_FILES", "readwrite")
+        self.assertFailsWith(
+            self.errors(),
+            "xcodebuild: target ShowMyCopy (Release): ENABLE_USER_SELECTED_FILES = readwrite grants access",
+        )
+
     def test_project_file_debug_hardened_runtime_no_still_fails(self) -> None:
         # The project must still declare YES everywhere; only Xcode's own resolution may say NO.
         self.fixture.replace(APP_DEBUG, APP_DEBUG + "\t\t\t\tENABLE_HARDENED_RUNTIME = NO;\n")
@@ -655,6 +763,31 @@ class SignedAppTests(CheckerTestCase):
         self.bundle(self.nested("Frameworks/KeyboardShortcuts.framework"), None)
         self.bundle(self.nested("Frameworks/libFoo.dylib"), None)
         self.assertEqual(self.errors(), [])
+
+    def test_app_with_read_only_passes(self) -> None:
+        self.bundle(self.app, APP_ENTITLEMENTS)
+        self.bundle(self.nested("PlugIns/Share.appex"), SANDBOX_ONLY)
+        self.assertEqual(self.errors(), [])
+
+    def test_app_read_only_must_be_exactly_true(self) -> None:
+        for value in (False, 1, "true"):
+            with self.subTest(value=value):
+                self.bundle(self.app, dict(SANDBOX_ONLY, **{READ_ONLY: value}))
+                self.assertFailsWith(self.errors(), "entitlement %s must be True" % READ_ONLY)
+
+    def test_app_read_write_next_to_read_only_fails(self) -> None:
+        self.bundle(self.app, dict(APP_ENTITLEMENTS, **{READ_WRITE: True}))
+        self.assertFailsWith(self.errors(), "entitlement %s is not allowed" % READ_WRITE)
+
+    def test_embedded_code_with_read_only_fails(self) -> None:
+        for relative in ("PlugIns/Share.appex", "XPCServices/Helper.xpc", "Library/LoginItems/Helper.app"):
+            with self.subTest(relative):
+                self.bundle(self.app, APP_ENTITLEMENTS)
+                self.bundle(self.nested(relative), APP_ENTITLEMENTS)
+                errors = self.errors()
+                self.assertFailsWith(errors, "%s: entitlement %s is not allowed (only the app" % (relative, READ_ONLY))
+                self.assertEqual(len(errors), 1, errors)
+                shutil.rmtree(self.nested(relative))
 
     def test_sandbox_false(self) -> None:
         self.bundle(self.app, {"com.apple.security.app-sandbox": False})
