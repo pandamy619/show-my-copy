@@ -321,7 +321,7 @@ class CodeScanTests(CheckerTestCase):
 
     def test_disk_space_read_from_getfsstat_results_fails(self) -> None:
         self.fixture.replace(
-            "ShowMyCopy/Platform/Files/SystemMountedVolumes.swift",
+            "ShowMyCopy/History/SystemMountedVolumes.swift",
             "isLocal: info.f_flags & UInt32(MNT_LOCAL) != 0",
             "isLocal: info.f_flags & UInt32(MNT_LOCAL) != 0 && info.f_bavail > 0",
         )

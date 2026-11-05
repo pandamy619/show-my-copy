@@ -161,7 +161,7 @@ LOOKALIKES: List[Tuple[str, str, Set[str], str]] = [
     (
         _name("getfsstat"),
         "getfsstat",
-        {"ShowMyCopy/Platform/Files/SystemMountedVolumes.swift"},
+        {"ShowMyCopy/History/SystemMountedVolumes.swift"},
         "lists mounted volumes; it fills statfs structures, but the app reads only the mount point, the file system "
         "type and MNT_LOCAL, never free or total space (reading those matches the disk space category). Apple lists "
         "statfs, statvfs, fstatfs and fstatvfs, not getfsstat.",
