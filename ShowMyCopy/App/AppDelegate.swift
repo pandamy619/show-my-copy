@@ -29,6 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !Self.isRunningTests else {
             return
         }
+        // Before anything reads the clipboard or opens the history: two processes on one saved history would each
+        // save every copy, and the next launch would list it twice.
+        if Self.anotherInstanceIsRunning() {
+            AppLogger.app.info("Another copy of the app is running; quitting this one")
+            NSApplication.shared.terminate(nil)
+            return
+        }
         let firstLaunch = FirstLaunch()
         // Before anything opens the history: development builds saved it in a format that is gone.
         if let applicationSupport = HistoryFolder.applicationSupport() {
@@ -42,6 +49,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let history = await AppHistory.loadSaved(blobs: blobs, defaults: .standard)
             finishLaunching(history: history, blobs: blobs, firstLaunch: firstLaunch)
         }
+    }
+
+    /// Asks LaunchServices, which keeps the list of running apps in memory, so nothing waits for the disk.
+    private static func anotherInstanceIsRunning() -> Bool {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
+            return false
+        }
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).map { app in
+            SingleInstance.RunningCopy(
+                bundleIdentifier: app.bundleIdentifier, processIdentifier: app.processIdentifier,
+                isTerminated: app.isTerminated)
+        }
+        return SingleInstance.anotherIsRunning(
+            bundleIdentifier: bundleIdentifier, ownProcess: NSRunningApplication.current.processIdentifier,
+            running: running)
     }
 
     private func finishLaunching(history: AppHistory, blobs: InFlightBlobStore?, firstLaunch: FirstLaunch) {
