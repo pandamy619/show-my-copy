@@ -82,6 +82,45 @@ struct RetentionPolicy: Equatable, Sendable {
     }
 }
 
+// MARK: - Pinned entries
+
+extension RetentionPolicy {
+    /// The most entries that are pinned at once. Pinned entries do not count toward the other limits, so this one
+    /// bounds what they keep: up to 50 copies of the largest content allowed. Pinning one more unpins the oldest.
+    static let maximumPinned = 50
+
+    /// How far apart entries unpinned together are dated, so they keep their order after a relaunch too.
+    private static let unpinnedSpacing: TimeInterval = 0.001
+
+    /// `entries` with at most `maximumPinned` pinned. The oldest pinned entries over the limit (pinned first, by
+    /// their date) are unpinned as the user unpins an entry at `date`: put at the top of the history as if just
+    /// copied, the newest pinned of them first, so the age limit does not remove them at once and the other limits
+    /// count them again. `keeping`, the entry the user just pinned, is never one of them, even when the clock was
+    /// set back since the other pins. `entries` are newest first, as the history keeps them; with no more than
+    /// `maximumPinned` pinned they are returned as they are.
+    static func limitingPins(
+        _ entries: [ClipboardEntry],
+        at date: Date,
+        keeping kept: ClipboardEntry.ID? = nil
+    ) -> [ClipboardEntry] {
+        let pinnedCount = entries.count(where: \.isPinned)
+        guard pinnedCount > maximumPinned else {
+            return entries
+        }
+        let oldest = entries.filter { $0.isPinned && $0.id != kept }.sorted { $0.date > $1.date }
+            .suffix(pinnedCount - maximumPinned)
+        let unpinnedIDs = Set(oldest.map(\.id))
+        var limited = entries.filter { !unpinnedIDs.contains($0.id) }
+        for (offset, entry) in oldest.enumerated() {
+            var unpinned = entry
+            unpinned.isPinned = false
+            unpinned.date = date - Double(offset) * unpinnedSpacing
+            limited.insert(unpinned, at: limited.firstIndex { $0.date <= unpinned.date } ?? limited.endIndex)
+        }
+        return limited
+    }
+}
+
 extension Duration {
     /// The duration in seconds, for date arithmetic.
     var timeInterval: TimeInterval {

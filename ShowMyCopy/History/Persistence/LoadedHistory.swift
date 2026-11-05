@@ -253,3 +253,30 @@ extension PersistentHistoryStore {
             openError: openError, blobs: blobs, leftovers: leftovers)
     }
 }
+
+extension SavedRecords {
+    /// The one write of a launch: deletes `deleted`, and saves the entries the history changed while it started
+    /// from `loaded` (`started` is what it holds then): pinned ones over `RetentionPolicy.maximumPinned` that were
+    /// unpinned. Entries the coder cannot write are left out and returned, to be written with the next change.
+    static func launchChange(
+        deleting deleted: [UUID],
+        loaded: [ClipboardEntry],
+        started: [ClipboardEntry],
+        coder: StoredEntryCoder
+    ) -> (change: StoredChange, unwritten: Set<UUID>) {
+        let loadedByID = Dictionary(loaded.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var change = StoredChange(deleted: deleted)
+        var unwritten: Set<UUID> = []
+        for entry in started where loadedByID[entry.id] != entry {
+            do {
+                if let record = try coder.record(for: entry) {
+                    change.saved.append(record)
+                }
+            } catch {
+                // Logged by the coder.
+                unwritten.insert(entry.id)
+            }
+        }
+        return (change, unwritten)
+    }
+}

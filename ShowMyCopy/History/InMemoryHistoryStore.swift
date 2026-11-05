@@ -29,10 +29,12 @@ final class InMemoryHistoryStore: HistoryStore {
         self.now = now
     }
 
-    /// Starts with `entries`, newest first, such as a history saved before the app quit. Removes the concealed
-    /// entries whose time is up at `date` and the entries past the age limit first, then the entries the other
-    /// limits do not allow, so an expired entry does not push out one that fits once it is gone. No entry is
-    /// current: nothing says yet what is on the pasteboard.
+    /// Starts with `entries`, newest first, such as a history saved before the app quit. Unpins the oldest pinned
+    /// entries over `RetentionPolicy.maximumPinned` at `date` first, as if the user unpinned them then (a history
+    /// pinned before the limit, or by two running copies of the app). Then removes the concealed entries whose time
+    /// is up at `date` and the entries past the age limit, then the entries the other limits do not allow, so an
+    /// expired entry does not push out one that fits once it is gone. No entry is current: nothing says yet what is
+    /// on the pasteboard.
     init(
         restoring entries: [ClipboardEntry],
         at date: Date,
@@ -41,7 +43,7 @@ final class InMemoryHistoryStore: HistoryStore {
         blobs: (any BlobStore)? = nil,
         now: @escaping @MainActor () -> Date = { Date() }
     ) {
-        self.entries = entries
+        self.entries = RetentionPolicy.limitingPins(entries, at: date)
         self.retention = retention
         self.hasher = hasher
         self.blobs = blobs
@@ -301,7 +303,9 @@ extension InMemoryHistoryStore {
     /// Adds entries saved before that could not be loaded with the others, such as saved passwords that waited for
     /// their key, or entries removed earlier in this session (see `HistoryStore.restore(_:)`), each at its place by
     /// date. An entry whose ID or content is in the history already is not added: the one in the history was recorded
-    /// in this session and may be current. Nothing becomes current, and the limits apply afterwards.
+    /// in this session and may be current. Nothing becomes current. A pinned entry put back keeps its pin, and with
+    /// more than `RetentionPolicy.maximumPinned` pinned then the oldest pinned is unpinned, as when pinning one more:
+    /// it may be the one put back. The limits apply afterwards.
     func restore(_ restored: [ClipboardEntry]) {
         var ids = Set(entries.map(\.id))
         var hashes = Set(entries.map(\.contentHash))
@@ -319,6 +323,7 @@ extension InMemoryHistoryStore {
         guard added else {
             return
         }
+        entries = RetentionPolicy.limitingPins(entries, at: now())
         entriesChanged()
         trim()
     }
@@ -338,6 +343,8 @@ extension InMemoryHistoryStore {
         // Pinned: its place among the pinned entries. Unpinned: the top, as if just copied.
         entry.date = now()
         entries.insert(entry, at: entries.firstIndex { $0.date <= entry.date } ?? entries.endIndex)
+        // One past the limit unpins the oldest pinned entry in the same change, never this one.
+        entries = RetentionPolicy.limitingPins(entries, at: entry.date, keeping: entry.id)
         entriesChanged()
         trim()
     }

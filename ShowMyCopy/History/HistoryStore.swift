@@ -104,7 +104,9 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// Puts back entries removed earlier in this session, such as one the user deleted and then brought back with
     /// Undo: each at its place by date, with its ID, content, blobs, source app, concealment and expiry. An entry
     /// whose ID or content the history holds already (it was copied again meanwhile) is not added, and none becomes
-    /// current: what is on the pasteboard now is not known to be it. The limits apply afterwards.
+    /// current: what is on the pasteboard now is not known to be it. A pinned entry comes back pinned at its place;
+    /// when that makes more than `RetentionPolicy.maximumPinned` pinned, the oldest pinned entry is unpinned as in
+    /// `setPinned(_:id:)`, even when it is the one put back. The limits apply afterwards.
     ///
     /// The store owns the blobs of the entries it adds from this call on. Those of entries it does not add stay with
     /// the caller, who must keep them from being deleted while the entry is out of the history (see
@@ -115,6 +117,12 @@ protocol HistoryStore: AnyObject, Observable, Sendable {
     /// order they were pinned in; the limits no longer count it. Unpinning puts it at the top as if just copied, so
     /// the age limit does not remove it at once, and the limits count it again. A concealed entry cannot be pinned:
     /// nothing changes. Nothing changes for an entry already in that state or one that is gone either.
+    ///
+    /// At most `RetentionPolicy.maximumPinned` entries are pinned. Pinning one more unpins the oldest pinned entry
+    /// (pinned first) in the same change, as if the user unpinned it now: it goes to the top of the history with
+    /// the store's time as its date. Its copy date is not kept: a pinned entry's date is when it was pinned, and an
+    /// older date would let the age limit remove it at once. The history window tells the user (`HistoryWindowModel`).
+    /// A saved history with more pinned entries is loaded with the newest pinned ones kept the same way.
     func setPinned(_ isPinned: Bool, id: ClipboardEntry.ID)
 
     /// Removes every entry, or every entry that is not pinned with `keepingPinned`. A current entry that is kept

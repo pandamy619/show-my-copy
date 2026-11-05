@@ -61,9 +61,10 @@ final class PersistentHistoryStore: HistoryStore, HistoryStorage {
     /// Starts from the saved history as `loaded` found it (see `LoadedHistory` and `load`): the entries `retention`
     /// does not allow are removed, also from disk, and the records loading found unreadable, unwanted or holding the
     /// content of another record are deleted, so load with the limits and the password choice the user saved, not
-    /// the defaults. `now` is the store's clock, which the age limit is measured against. `openError` is what went
-    /// wrong opening the store on disk, if anything, to show in `storageError`. `leftovers` are the files of a saved
-    /// history this session does not use, such as a damaged copy.
+    /// the defaults. Pinned entries over `RetentionPolicy.maximumPinned` are unpinned and saved so in that write.
+    /// `now` is the store's clock, which the age limit is measured against. `openError` is what went wrong opening
+    /// the store on disk, if anything, to show in `storageError`. `leftovers` are the files of a saved history this
+    /// session does not use, such as a damaged copy.
     ///
     /// Image data lives in `blobs`. An entry whose data is gone is deleted, and blobs that no saved record
     /// references (written for an entry that was never saved, or left by a failed delete) are deleted too. Without
@@ -102,9 +103,12 @@ final class PersistentHistoryStore: HistoryStore, HistoryStorage {
         }
         // One transaction, so a failed delete leaves the disk as it was and the next write tries again.
         let deleted = found.unwanted + found.unreadable + found.duplicates + removed
+        let (change, unwritten) = SavedRecords.launchChange(
+            deleting: deleted, loaded: found.entries, started: memory.entries, coder: coder)
+        unsaved.formUnion(unwritten)
         var isDeleted = true
-        if !deleted.isEmpty {
-            isDeleted = write(StoredChange(deleted: deleted), covering: Set(deleted))
+        if !change.isEmpty {
+            isDeleted = write(change, covering: Set(deleted + change.saved.map(\.id)))
         }
         // `loaded` listed the blobs only with every record known (`LoadedHistory.Read.sweepsBlobs`). Those of records
         // that could not be deleted stay.
