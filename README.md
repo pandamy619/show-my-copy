@@ -42,6 +42,8 @@ Show My Copy is in early development. There are no releases yet; build it from s
 - **English and Russian** interface.
 - **Private by design.** No analytics. Sandboxed without network access, so the app itself makes no connections; the only file access it asks for is reading the app you choose in Settings → Excluded apps; file thumbnails are drawn by macOS QuickLook outside the sandbox, for local files only (see [SECURITY.md](SECURITY.md)).
 
+The app sends nothing you copy anywhere: see the [privacy policy](PRIVACY.md) for what the app stores, where and for how long, and how to delete all of it.
+
 Deleted entries can stay in the history file's free space until they are overwritten. A password copied without a marker from an app that is not a known password manager, such as a browser extension, can still be kept like normal text — see [SECURITY.md](SECURITY.md) for the details and known limitations.
 
 ## Building
@@ -63,6 +65,12 @@ Settings every target shares (Swift 6 with complete concurrency checking, warnin
 `make lint` needs SwiftLint: `brew install swiftlint`.
 
 Only one copy of the app runs at a time. A Debug build run from Xcode replaces a Debug build that is already running; next to a Release copy, such as the installed app at login, it quits after a few seconds and the installed app shows its Settings. Quit that copy first: `pkill -x ShowMyCopy`.
+
+`make lint` also checks the app's privacy manifest against the code (`scripts/check_privacy_manifest.py`) and the App Store texts in `AppStore/metadata` against App Store Connect's length limits (`scripts/check_store_metadata.py`).
+
+## Mac App Store
+
+The app is being prepared for the Mac App Store: [checklist](AppStore/CHECKLIST.md), [store texts](AppStore/metadata), [notes for App Review](AppStore/review-notes.md) and the [privacy policy](PRIVACY.md).
 
 ## License
 
