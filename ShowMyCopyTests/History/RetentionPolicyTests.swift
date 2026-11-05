@@ -167,4 +167,44 @@ struct RetentionPolicyTests {
         #expect(policy.maxAge == .zero)
         #expect(policy.kept(entries(2), at: start + 1).map(\.text) == [])
     }
+
+    /// `count` pinned entries, "pin 0" pinned first, newest first like the history keeps them.
+    private func pinned(_ count: Int) -> [ClipboardEntry] {
+        entries(count).map { entry in
+            var pinned = entry
+            pinned.isPinned = true
+            return pinned
+        }
+    }
+
+    @Test func atMostTheLimitLeavesThePinsAsTheyAre() {
+        let all = pinned(RetentionPolicy.maximumPinned) + entries(2)
+        #expect(RetentionPolicy.limitingPins(all, at: start + 100) == all)
+    }
+
+    @Test func theOldestPinsOverTheLimitAreUnpinnedOnTopNewestFirstAMomentApart() {
+        let all = pinned(RetentionPolicy.maximumPinned + 2)
+
+        let limited = RetentionPolicy.limitingPins(all, at: start + 100)
+
+        #expect(limited.filter(\.isPinned).count == RetentionPolicy.maximumPinned)
+        #expect(limited.prefix(2).map(\.text) == ["item 1", "item 0"])
+        #expect(limited.prefix(2).allSatisfy { !$0.isPinned })
+        #expect(limited[0].date == start + 100)
+        #expect(limited[1].date < limited[0].date)
+        #expect(limited[1].date > start + 99)
+    }
+
+    /// The entry just pinned stays pinned even when the clock was set back since the other pins.
+    @Test func theEntryKeptIsNeverUnpinned() throws {
+        var all = pinned(RetentionPolicy.maximumPinned + 1)
+        let index = try #require(all.indices.first)
+        all[index].date = start - 1000
+        let kept = all[index].id
+
+        let limited = RetentionPolicy.limitingPins(all, at: start - 1000, keeping: kept)
+
+        #expect(limited.first { $0.id == kept }?.isPinned == true)
+        #expect(limited.first { $0.text == "item 0" }?.isPinned == false)
+    }
 }

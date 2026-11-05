@@ -61,6 +61,51 @@ struct PersistentHistoryStorePinTests {
         #expect(store.storageError == nil)
     }
 
+    /// 51 pinned records, "pin 0" the oldest, and an older plain copy of "pin 3", as saved before the limit.
+    private func saveTooManyPins() throws -> (oldest: ClipboardEntry, copy: ClipboardEntry) {
+        let pinned = (0...RetentionPolicy.maximumPinned).map { index in
+            StoreHarness.saved("pin \(index)", at: start - 100 + Double(index), pinned: true)
+        }
+        let copy = StoreHarness.saved("pin 3", at: start - 200)
+        let coder = StoredEntryCoder(sealer: FakeSecretSealer(), hasher: SHA256ContentHasher())
+        try disk.insert(try (pinned + [copy]).compactMap { try coder.record(for: $0) })
+        disk.resetCalls()
+        return (pinned[0], copy)
+    }
+
+    @Test func pinsOverTheLimitAreUnpinnedInTheLoadsOneTransaction() throws {
+        let (oldest, copy) = try saveTooManyPins()
+
+        let store = makeStore()
+
+        // With the copy that loading deletes, in the one write of the launch.
+        #expect(disk.calls == [.loadAll, .apply])
+        let change = try #require(disk.changes.first)
+        #expect(change.deleted == [copy.id])
+        #expect(change.saved.map(\.id) == [oldest.id])
+        #expect(disk.record(oldest.id)?.isPinned == false)
+        #expect(disk.record(oldest.id)?.date == start)
+        #expect(store.entries.filter(\.isPinned).count == RetentionPolicy.maximumPinned)
+        #expect(store.storageError == nil)
+    }
+
+    @Test func pinsUnpinnedAtLaunchThatCouldNotBeSavedAreSavedWithTheNextChange() throws {
+        let (oldest, copy) = try saveTooManyPins()
+        disk.failingCalls = [disk.nextCall + 1]
+
+        let store = makeStore()
+        #expect(store.storageError == .saveFailed)
+        #expect(disk.record(oldest.id)?.isPinned == true)
+        #expect(disk.record(copy.id) != nil)
+        #expect(store.entries.first { $0.id == oldest.id }?.isPinned == false)
+
+        store.record(text: "next", sourceApp: nil, at: start + 1)
+        #expect(disk.record(oldest.id)?.isPinned == false)
+        #expect(disk.record(copy.id) == nil)
+        #expect(store.storageError == nil)
+        #expect(makeStore().entries == store.entries)
+    }
+
     @Test func clearKeepingPinnedSavesThePinnedAndDeletesTheOthers() {
         let store = makeStore()
         let pinned = store.record(text: "pinned", sourceApp: nil, at: start)
