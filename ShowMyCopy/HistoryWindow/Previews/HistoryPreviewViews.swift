@@ -136,6 +136,10 @@ struct EntryPreviewPane: View {
     let preview: EntryPreviewModel
     let thumbnails: ThumbnailProvider
     let icons: WorkspaceFileIconProvider
+    /// Copies text the user selected in the preview without recording it (`EntryCopying.copyText(_:)`).
+    let onCopyText: @MainActor (String) -> Void
+    /// Esc in selected text: the keys go back to the search field.
+    let onLeaveText: @MainActor () -> Void
     let onClose: @MainActor () -> Void
 
     var body: some View {
@@ -212,7 +216,8 @@ struct EntryPreviewPane: View {
         case .image(_, let state):
             imagePreview(state)
         case .files(let items):
-            FilesPreview(items: items, thumbnails: thumbnails, icons: icons)
+            FilesPreview(
+                items: items, thumbnails: thumbnails, icons: icons, onCopyText: onCopyText, onLeaveText: onLeaveText)
         case nil:
             Color.clear
         }
@@ -272,11 +277,14 @@ private struct PlainTextPreview: View {
     }
 }
 
-/// The copied files, with their thumbnails or icons, sizes and a mark on those that may be unavailable.
+/// The copied files, with their thumbnails or icons, the folders they are in, sizes and a mark on those that may be
+/// unavailable. The folder can be selected and copied by hand (`SelectablePathText`).
 private struct FilesPreview: View {
     let items: [FilePreviewItem]
     let thumbnails: ThumbnailProvider
     let icons: WorkspaceFileIconProvider
+    let onCopyText: @MainActor (String) -> Void
+    let onLeaveText: @MainActor () -> Void
 
     var body: some View {
         ScrollView {
@@ -290,6 +298,11 @@ private struct FilesPreview: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                                 .accessibilityLabel(fileAccessibilityLabel(name: item.name, thumbnail: item.thumbnail))
+                            if let folder = item.folder {
+                                // VoiceOver hears the folder as the item's value, below.
+                                SelectablePathText(text: folder, onCopy: onCopyText, onEscape: onLeaveText)
+                                    .accessibilityHidden(true)
+                            }
                             if let size = item.byteSize {
                                 Text(verbatim: ByteCount.fileSize(size))
                                     .font(.caption)
@@ -304,6 +317,7 @@ private struct FilesPreview: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .accessibilityElement(children: .combine)
+                    .modifier(FolderAccessibilityValue(folder: item.folder))
                 }
             }
             .padding(6)

@@ -62,6 +62,30 @@ final class EntryCopier: EntryCopying {
         return changeCount
     }
 
+    /// Puts text the user selected in the history window and copied with ⌘C, such as the folder of a copied file in
+    /// the preview, on the pasteboard as plain text, with the app's source marker, and does not record it.
+    ///
+    /// The history panel does not make the app active, so a copy the monitor found on its own would be recorded as
+    /// one from the app in front, which did not make it, and would add an entry for a detail of an entry already
+    /// there. So, as in `copy(_:)`, the monitor first records anything copied since its last poll and is then told
+    /// about the write. The clipboard now holds what no entry holds, so no entry is current any more.
+    ///
+    /// Returns nil, and leaves the history and the monitor alone, for empty text or when the write failed.
+    @discardableResult
+    func copyText(_ text: String) -> Int? {
+        guard !text.isEmpty else {
+            return nil
+        }
+        monitor.poll()
+        guard let changeCount = pasteboard.write(text) else {
+            AppLogger.clipboard.info("Could not put the selected text on the pasteboard")
+            return nil
+        }
+        monitor.acknowledge(changeCount: changeCount)
+        history.markCurrentSkipped()
+        return changeCount
+    }
+
     /// What to put on the pasteboard for `content`: styled text with its plain text, an image in its original
     /// format (read from the blob store now, the only time the full image is read), files as their URLs. Nil when
     /// the image data cannot be read.

@@ -118,6 +118,12 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Copies text the user selected in the window, such as a file's folder in the preview, without recording it
+    /// (`EntryCopying.copyText(_:)`). The window stays open: the user copied a detail, not an entry.
+    func copySelectedText(_ text: String) {
+        copier.copyText(text)
+    }
+
     /// ⌘⌫, ⌘Z and ⌘P, which reach the panel as key equivalents before the search field or the main menu sees them.
     /// Returns false for a key the model leaves to the search field, such as ⌘Z with nothing to bring back, which
     /// then undoes typing. ⌘P is always handled while the window is open, so it never prints.
@@ -234,21 +240,24 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         background.state = .active
         background.autoresizingMask = [.width, .height]
 
-        let content = HistoryContentFactory.makeView(
-            model: model,
-            onChoose: { [weak self] entry, pastes in
+        let actions = HistoryViewActions(
+            choose: { [weak self] entry, pastes in
                 self?.choose(entry, pastes: pastes)
             },
-            onClose: { [weak self] in
+            close: { [weak self] in
                 self?.hide()
             },
-            onOpenSettings: { [weak self] in
+            openSettings: { [weak self] in
                 self?.openSettings()
             },
-            onDrag: { [weak self] event in
+            drag: { [weak self] event in
                 self?.rowDrag(event)
+            },
+            copyText: { [weak self] text in
+                self?.copySelectedText(text)
             }
         )
+        let content = HistoryContentFactory.makeView(model: model, actions: actions)
         content.frame = background.bounds
         content.autoresizingMask = [.width, .height]
         background.addSubview(content)

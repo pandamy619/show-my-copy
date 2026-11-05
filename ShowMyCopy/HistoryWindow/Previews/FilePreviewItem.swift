@@ -7,8 +7,10 @@ struct FilePreviewItem: Identifiable, Equatable, Sendable {
     let id: Int
     /// The file name, sanitized like any other text in the history window.
     let name: String
-    /// The path, for the file's icon. Not shown.
+    /// The path, for the file's icon.
     let path: String
+    /// The folder the file is in, shown under its name (`FilePathDisplay`), or nil for the startup disk itself.
+    let folder: String?
     /// The size when the file was copied, or nil for a folder or a file the app could not read.
     let byteSize: Int?
     /// The thumbnail of a photo or video, shown instead of the icon, or nil.
@@ -20,6 +22,7 @@ struct FilePreviewItem: Identifiable, Equatable, Sendable {
         self.id = id
         name = EntryPreview.text(file.name)
         path = file.path
+        folder = FilePathDisplay.current.folder(of: file)
         byteSize = file.byteSize
         thumbnail = file.thumbnail
         self.availability = availability

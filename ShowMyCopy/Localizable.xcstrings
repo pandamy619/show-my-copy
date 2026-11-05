@@ -299,6 +299,16 @@
         }
       }
     },
+    "and %lld more" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "и ещё %lld"
+          }
+        }
+      }
+    },
     "App memory" : {
       "localizations" : {
         "ru" : {
@@ -395,6 +405,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Скопированное в известных менеджерах паролей пропускается, если не включено «Сохранять пароли»."
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопировать"
           }
         }
       }
@@ -635,6 +655,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Изображения"
+          }
+        }
+      }
+    },
+    "In folder %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В папке %@"
           }
         }
       }

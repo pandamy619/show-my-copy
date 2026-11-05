@@ -7,4 +7,9 @@ protocol EntryCopying: AnyObject {
     /// pasteboard.
     @discardableResult
     func copy(_ entry: ClipboardEntry) -> Int?
+
+    /// Puts text the user selected in the window and copied by hand, such as a file's folder, on the pasteboard
+    /// without recording it. Returns the change count after the write, or nil when nothing was written.
+    @discardableResult
+    func copyText(_ text: String) -> Int?
 }

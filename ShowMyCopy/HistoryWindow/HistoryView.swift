@@ -10,6 +10,8 @@ struct HistoryView: View {
     let onOpenSettings: @MainActor () -> Void
     /// A row is being dragged into another app (`RowDragSource`).
     let onDrag: @MainActor (RowDragEvent) -> Void
+    /// Copies text the user selected in the preview, such as a file's folder, without recording it.
+    let onCopyText: @MainActor (String) -> Void
 
     @FocusState private var isSearchFocused: Bool
 
@@ -37,15 +39,22 @@ struct HistoryView: View {
                     .overlay {
                         if let previewed {
                             EntryPreviewPane(
-                                entry: previewed, preview: model.preview, thumbnails: model.thumbnails, icons: icons
-                            ) {
-                                model.preview.close()
-                            }
+                                entry: previewed, preview: model.preview, thumbnails: model.thumbnails, icons: icons,
+                                onCopyText: onCopyText,
+                                onLeaveText: { isSearchFocused = true },
+                                onClose: { model.preview.close() }
+                            )
                         }
                     }
                     // An image saved or thumbnails made after the preview opened show up in it.
                     .onChange(of: previewed?.content) {
                         model.previewedEntryChanged()
+                    }
+                    // A folder selected in the preview had the focus; the keys go to the search field again.
+                    .onChange(of: previewed == nil) { _, isClosed in
+                        if isClosed {
+                            isSearchFocused = true
+                        }
                     }
             }
         }
@@ -312,6 +321,8 @@ private struct HistoryRow: View {
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        // Where the copied files are, on hover. The row itself stays as it is.
+        .modifier(FilePathsHelp(entry: entry))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -369,28 +380,5 @@ private struct HistoryRow: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
-    }
-}
-
-/// Creates the AppKit view that hosts `HistoryView`, so the window controller does not depend on SwiftUI.
-enum HistoryContentFactory {
-    @MainActor
-    static func makeView(
-        model: HistoryWindowModel,
-        onChoose: @escaping @MainActor (ClipboardEntry, Bool) -> Void,
-        onClose: @escaping @MainActor () -> Void,
-        onOpenSettings: @escaping @MainActor () -> Void,
-        onDrag: @escaping @MainActor (RowDragEvent) -> Void
-    ) -> NSView {
-        let view = HistoryView(
-            model: model, onChoose: onChoose, onClose: onClose, onOpenSettings: onOpenSettings, onDrag: onDrag)
-        let hostingView = NSHostingView(rootView: view)
-        // The panel sets the size, not the SwiftUI content: the window controller switches between the compact and
-        // the full size, and the hosting view follows through its autoresizing mask.
-        hostingView.sizingOptions = []
-        // The hidden title bar would otherwise count as a top safe-area inset and push the search field down.
-        hostingView.safeAreaRegions = []
-        hostingView.frame = NSRect(origin: .zero, size: HistoryPanelPlacement.fullSize)
-        return hostingView
     }
 }
