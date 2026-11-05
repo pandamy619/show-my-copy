@@ -168,6 +168,10 @@ struct HistoryView: View {
         // would also choose the entry.
         return HStack(spacing: 0) {
             Button {
+                // While a row shows its Delete button, a click on any row only closes it, as in Mail.
+                guard !model.closeSwipedRow() else {
+                    return
+                }
                 // ⌥-click does the other of what Return does, like ⌥Return.
                 onChoose(entry, model.choosingPastes(isAlternate: NSEvent.modifierFlags.contains(.option)))
             } label: {
@@ -183,6 +187,9 @@ struct HistoryView: View {
             }
             if entry.isConcealed {
                 RevealButton(isRevealed: isRevealed) {
+                    guard !model.closeSwipedRow() else {
+                        return
+                    }
                     model.toggleReveal(entry.id)
                 }
             }
@@ -191,6 +198,8 @@ struct HistoryView: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.clear)
         )
+        // Swipe left to delete; the selection slides with the row.
+        .modifier(RowSwipeModifier(entry: entry, model: model))
         .id(entry.id)
     }
 

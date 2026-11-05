@@ -11,6 +11,8 @@ final class HistoryWindowModel {
     let preview: EntryPreviewModel
     /// Thumbnails for image rows, loaded as rows appear.
     let thumbnails: ThumbnailProvider
+    /// The row swiped to show its Delete button (`HistoryWindowModel+Swipe.swift`).
+    let swipe = RowSwipe()
     private let fileAvailability: any FileAvailabilityChecking
     /// Settings → General → Paste after choosing an entry, read on every Return.
     private let pastesAfterChoosing: @MainActor () -> Bool
@@ -35,6 +37,8 @@ final class HistoryWindowModel {
     var query = "" {
         didSet {
             if query != oldValue {
+                // Typing closes a swiped row.
+                swipe.close()
                 selectFirst()
                 // The list changes under the preview: close it rather than show an entry that may be filtered out.
                 preview.close()
@@ -177,6 +181,7 @@ final class HistoryWindowModel {
     func prepareForPresentation() {
         // Undo works only in the window the entry was deleted in.
         deleter.finishDeleting()
+        swipe.close()
         query = ""
         concealAll()
         preview.close()
@@ -201,6 +206,8 @@ final class HistoryWindowModel {
     /// the selected entry and ⌘Z brings it back; with nothing to delete or bring back they are left to the search
     /// field. ⌘P pins or unpins the selected entry.
     func handleKey(_ key: Key, isCaretAtEnd: Bool) -> KeyResult {
+        // Any of these keys closes a swiped row, as typing does.
+        swipe.close()
         switch key {
         case .delete, .undo, .pin:
             return handleCommandKey(key)
@@ -299,7 +306,12 @@ final class HistoryWindowModel {
     /// Selects the entry in `row`, or only remembers the row when the list is empty.
     private func select(row: Int, in items: [ClipboardEntry]) {
         selectedRow = row
-        selectedID = items.indices.contains(row) ? items[row].id : nil
+        let id = items.indices.contains(row) ? items[row].id : nil
+        if id != selectedID {
+            // A new selection closes a swiped row.
+            swipe.close()
+        }
+        selectedID = id
     }
 
     private static func clamped(_ index: Int, count: Int) -> Int? {
@@ -335,9 +347,10 @@ extension HistoryWindowModel {
         return .handled
     }
 
-    /// Deletes `entry`, for ⌘⌫, the row's "Delete" action and VoiceOver. The window stays open. When the entry was
-    /// selected, the entry after it is selected, or the one before it when it was the last.
+    /// Deletes `entry`, for ⌘⌫, the row's "Delete" action, VoiceOver and swipe to delete. The window stays open. When
+    /// the entry was selected, the entry after it is selected, or the one before it when it was the last.
     func delete(_ entry: ClipboardEntry) {
+        swipe.close()
         let items = items
         let row = items.firstIndex { $0.id == entry.id }
         let wasSelected = row != nil && row == selectedIndex(in: items)
