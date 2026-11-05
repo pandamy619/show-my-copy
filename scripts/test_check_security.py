@@ -398,6 +398,147 @@ class SourceScanTests(CheckerTestCase):
         self.fixture.write("ShowMyCopy/Good.swift", self.GOOD)
         self.assertEqual(self.fixture.errors(), [])
 
+    def test_unreadable_file_fails(self) -> None:
+        self.fixture.write("ShowMyCopy/Bad.swift", 'let text = "not closed\nlet session = 1\n')
+        self.assertFailsWith(self.fixture.errors(), "ShowMyCopy/Bad.swift: cannot scan: line 1: string not closed")
+
+
+class WorkspaceAndOpenTests(CheckerTestCase):
+    """NSWorkspace only through its read-only members, `open...` only by the app's own names, across line breaks."""
+
+    WORKSPACE = "NSWorkspace beyond its read-only members"
+    OPEN = "open call that is not in OPEN_ALLOWLIST"
+    # name: (code, line of the error, label). The code starts at line 2, after `import AppKit`.
+    BAD = {
+        "workspace kept in a variable": ("let w = NSWorkspace.shared; w.open(url)", 2, WORKSPACE),
+        "workspace passed around": (
+            "func show(_ url: URL) { hand(NSWorkspace.shared, url) }\n"
+            "func hand(_ w: NSWorkspace, _ url: URL) { _ = w.open(url) }",
+            2, WORKSPACE,
+        ),
+        "workspace as a parameter type": (
+            "func show(_ url: URL) { hand(NSWorkspace.shared, url) }\n"
+            "func hand(_ w: NSWorkspace, _ url: URL) { _ = w.open(url) }",
+            3, WORKSPACE,
+        ),
+        "split across lines": ("_ = NSWorkspace.shared\n    .open(url)", 2, WORKSPACE),
+        "split with a comment": ("_ = NSWorkspace // the shared one\n    .shared /* then */ .open(url)", 2, WORKSPACE),
+        "injected workspace": (
+            "final class Opener {\n"
+            "    private let workspace: NSWorkspace\n"
+            "    init(workspace: NSWorkspace) { self.workspace = workspace }\n"
+            "    func show(_ url: URL) { _ = workspace.open(url) }\n"
+            "}",
+            3, WORKSPACE,
+        ),
+        "workspace made, not shared": ("_ = NSWorkspace().open(url)", 2, WORKSPACE),
+        "openApplication on a stored workspace": (
+            "let workspace = NSWorkspace.shared\n"
+            "workspace.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())",
+            3, WORKSPACE,
+        ),
+        "other workspace call": ("NSWorkspace.shared.activateFileViewerSelecting([url])", 2, WORKSPACE),
+        "allowed member's name on another receiver": ("_ = NSWorkspace.shared\n    .open(url).icon", 2, WORKSPACE),
+        "workspace in a type alias": ("typealias Shell = NSWorkspace", 2, WORKSPACE),
+        "workspace in a key path": ("let path = \\NSWorkspace.shared", 2, WORKSPACE),
+        "workspace extended": ("extension NSWorkspace: Opening {}", 2, WORKSPACE),
+        "workspace in an interpolation": ('let text = "\\(NSWorkspace.shared.open(url))"', 2, WORKSPACE),
+        "workspace in a multi-line string's interpolation": (
+            'let text = """\n    \\(NSWorkspace.shared.open(url))\n    """', 3, WORKSPACE,
+        ),
+        "open call of another type": (
+            "NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, _ in }", 2, OPEN,
+        ),
+        "open call split across lines": ("documents\n    .openDocument(withContentsOf: url, display: true)", 3, OPEN),
+        "open member without a call": ("urls.forEach(documents.openUntitledDocumentAndDisplay)", 2, OPEN),
+        "open call in backticks": ("documents.`openDocument`(url)", 2, OPEN),
+        "free open call": ("openFile(path)", 2, OPEN),
+        "free open call with a trailing closure": ("openThing { url }", 2, OPEN),
+        "open environment value": ("@Environment(\\.openWindow) private var openWindow", 2, OPEN),
+        "qualified call on another receiver": ("Other.openSystemSettingsLoginItems()", 2, OPEN),
+        "qualified call through a nested name": ("Kit.SMAppService.openSystemSettingsLoginItems()", 2, OPEN),
+        "initializer split across lines": (
+            "let data = try Data(\n    contentsOf: url\n)", 2, "initializer reading contentsOf: a URL",
+        ),
+        "process split across lines": ("try Process\n    .run(url, arguments: [])", 2, "process execution"),
+        "import split across lines": ("import\n    Network", 2, "network module import"),
+        "Launch Services": ("LSOpenCFURLRef(url as CFURL, nil)", 2, "Launch Services call"),
+        "Apple event": ("let event = NSAppleEventDescriptor(eventClass: 1, eventID: 2, target: nil, "
+                        "returnID: 0, transactionID: 0)", 2, "Apple event"),
+        "Services menu": ("NSPerformService(name, pasteboard)", 2, "external hand-off API"),
+        "class by name": ('let type = NSClassFromString("NSWork" + "space")', 2, "dynamic lookup"),
+        "method by name": ('_ = object.perform(Selector(("open" + ":")), with: url)', 2, "dynamic lookup"),
+        "symbol by name": ('let symbol = dlsym(handle, "LSOpenCFURLRef")', 2, "dynamic lookup"),
+    }
+    GOOD = textwrap.dedent(
+        """\
+        import AppKit
+        import ServiceManagement
+
+        // NSWorkspace.shared.open(url), NSWorkspace().open(url) and `x.openFile(path)` in a comment.
+        /* let w = NSWorkspace.shared
+           w.open(url) */
+        let text = "NSWorkspace.shared.open(url) openURL(x)"
+        let raw = #"NSWorkspace.shared.open("\\(url)")"#
+        let lines = \"""
+            NSWorkspace.shared
+                .openApplication(at: url)
+            \"""
+        let apps = NSWorkspace.shared.runningApplications
+        let front = NSWorkspace
+            .shared
+            .frontmostApplication
+        let center = NSWorkspace.shared.notificationCenter
+        let note = NSWorkspace.didWakeNotification
+        let icon = NSWorkspace.shared.icon(forFile: path)
+        let typeIcon = NSWorkspace.shared.icon(for: .applicationBundle)
+        let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier)
+        let label = "\\(NSWorkspace.shared.runningApplications.count) apps"
+        let plain = try sealer.open(sealed)
+        let decrypted = try AES.GCM.open(box, using: key)
+        let descriptor = Darwin.open(path, O_RDONLY)
+        let store = try opener.openStore(url)
+        SMAppService.openSystemSettingsLoginItems()
+        SMAppService
+            .openSystemSettingsLoginItems()
+        func openLater(_ value: Int) {}
+        open class Base {}
+        let gate = Gate(open: true)
+        let opened = true
+        func openingTwiceChangesNothing() {}
+        let panel = NSOpenPanel()
+        let handle = try FileHandle(forReadingFrom: url)
+        let result = sqlite3_open(path, &database)
+        let action = #selector(Base.description)
+        """
+    )
+
+    def test_each_bypass_is_caught(self) -> None:
+        for name, (code, line, label) in self.BAD.items():
+            with self.subTest(name):
+                path = self.fixture.write("ShowMyCopy/Bad.swift", "import AppKit\n" + code + "\n")
+                self.assertFailsWith(self.fixture.errors(), "ShowMyCopy/Bad.swift:%d: %s" % (line, label))
+                os.remove(path)
+
+    def test_also_in_tests_and_new_folders(self) -> None:
+        for relative in ("ShowMyCopyTests/MacOnly/OpenTests.swift", "NewTarget/Opener.swift"):
+            with self.subTest(relative):
+                path = self.fixture.write(relative, "let w = NSWorkspace.shared\n")
+                self.assertFailsWith(self.fixture.errors(), "%s:1: %s" % (relative, self.WORKSPACE))
+                os.remove(path)
+
+    def test_read_only_members_and_lookalikes_pass(self) -> None:
+        self.fixture.write("ShowMyCopy/Good.swift", self.GOOD)
+        self.assertEqual(self.fixture.errors(), [])
+
+    def test_every_allowlisted_name_passes(self) -> None:
+        code = ["import AppKit"]
+        code += ["_ = NSWorkspace.shared.%s" % member for member in sorted(check_security.NSWORKSPACE_READ_ONLY)]
+        code += ["_ = x.%s()" % name for name in sorted(check_security.OPEN_ALLOWLIST)]
+        code += ["%s.%s()" % pair for pair in sorted(check_security.OPEN_QUALIFIED_ALLOWLIST)]
+        self.fixture.write("ShowMyCopy/Good.swift", "\n".join(code) + "\n")
+        self.assertEqual(self.fixture.errors(), [])
+
 
 class XcodebuildTests(CheckerTestCase):
     """The resolved-settings cross-check, fed by a fake xcodebuild put first on PATH."""
@@ -648,7 +789,7 @@ class SettingsPaneTests(CheckerTestCase):
         ):
             with self.subTest(relative):
                 path = self.fixture.write(relative, self.GOOD)
-                self.assertFailsWith(self.fixture.errors(), relative + ":21: NSWorkspace.shared.open")
+                self.assertFailsWith(self.fixture.errors(), relative + ":21: NSWorkspace beyond its read-only members")
                 os.remove(path)
 
     def test_http_url_fails(self) -> None:
