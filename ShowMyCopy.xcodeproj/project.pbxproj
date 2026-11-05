@@ -68,7 +68,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				App/HistoryRequests.swift,
-				Platform/Intents/OpenHistoryIntent.swift,
+				App/OpenHistoryIntent.swift,
 			);
 			target = E35B7A813091D33900B290BD /* ShowMyCopyControlExtension */;
 		};
