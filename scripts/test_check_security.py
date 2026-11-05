@@ -1015,10 +1015,10 @@ class SettingsPaneTests(CheckerTestCase):
 
     def test_same_code_in_another_file_fails(self) -> None:
         for relative in (
-            "ShowMyCopy/Platform/Settings/OtherPane.swift",
-            "ShowMyCopy/Settings/SystemSettingsPane.swift",
-            "Other/ShowMyCopy/Platform/Settings/SystemSettingsPane.swift",
-            "ShowMyCopy/Platform/Settings/SystemSettingsPane.swift.swift",
+            "ShowMyCopy/Settings/OtherPane.swift",
+            "ShowMyCopy/Platform/Settings/SystemSettingsPane.swift",
+            "Other/ShowMyCopy/Settings/SystemSettingsPane.swift",
+            "ShowMyCopy/Settings/SystemSettingsPane.swift.swift",
         ):
             with self.subTest(relative):
                 path = self.fixture.write(relative, self.GOOD)

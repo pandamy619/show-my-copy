@@ -40,7 +40,7 @@ custom_rules:
     name: "No hand-off to other apps or processes"
     # The one exception (SECURITY.md): this file opens System Settings at Privacy & Security -> Accessibility.
     # scripts/check_security.py (SETTINGS_PANE_FILE) checks it instead: fixed System Settings addresses only.
-    excluded: '(^|/)ShowMyCopy/Platform/Settings/SystemSettingsPane\.swift$'
+    excluded: '(^|/)ShowMyCopy/Settings/SystemSettingsPane\.swift$'
     # Names in comments and string literals are not code.
     excluded_match_kinds:
       - comment

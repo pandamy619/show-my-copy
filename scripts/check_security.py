@@ -65,7 +65,7 @@ APP_ACCESS_SETTING_ENTITLEMENTS: Dict[str, Tuple[str, str]] = {
 # .swiftlint.yml. The file may only open fixed SETTINGS_PANE_SCHEME addresses written as plain string literals, in
 # exactly the form `URL(string: "<literal>").map { NSWorkspace.shared.open($0) }`, and takes no parameters
 # (check_settings_pane). Every other file is held to NSWORKSPACE_READ_ONLY and OPEN_ALLOWLIST below.
-SETTINGS_PANE_FILE = "ShowMyCopy/Platform/Settings/SystemSettingsPane.swift"
+SETTINGS_PANE_FILE = "ShowMyCopy/Settings/SystemSettingsPane.swift"
 SETTINGS_PANE_SCHEME = "x-apple.systempreferences:"
 
 # Outside SETTINGS_PANE_FILE, `NSWorkspace` may appear in code only as `NSWorkspace.shared.<member>` with one of these
