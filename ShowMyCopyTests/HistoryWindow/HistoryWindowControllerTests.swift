@@ -344,9 +344,15 @@ final class EntryCopierSpy: EntryCopying {
     /// The change count a successful copy answers with.
     var changeCount = 1
     private(set) var copied: [ClipboardEntry.ID] = []
+    private(set) var copiedTexts: [String] = []
 
     func copy(_ entry: ClipboardEntry) -> Int? {
         copied.append(entry.id)
+        return succeeds ? changeCount : nil
+    }
+
+    func copyText(_ text: String) -> Int? {
+        copiedTexts.append(text)
         return succeeds ? changeCount : nil
     }
 }
