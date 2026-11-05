@@ -1,7 +1,7 @@
 import Foundation
 
-/// Styled text ready for the preview. Platform code makes it (`AppKitRichTextRenderer` on macOS) and the preview view
-/// draws it; the history window only passes it along.
+/// Styled text ready for the preview. `AppKitRichTextRenderer` makes it and the preview view draws it; the history
+/// window only passes it along.
 protocol RenderedRichText: Sendable {}
 
 /// Turns copied RTF into styled text for the preview. Called off the main actor.

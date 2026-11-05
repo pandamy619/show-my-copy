@@ -1,7 +1,7 @@
 import Foundation
 
-/// A decoded image, ready to draw. Platform code makes it (`ImageIOPreviewDecoder` on macOS); the history window
-/// only keeps it, counts its size and hands it to the view.
+/// A decoded image, ready to draw. `ImageIOPreviewDecoder` makes it; the history window only keeps it, counts its
+/// size and hands it to the view.
 protocol PreviewImage: Sendable {
     var pixelWidth: Int { get }
     var pixelHeight: Int { get }

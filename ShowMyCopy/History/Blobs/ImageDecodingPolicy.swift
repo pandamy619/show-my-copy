@@ -88,7 +88,7 @@ enum ImageFormat: CaseIterable, Equatable, Sendable {
 ///
 /// 1. Its bytes start with the signature of an allowlisted `ImageFormat`, the same one as the type it was copied
 ///    as, when that is known.
-/// 2. ImageIO, given that format as a hint, reads it as that same format (checked by the platform code).
+/// 2. ImageIO, given that format as a hint, reads it as that same format (checked by `CheckedImageSource`).
 /// 3. The width and height in its header give at most `maximumPixelCount` pixels. Reading the header decodes no
 ///    pixels; an image over the limit is never decoded.
 enum ImageDecodingPolicy {

@@ -5,9 +5,9 @@ import Foundation
 typealias SettingsWindowFactory = @MainActor (AppSettings) -> any SettingsWindowShowing
 
 /// The services the app runs on that `AppContainer` does not pick itself: the system's clock, pasteboard,
-/// notifications and session state, and what needs a macOS-only framework (images, previews, memory, pasting into
-/// other apps, the shortcut recorder). The app passes the real ones (`AppServices.live`, next to the macOS
-/// implementations), tests pass fakes from the test target. A new service is a field here, in the group it belongs
+/// notifications and session state, and the system frameworks behind images, previews, memory, pasting into other
+/// apps and the shortcut recorder. The app passes the real ones (`AppServices.live`, in `AppServices+Live.swift`),
+/// tests pass fakes from the test target. A new service is a field here, in the group it belongs
 /// to, and is used in `AppContainer`.
 struct AppServices {
     /// The clock, the system's state and its notifications.

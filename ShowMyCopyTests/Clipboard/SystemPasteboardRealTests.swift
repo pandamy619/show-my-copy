@@ -6,7 +6,6 @@ import Testing
 /// Runs `SystemPasteboard` and the snapshot reader against real `NSPasteboard`s, to check what the fakes assume.
 ///
 /// Each test uses its own named pasteboard, so the tests never touch the user's clipboard and can run in parallel.
-/// macOS only: the Linux stub build leaves this file out, because its `NSPasteboard` stand-in holds no data.
 @MainActor
 struct SystemPasteboardRealTests {
     private let bundleIdentifier = "com.example.ShowMyCopy"

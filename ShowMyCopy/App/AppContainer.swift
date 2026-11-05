@@ -5,7 +5,7 @@ import Synchronization
 /// Builds the app's objects, connects them and owns them for as long as the app runs: the one place that wires
 /// objects together.
 ///
-/// It is given the loaded history and the services that depend on the system or on macOS-only frameworks
+/// It is given the loaded history and the services that depend on the system and its frameworks
 /// (`AppServices`); everything else it makes itself, and everything it makes takes protocols. The initializer has no
 /// side effects: nothing reads the pasteboard, changes the history or observes notifications until `start()`.
 ///

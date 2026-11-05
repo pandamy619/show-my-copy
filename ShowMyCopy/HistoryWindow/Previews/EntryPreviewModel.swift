@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// What the history window needs to show thumbnails and previews. The platform pieces are nil in tests and when the
-/// app keeps no images; rows and previews then show placeholders and plain text.
+/// What the history window needs to show thumbnails and previews. The blob store and the decoders are nil in tests
+/// and when the app keeps no images; rows and previews then show placeholders and plain text.
 struct PreviewServices: Sendable {
     /// Where image data and thumbnails are kept.
     let blobs: (any BlobStore)?

@@ -2,8 +2,7 @@ import Foundation
 import Synchronization
 
 /// Holds background work at one point until the test lets it go on, so a test can change the history while the work
-/// is in flight. The work suspends there: no thread is blocked, which on Linux would also stall the main actor, and
-/// no real time passes.
+/// is in flight. The work suspends there: no thread is blocked and no real time passes.
 final class AsyncGate: Sendable {
     private struct State {
         var isArmed = false

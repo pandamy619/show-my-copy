@@ -24,7 +24,7 @@ enum ThumbnailError: Error, Equatable, Sendable {
 }
 
 /// Measures copied image data and draws a small PNG thumbnail of it. The app uses ImageIO
-/// (`ImageIOThumbnailMaker`, macOS only), which decodes only as much of the image as the thumbnail needs.
+/// (`ImageIOThumbnailMaker`), which decodes only as much of the image as the thumbnail needs.
 ///
 /// Called off the main actor while an image recorded already is saved (`ImageIngestor`). `async`, so a maker may
 /// suspend instead of holding a thread; `ImageIOThumbnailMaker` does its work at once on the caller's thread.
