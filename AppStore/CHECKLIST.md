@@ -287,14 +287,14 @@ from [NSPrivacyAccessedAPIType](https://developer.apple.com/documentation/bundle
 | `FileManager.attributesOfItem` → `.size` of saved images and of the history files | `History/Blobs/FileBlobStore.swift`, `History/Persistence/StoreFiles.swift` | File timestamp (counted although only the size is read: the call returns the dates too) | `C617.1`: metadata of files in the app container |
 | `attributesOfItem(...)[.modificationDate]`, `setAttributes([.modificationDate: ...])` of the damaged copy | `History/Persistence/HistoryStoreOpener.swift` | File timestamp | `C617.1` |
 | `FileManager.attributesOfItem` → size and type of copied files | `History/FileSizeReader.swift` | File timestamp | `3B52.1`: metadata of files the user gave the app access to (macOS grants it for files the user copies) |
-| `stat` → `st_flags` (dataless placeholder) of copied photos and videos | `Platform/Files/QuickLookFileThumbnailMaker.swift` | File timestamp | `3B52.1` |
-| `getfsstat` (mount point, file system type, local flag) | `Platform/Files/SystemMountedVolumes.swift` | Not on Apple's list (statfs, statvfs, fstatfs, fstatvfs are); no free or total space is read, so no disk space reason applies | none |
-| Text Input Sources (`TISCopyCurrentASCIICapableKeyboardLayoutInputSource`) | `Platform/Paste/SystemPasteKeystrokes.swift`, also in KeyboardShortcuts | Not on Apple's list (active keyboards lists only UIKit's `activeInputModes`) | none |
+| `stat` → `st_flags` (dataless placeholder) of copied photos and videos | `History/Blobs/QuickLookFileThumbnailMaker.swift` | File timestamp | `3B52.1` |
+| `getfsstat` (mount point, file system type, local flag) | `History/SystemMountedVolumes.swift` | Not on Apple's list (statfs, statvfs, fstatfs, fstatvfs are); no free or total space is read, so no disk space reason applies | none |
+| Text Input Sources (`TISCopyCurrentASCIICapableKeyboardLayoutInputSource`) | `Paste/SystemPasteKeystrokes.swift`, also in KeyboardShortcuts | Not on Apple's list (active keyboards lists only UIKit's `activeInputModes`) | none |
 | System boot time (`systemUptime`, `mach_absolute_time`) | not used; `ContinuousClock` is read inside Apple's Swift runtime | — | none |
 | Disk space (`volumeAvailableCapacity*Key`, `systemFreeSize`, `statfs`, ...) | not used | — | none |
 
 The Control Center extension builds `ShowMyCopyControl/*.swift`, `App/HistoryRequests.swift` and
-`Platform/Intents/OpenHistoryIntent.swift`, none of which uses a listed API, so it needs no manifest of its own:
+`App/OpenHistoryIntent.swift`, none of which uses a listed API, so it needs no manifest of its own:
 "For each executable or dynamic library in an app that uses a required reason API, the bundle that includes the
 executable or dynamic library needs to include a privacy manifest file"
 ([Describing use of required reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api)).
