@@ -123,6 +123,9 @@ DEBUG_ONLY_STRINGS: Dict[str, str] = {
     "com.pandamy619.ShowMyCopy.debug.quitForNewerDebugBuild": "the request a newer Debug build posts so an older "
     "Debug build quits (AppDelegate.debugBuildReplacement). A Release build must not observe it: any app could post "
     "it and quit the app (SECURITY.md)",
+    "debug.paste.": "the prefix of the UserDefaults keys Debug builds read to tune pasting on the Mac "
+    "(PasteTuning.overridden(by:), for example debug.paste.settleMs). Release builds always paste the standard way "
+    "and must not read them (SECURITY.md)",
 }
 TESTS_FOLDER = "ShowMyCopyTests/"
 

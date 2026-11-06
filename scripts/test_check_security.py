@@ -89,6 +89,13 @@ WIDGET = "ShowMyCopyControlExtension"
 WIDGET_XCCONFIG = "Config/Widget.xcconfig"
 APP_READ_ONLY_SETTING = "ENABLE_USER_SELECTED_FILES = readonly;"
 DEBUG_MARKER = "com.pandamy619.ShowMyCopy.debug.quitForNewerDebugBuild"
+# A key Debug builds read to tune pasting; DEBUG_ONLY_STRINGS has its prefix.
+PASTE_DEBUG_KEY = "debug.paste.settleMs"
+# Where each DEBUG_ONLY_STRINGS string is used in the app.
+DEBUG_ONLY_STRING_FILES = {
+    DEBUG_MARKER: "ShowMyCopy/App/AppDelegate.swift",
+    "debug.paste.": "ShowMyCopy/Paste/PasteDebugTuning.swift",
+}
 
 
 class Fixture:
@@ -856,6 +863,11 @@ class SignedAppTests(CheckerTestCase):
             out.write(DEBUG_MARKER.encode() + b"\x00")
         self.assertFailsWith(self.errors(), "MacOS/ShowMyCopy: contains the Debug-only string %r" % DEBUG_MARKER)
 
+    def test_paste_debug_key_in_the_executable_fails(self) -> None:
+        with open(self.executable, "ab") as out:
+            out.write(b"\x00" + PASTE_DEBUG_KEY.encode() + b"\x00")
+        self.assertFailsWith(self.errors(), "MacOS/ShowMyCopy: contains the Debug-only string 'debug.paste.'")
+
     def test_debug_only_string_in_nested_code_fails(self) -> None:
         for relative in ("MacOS/ShowMyCopy.debug.dylib", "PlugIns/Share.appex/Contents/MacOS/Share"):
             with self.subTest(relative):
@@ -940,6 +952,22 @@ class DebugOnlyStringTests(CheckerTestCase):
                 self.assertFailsWith(
                     self.errors_for(code.replace("%s", DEBUG_MARKER)),
                     "%s:%d: Debug-only string" % (self.FILE, code.count("\n", 0, code.index("%s")) + 1),
+                )
+
+    def test_paste_debug_keys_only_in_a_debug_branch(self) -> None:
+        relative = "ShowMyCopy/Paste/PasteDebugTuning.swift"
+        inside = '#if DEBUG\n    static let settle = "%s"\n#endif\n' % PASTE_DEBUG_KEY
+        self.assertEqual(self.errors_for(inside, relative), [])
+        cases = {
+            "no condition": 'static let settle = "%s"\n',
+            "else": '#if DEBUG\nlet a = 1\n#else\nstatic let settle = "%s"\n#endif\n',
+            "another key": 'let tap = "debug.paste.tap"\n',
+        }
+        for name, code in cases.items():
+            with self.subTest(name):
+                self.assertFailsWith(
+                    self.errors_for(code.replace("%s", PASTE_DEBUG_KEY), relative),
+                    "Debug-only string 'debug.paste.' outside an #if DEBUG branch",
                 )
 
     def test_in_any_app_folder_and_the_extension_fails(self) -> None:
@@ -1130,11 +1158,11 @@ class SettingsPaneTests(CheckerTestCase):
 class RealRepositoryTests(unittest.TestCase):
     def test_debug_only_strings_are_in_the_app(self) -> None:
         # Keeps DEBUG_ONLY_STRINGS in step with the code: a renamed string would no longer be looked for.
-        self.assertIn(DEBUG_MARKER, check_security.DEBUG_ONLY_STRINGS)
-        for marker in check_security.DEBUG_ONLY_STRINGS:
+        self.assertEqual(set(check_security.DEBUG_ONLY_STRINGS), set(DEBUG_ONLY_STRING_FILES))
+        for marker, relative in DEBUG_ONLY_STRING_FILES.items():
             with self.subTest(marker):
-                with open(os.path.join(REPO, "ShowMyCopy/App/AppDelegate.swift"), encoding="utf-8") as handle:
-                    self.assertIn('"%s"' % marker, handle.read())
+                with open(os.path.join(REPO, relative), encoding="utf-8") as handle:
+                    self.assertIn('"%s' % marker, handle.read())
 
     def test_configured_files_exist(self) -> None:
         # A moved or renamed file would leave its check pointing at nothing: the pane's stricter check and the
