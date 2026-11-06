@@ -139,6 +139,26 @@ struct HistoryWindowPasteTests {
         #expect(paster.pastedChangeCounts == [pasteboard.changeCount])
     }
 
+    /// The paster waits until the window server no longer shows the window, and does not paste while it is open,
+    /// such as when the user opens it again. Whether the window server still shows a closed panel while it fades out
+    /// can only be seen on screen: that is checked by hand.
+    @Test func thePasteIsToldWhenTheWindowIsOpen() throws {
+        pasteboard.copy("older")
+        monitor.poll()
+        let paster = EntryPasterSpy()
+        let controller = makeController(paster: paster)
+        #expect(controller.isGoneFromScreen)
+        controller.show()
+        #expect(!controller.isGoneFromScreen)
+        let older = try #require(controller.model.items.first)
+
+        controller.choose(older, pastes: true)
+        let isGone = try #require(paster.historyWindowIsGone)
+        controller.show()
+
+        #expect(!isGone())
+    }
+
     @Test func choosingToCopyDoesNotPaste() throws {
         pasteboard.copy("older")
         monitor.poll()
@@ -192,13 +212,13 @@ struct HistoryWindowPasteTests {
             let textEdit = SourceApp(bundleIdentifier: "com.apple.TextEdit", name: "TextEdit")
             let paster = EntryPaster(
                 pasteboard: pasteboard, keystrokes: keystrokes, settings: settings, frontmostApp: { textEdit },
-                ownBundleIdentifier: "com.example.ShowMyCopy", sleep: { _ in })
+                ownBundleIdentifier: "com.example.ShowMyCopy", sleep: { _ in }, tuning: { .standard })
             let copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor)
             history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: .distantFuture)
             let password = try #require(history.entries.first)
 
             let changeCount = try #require(copier.copy(password))
-            let outcome = await paster.paste(copiedAt: changeCount).value
+            let outcome = await paster.paste(copiedAt: changeCount) { true }.value
 
             #expect(outcome == .pasted)
             #expect(pasteboard.writtenConcealed == [true])

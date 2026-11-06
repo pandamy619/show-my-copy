@@ -31,6 +31,10 @@ struct SystemPasteKeystrokesTests {
         #expect(PasteKey.ansiV == UInt16(kVK_ANSI_V))
     }
 
+    @Test func leftCommandMatchesCarbon() {
+        #expect(PasteKey.leftCommand == UInt16(kVK_Command))
+    }
+
     /// Asking whether the app may post events shows nothing and changes nothing, so it gives the same answer twice.
     /// The test never calls `request()`, which can show macOS's alert.
     @Test func checkingThePermissionShowsNothing() {

@@ -17,6 +17,8 @@ final class FakePasteKeystrokes: PasteAccessChecking, PasteKeystrokePosting {
     private(set) var checkCount = 0
     private(set) var requestCount = 0
     private(set) var postCount = 0
+    /// How each ⌘V was to be posted, in order.
+    private(set) var postedStyles: [PastePostingStyle] = []
 
     init(isAllowed: Bool = false) {
         self.isAllowed = isAllowed
@@ -35,11 +37,12 @@ final class FakePasteKeystrokes: PasteAccessChecking, PasteKeystrokePosting {
         return isAllowed
     }
 
-    func postPaste() -> Bool {
+    func postPaste(_ style: PastePostingStyle) -> Bool {
         guard postSucceeds else {
             return false
         }
         postCount += 1
+        postedStyles.append(style)
         onPost()
         return true
     }
@@ -71,11 +74,17 @@ extension PasteSettings {
 @MainActor
 final class EntryPasterSpy: EntryPasting {
     private(set) var pastedChangeCounts: [Int] = []
+    /// What the last paste was handed to ask whether the history window is gone.
+    private(set) var historyWindowIsGone: (@MainActor () -> Bool)?
     /// What `takeFallbackHint()` returns next, once.
     var fallbackHint: PasteFallback?
 
-    func paste(copiedAt changeCount: Int) -> Task<PasteOutcome, Never> {
+    func paste(
+        copiedAt changeCount: Int,
+        historyWindowIsGone: @escaping @MainActor () -> Bool
+    ) -> Task<PasteOutcome, Never> {
         pastedChangeCounts.append(changeCount)
+        self.historyWindowIsGone = historyWindowIsGone
         return Task { .pasted }
     }
 
@@ -86,8 +95,9 @@ final class EntryPasterSpy: EntryPasting {
 }
 
 extension AppServices.Paste {
-    /// Not allowed to paste unless `keystrokes` says so, posting nothing, waiting no time, and System Settings that
-    /// only count how often they were opened.
+    /// Not allowed to paste unless `keystrokes` says so, posting nothing, waiting no time, the standard tuning
+    /// whatever the defaults of the Mac running the tests say, and System Settings that only count how often they
+    /// were opened.
     @MainActor
     static func fake(
         _ keystrokes: FakePasteKeystrokes? = nil, systemSettings: FakeAccessibilitySettings? = nil
@@ -97,7 +107,8 @@ extension AppServices.Paste {
             access: keystrokes,
             keystrokes: keystrokes,
             systemSettings: systemSettings ?? FakeAccessibilitySettings(),
-            sleep: { _ in }
+            sleep: { _ in },
+            tuning: { .standard }
         )
     }
 }
