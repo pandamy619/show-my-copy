@@ -1,8 +1,10 @@
 import Foundation
 
-/// Makes the settings window from what it shows. The real window is built with SwiftUI and includes the shortcut
-/// recorder, so it comes from `AppServices`, and `AppContainer` depends on neither.
-typealias SettingsWindowFactory = @MainActor (AppSettings) -> any SettingsWindowShowing
+/// Makes the settings window from what it shows, and how it copies text the user selected there without recording it
+/// (`EntryCopying.copyText(_:)`). The real window is built with SwiftUI and includes the shortcut recorder, so it
+/// comes from `AppServices`, and `AppContainer` depends on neither.
+typealias SettingsWindowFactory =
+    @MainActor (AppSettings, _ copyText: @escaping @MainActor (String) -> Void) -> any SettingsWindowShowing
 
 /// The services the app runs on that `AppContainer` does not pick itself: the system's clock, pasteboard,
 /// notifications and session state, and the system frameworks behind images, previews, memory, pasting into other

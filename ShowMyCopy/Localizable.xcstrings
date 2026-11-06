@@ -259,6 +259,16 @@
         }
       }
     },
+    "About" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "О программе"
+          }
+        }
+      }
+    },
     "Add an Open App" : {
       "localizations" : {
         "ru" : {
@@ -709,6 +719,16 @@
         }
       }
     },
+    "Keeps passwords hidden in the history and removes them after the time you choose." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароли хранятся в истории скрытыми и удаляются через выбранное вами время."
+          }
+        }
+      }
+    },
     "Left Arrow or Esc closes the preview." : {
       "localizations" : {
         "ru" : {
@@ -735,6 +755,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Возможно, перемещён или удалён"
+          }
+        }
+      }
+    },
+    "MIT License" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лицензия MIT"
           }
         }
       }
@@ -1016,6 +1046,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Просмотр"
+          }
+        }
+      }
+    },
+    "Privacy policy" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Политика конфиденциальности"
+          }
+        }
+      }
+    },
+    "PRIVACY.md" : {
+      "comment" : "The privacy policy's file name in the source code, in this language.",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRIVACY.ru.md"
           }
         }
       }
@@ -1392,6 +1443,16 @@
         }
       }
     },
+    "Source code" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Исходный код"
+          }
+        }
+      }
+    },
     "Storage" : {
       "localizations" : {
         "ru" : {
@@ -1668,6 +1729,16 @@
         }
       }
     },
+    "Version %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Версия %@"
+          }
+        }
+      }
+    },
     "Video, %@" : {
       "localizations" : {
         "ru" : {
@@ -1684,16 +1755,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Если выключено, пароли и всё, что вы копируете из менеджера паролей, не сохраняются."
-          }
-        }
-      }
-    },
-    "When on, they are kept hidden in the history and removed after the time you choose." : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Если включено, они хранятся в истории скрытыми и удаляются через выбранное время."
           }
         }
       }

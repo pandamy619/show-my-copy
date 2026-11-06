@@ -41,8 +41,8 @@ extension AppServices {
             ),
             memoryReader: TaskMemoryReader(),
             loginItem: MainAppLoginItem(),
-            makeSettingsWindow: { settings in
-                SettingsWindowController(settings: settings) {
+            makeSettingsWindow: { settings, copyText in
+                SettingsWindowController(settings: settings, copyText: copyText) {
                     KeyboardShortcuts.Recorder(for: .toggleHistoryWindow)
                 }
             }

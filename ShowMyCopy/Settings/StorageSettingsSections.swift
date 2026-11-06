@@ -1,8 +1,42 @@
 import AppKit
 import SwiftUI
 
-/// Settings → Storage: how much the history takes by type and on disk, the app's memory, the size limit and any
-/// problem saving the history.
+/// Settings → Storage: what the history takes and its size limit (`StorageSection`), and Clear History
+/// (`ClearHistorySection`).
+struct StorageSettingsPage: View {
+    let settings: HistorySettings
+    let usage: StorageUsage
+
+    var body: some View {
+        Form {
+            StorageSection(settings: settings, usage: usage)
+            ClearHistorySection(usage: usage)
+        }
+        .formStyle(.grouped)
+        .task {
+            // Memory changes all the time, so it is read again while this page is shown. The window stays loaded
+            // after it is closed, so later reads happen only while the app is in front.
+            usage.refreshAppMemory()
+            while true {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return
+                }
+                if NSApplication.shared.isActive {
+                    usage.refreshAppMemory()
+                }
+            }
+        }
+        // "History cleared" is shown until something new is copied, or until the user leaves the page.
+        .onDisappear {
+            usage.forgetRecentClear()
+        }
+    }
+}
+
+/// How much the history takes by type and on disk, the app's memory, the size limit and any problem saving the
+/// history.
 struct StorageSection: View {
     let settings: HistorySettings
     let usage: StorageUsage
@@ -47,7 +81,7 @@ struct StorageSection: View {
                     Text("A copy of a history that could not be opened takes \(damagedBytes).")
                     Text("It is deleted a week after it was set aside, or at once with Clear History.")
                 }
-                .font(.caption)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -93,7 +127,7 @@ struct StorageSection: View {
                         Text("Saved on this Mac only. Not synced, not in Time Machine backups.")
                     }
                 }
-                .font(.caption)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -139,7 +173,7 @@ struct StorageSection: View {
     }
 }
 
-/// Settings → Clear History, with what it frees before and after.
+/// Settings → Storage → Clear History, with what it frees before and after.
 ///
 /// Pinned entries are kept unless the user asks otherwise: pinning is how the user says "keep this", so clearing the
 /// rest is what they most likely want, and the confirmation offers to remove the pinned ones too, unchecked.

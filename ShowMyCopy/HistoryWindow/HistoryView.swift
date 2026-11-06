@@ -7,7 +7,7 @@ struct HistoryView: View {
     /// Copies the entry, and pastes it into the app in front when the flag is true.
     let onChoose: @MainActor (ClipboardEntry, Bool) -> Void
     let onClose: @MainActor () -> Void
-    let onOpenSettings: @MainActor () -> Void
+    let onOpenSettings: @MainActor (SettingsSection?) -> Void
     /// A row is being dragged into another app (`RowDragSource`).
     let onDrag: @MainActor (RowDragEvent) -> Void
     /// Copies text the user selected in the preview, such as a file's folder, without recording it.
@@ -89,7 +89,7 @@ struct HistoryView: View {
                 .onKeyPress(keys: Self.handledKeys) { handleKey($0) }
                 .onSubmit { chooseSelected() }
             Button {
-                onOpenSettings()
+                onOpenSettings(nil)
             } label: {
                 Image(systemName: "gearshape")
                     .imageScale(.large)

@@ -3,7 +3,8 @@ struct HistoryViewActions {
     /// Copies the entry, and pastes it into the app in front when the flag is true.
     let choose: @MainActor (ClipboardEntry, Bool) -> Void
     let close: @MainActor () -> Void
-    let openSettings: @MainActor () -> Void
+    /// Shows Settings on a page, or on the page they show with nil (the gear button and ⌘,).
+    let openSettings: @MainActor (SettingsSection?) -> Void
     /// A row is being dragged into another app (`RowDragSource`).
     let drag: @MainActor (RowDragEvent) -> Void
     /// Copies text the user selected, such as a file's folder in the preview, without recording it.

@@ -8,7 +8,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     private let monitor: any PasteboardChangeTracking
     private let copier: any EntryCopying
     private let paster: any EntryPasting
-    private let onOpenSettings: @MainActor () -> Void
+    /// Shows Settings on a page, or on the page they show with nil.
+    private let onOpenSettings: @MainActor (SettingsSection?) -> Void
     /// Made when the window first opens and kept for the next time.
     private(set) var panel: HistoryPanel?
     /// The resize scheduled by the last change of what the list shows. Tests await it instead of guessing when the
@@ -22,7 +23,7 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         copier: any EntryCopying,
         paster: any EntryPasting,
         monitor: any PasteboardChangeTracking,
-        onOpenSettings: @escaping @MainActor () -> Void
+        onOpenSettings: @escaping @MainActor (SettingsSection?) -> Void
     ) {
         self.model = model
         self.copier = copier
@@ -178,9 +179,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
 
     // MARK: - Private
 
-    private func openSettings() {
+    private func openSettings(_ section: SettingsSection?) {
         hide()
-        onOpenSettings()
+        onOpenSettings(section)
     }
 
     /// Watches whether the list has entries, for as long as the controller lives. A copy can arrive, the query can
@@ -247,8 +248,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
             close: { [weak self] in
                 self?.hide()
             },
-            openSettings: { [weak self] in
-                self?.openSettings()
+            openSettings: { [weak self] section in
+                self?.openSettings(section)
             },
             drag: { [weak self] event in
                 self?.rowDrag(event)

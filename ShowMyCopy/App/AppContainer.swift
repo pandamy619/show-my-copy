@@ -40,7 +40,6 @@ final class AppContainer: HistoryShowing {
         let pasteboardClearer = PasswordPasteboardClearer(history: store, pasteboard: services.pasteboard)
         let settings = Self.makeSettings(
             history: history, services: services, defaults: defaults, pasteboardClearer: pasteboardClearer)
-        let settingsWindow = services.makeSettingsWindow(settings)
 
         // The monitor reads the password setting and the excluded apps on every change, so a new choice applies to
         // the next copy.
@@ -60,6 +59,9 @@ final class AppContainer: HistoryShowing {
         pasteboardClearer.connect(to: monitor)
         let copier = EntryCopier(
             history: store, pasteboard: services.pasteboard, monitor: monitor, blobs: media.blobs, now: system.now)
+        // Text selected in Settings, such as the address in About, is copied like a folder from the history window's
+        // preview: without becoming an entry.
+        let settingsWindow = services.makeSettingsWindow(settings) { [copier] in copier.copyText($0) }
         // The deleter holds a deleted entry's blobs in the store the history deletes them in, so Undo can bring them
         // back.
         let deleter = EntryDeleter(
@@ -69,8 +71,8 @@ final class AppContainer: HistoryShowing {
             copier: copier,
             paster: Self.makePaster(services: services, settings: settings.paste),
             monitor: monitor,
-            onOpenSettings: { [weak settingsWindow] in
-                settingsWindow?.show()
+            onOpenSettings: { [weak settingsWindow] section in
+                settingsWindow?.show(section: section)
             }
         )
 
@@ -212,15 +214,17 @@ final class AppContainer: HistoryShowing {
         historyWindow.openRequested()
     }
 
+    /// Brings Settings to the front on the page they show: General, unless the user picked another one while they
+    /// were open.
     func showSettings() {
-        settingsWindow.show()
+        settingsWindow.show(section: nil)
     }
 
     /// Shows Settings on the first launch, offering once to open the app at login. The app never turns that on
     /// by itself.
     func showSettingsOnFirstLaunch() {
         settings.launchAtLogin.suggestOnce()
-        settingsWindow.show()
+        settingsWindow.show(section: SettingsSection.initial)
     }
 
     /// Whether the data or thumbnails of a recorded copy are still being saved.

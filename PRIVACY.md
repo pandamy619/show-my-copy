@@ -47,7 +47,7 @@ Files you copy are made readable to the app by macOS until it quits. The app rea
 
 ## How to delete everything
 
-1. In Settings, below Storage, choose Clear History… and check "Also remove pinned entries". This deletes the whole history from disk, including a damaged copy.
+1. In Settings → Storage, choose Clear History… and check "Also remove pinned entries". This deletes the whole history from disk, including a damaged copy.
 2. Turn off Settings → General → Open at login, and Paste after choosing an entry.
 3. In System Settings → Privacy & Security → Accessibility, remove Show My Copy if it is listed.
 4. Quit Show My Copy and move it from Applications to the Trash.

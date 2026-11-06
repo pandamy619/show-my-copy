@@ -5,13 +5,16 @@ import SwiftUI
 /// the user dismisses it or the window opens again.
 struct HistoryNotices: View {
     let model: HistoryWindowModel
-    let onOpenSettings: @MainActor () -> Void
+    /// Shows Settings on a page, or on the page they show with nil.
+    let onOpenSettings: @MainActor (SettingsSection?) -> Void
 
     var body: some View {
         if let hint = model.pasteHint {
-            PasteHintRow(hint: hint, onOpenSettings: onOpenSettings) {
-                model.pasteHint = nil
-            }
+            PasteHintRow(
+                hint: hint,
+                onOpenSettings: { onOpenSettings(SettingsSection.showing(hint)) },
+                onDismiss: { model.pasteHint = nil }
+            )
             Divider()
         }
         if model.showsPinLimitNotice {

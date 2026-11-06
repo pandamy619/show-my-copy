@@ -2,23 +2,33 @@ import AppKit
 import SwiftUI
 
 /// Shows the settings in a regular window. The app has no Dock or menu bar icon, so it opens the window itself.
+///
+/// The window has a sidebar of pages (`SettingsView`) and a fixed size; its title bar is transparent and its title
+/// hidden, so the sidebar runs up to the top edge.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let settings: AppSettings
     private let shortcutRecorder: AnyView
+    /// Copies text selected in Settings without recording it (`EntryCopying.copyText(_:)`).
+    private let copyText: @MainActor (String) -> Void
+    /// The page shown. Kept while the app runs, so a caller can pick a page while the window is open.
+    private let navigation = SettingsNavigation()
     private var window: NSWindow?
 
     init<ShortcutRecorder: View>(
         settings: AppSettings,
+        copyText: @escaping @MainActor (String) -> Void,
         @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
     ) {
         self.settings = settings
+        self.copyText = copyText
         self.shortcutRecorder = AnyView(shortcutRecorder())
         super.init()
     }
 
-    /// Opens the settings window, or brings it to the front if it is already open.
-    func show() {
+    /// Opens the settings window on `section`, or brings it to the front if it is already open. With nil it keeps
+    /// the page it shows.
+    func show(section: SettingsSection?) {
         // The store files can change size without a change to the history. Show their size as it is now, and count
         // the saved images again, in the background.
         Task { [usage = settings.storage] in
@@ -30,6 +40,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         }
         // The same for permission to paste, which the user can take back in Privacy & Security at any time.
         settings.paste.refresh()
+        navigation.show(section)
         let window = self.window ?? makeWindow()
         self.window = window
         // Closing this window hides the app. Show its windows again.
@@ -41,9 +52,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window.orderFrontRegardless()
     }
 
-    /// The window is only hidden when closed. Start from a fresh form next time, without unfinished
-    /// edits or an open confirmation.
+    /// The window is only hidden when closed. Start from a fresh form on the first page next time, without
+    /// unfinished edits or an open confirmation.
     func windowWillClose(_ notification: Notification) {
+        navigation.windowClosed()
         window?.contentViewController = makeContent()
         settings.launchAtLogin.settingsClosed()
         // An app without a Dock icon keeps being active after its last window closes, so no window has focus.
@@ -65,18 +77,25 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         settings.paste.refresh()
     }
 
+    /// The window takes the size the content asks for (`SettingsView`), also when the content is replaced on close.
     private func makeContent() -> NSViewController {
-        NSHostingController(
-            rootView: SettingsView(settings: settings) {
+        let controller = NSHostingController(
+            rootView: SettingsView(settings: settings, navigation: navigation, copyText: copyText) {
                 shortcutRecorder
             }
         )
+        controller.sizingOptions = [.preferredContentSize]
+        return controller
     }
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(contentViewController: makeContent())
+        // Hidden in the title bar, but still the window's name in Mission Control and for VoiceOver.
         window.title = String(localized: "Show My Copy Settings")
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.toolbarStyle = .unified
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.collectionBehavior.insert(.moveToActiveSpace)

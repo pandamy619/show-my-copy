@@ -32,16 +32,17 @@ struct ExcludedAppsSection: View {
             }
             if let chooseNote, let text = Self.note(for: chooseNote) {
                 text
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Nothing is read from the clipboard while one of these apps is in front.")
-                // The built-in list (`PasswordManager`) is not shown here; this matches the rule in Passwords above.
+                // The built-in list (`PasswordManager`) is not shown here; this matches the rule in
+                // Settings → Passwords.
                 Text("Copies from known password managers are skipped unless Save passwords is on.")
             }
-            .font(.caption)
+            .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
