@@ -25,7 +25,8 @@ struct SettingsView<ShortcutRecorder: View>: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        // Always both columns: the sidebar toggle is removed, so a collapsed sidebar could not come back.
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             List(SettingsSection.allCases, selection: $navigation.selection) { section in
                 Label {
                     Text(section.title)
