@@ -37,7 +37,8 @@ extension AppServices {
                 systemSettings: SystemSettingsPane(),
                 sleep: { duration in
                     try await Task.sleep(for: duration)
-                }
+                },
+                tuning: { PasteTuning.current() }
             ),
             memoryReader: TaskMemoryReader(),
             loginItem: MainAppLoginItem(),

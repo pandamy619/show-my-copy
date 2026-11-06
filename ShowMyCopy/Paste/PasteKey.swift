@@ -18,6 +18,9 @@ enum PasteKey {
     /// `kVK_ANSI_V` from Carbon's `Events.h`: the V key on a US keyboard.
     static let ansiV: UInt16 = 9
 
+    /// `kVK_Command` from Carbon's `Events.h`: the left ⌘ key, the same on every layout.
+    static let leftCommand: UInt16 = 55
+
     /// Virtual key codes run from 0 to 127.
     static let keyCodes: Range<UInt16> = 0..<128
 

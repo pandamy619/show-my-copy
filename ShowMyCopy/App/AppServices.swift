@@ -66,9 +66,11 @@ struct AppServices {
         var keystrokes: any PasteKeystrokePosting
         /// Opens Privacy & Security → Accessibility in System Settings, for the button under the setting.
         var systemSettings: any AccessibilitySettingsOpening
-        /// How the paster waits for the history window to give key focus back (`EntryPaster.focusDelay`): exactly,
-        /// unlike polling, which lets macOS delay its wakeups.
+        /// How the paster waits for the history window to give key focus back (`PasteTiming`): exactly, unlike
+        /// polling, which lets macOS delay its wakeups.
         var sleep: @Sendable (Duration) async throws -> Void
+        /// How long the paster waits and how it posts ⌘V, read for every paste (`PasteTuning.current()`).
+        var tuning: @MainActor () -> PasteTuning
     }
 
     var pasteboard: any PasteboardReading & PasteboardWriting

@@ -37,6 +37,19 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         panel?.isVisible ?? false
     }
 
+    /// Whether the panel is off screen as far as the window server knows: not visible, not key, and not among the
+    /// app's windows on screen, which it still is while it fades out. The paster waits for this before it sends ⌘V.
+    var isGoneFromScreen: Bool {
+        guard let panel else {
+            return true
+        }
+        guard !panel.isVisible, !panel.isKeyWindow else {
+            return false
+        }
+        let onScreen = NSWindow.windowNumbers(options: []) ?? []
+        return !onScreen.contains { $0.intValue == panel.windowNumber }
+    }
+
     func show() {
         drag.reset()
         let panel = panel ?? makePanel()
@@ -115,7 +128,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         }
         hide()
         if pastes {
-            paster.paste(copiedAt: changeCount)
+            paster.paste(copiedAt: changeCount) { [weak self] in
+                self?.isGoneFromScreen ?? true
+            }
         }
     }
 

@@ -24,14 +24,14 @@ final class SystemPasteKeystrokes: PasteAccessChecking, PasteKeystrokePosting {
         CGRequestPostEventAccess()
     }
 
-    /// Posts ⌘V down and up to the session, where the window server sends it to the active app's key window.
+    /// Posts ⌘V as `style` says (`PastePostingStyle.events(pasteKeyCode:)`), by default ⌘ down, V down and up, ⌘ up,
+    /// to the session, where the window server sends it to the active app's key window.
     ///
-    /// The key is the one the user would press for ⌘V (`PasteKey`), and the events carry "v" as their text, as a real
-    /// ⌘V does on every layout, so apps that match the text and apps that match the key both see ⌘V. The events have
-    /// only ⌘ set, so a modifier the user still holds, such as ⌥ after ⌥Return, does not change the shortcut. Real key
-    /// presses are held back for a moment while the paste is posted, so typing does not mix into it.
-    func postPaste() -> Bool {
-        let keyCode = Self.pasteKeyCode()
+    /// The V key is the one the user would press for ⌘V (`PasteKey`). The events have only ⌘ set, so a modifier the
+    /// user still holds, such as ⌥ after ⌥Return, does not change the shortcut. Real key presses are held back for a
+    /// moment while the paste is posted, so typing does not mix into it. All events are made before the first is
+    /// posted, so ⌘ never goes down without going up again.
+    func postPaste(_ style: PastePostingStyle) -> Bool {
         guard let source = CGEventSource(stateID: .combinedSessionState) else {
             return false
         }
@@ -39,19 +39,46 @@ final class SystemPasteKeystrokes: PasteAccessChecking, PasteKeystrokePosting {
             [.permitLocalMouseEvents, .permitSystemDefinedEvents],
             state: .eventSuppressionStateSuppressionInterval
         )
-        guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
-            let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
-        else {
-            return false
+        var events: [CGEvent] = []
+        for key in style.events(pasteKeyCode: UInt16(Self.pasteKeyCode())) {
+            guard let event = Self.makeEvent(key, source: source) else {
+                return false
+            }
+            events.append(event)
         }
-        let text = Array(PasteKey.letter.utf16)
-        for event in [down, up] {
-            event.flags = Self.commandFlags
-            event.keyboardSetUnicodeString(stringLength: text.count, unicodeString: text)
+        let tap = Self.location(of: style.tap)
+        for event in events {
+            event.post(tap: tap)
         }
-        down.post(tap: .cgSessionEventTap)
-        up.post(tap: .cgSessionEventTap)
         return true
+    }
+
+    private static func makeEvent(_ key: PasteKeyEvent, source: CGEventSource) -> CGEvent? {
+        let keyDown = key.kind != .keyUp
+        guard let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(key.keyCode), keyDown: keyDown)
+        else {
+            return nil
+        }
+        if key.kind == .flagsChanged {
+            event.type = .flagsChanged
+        }
+        event.flags = key.holdsCommand ? commandFlags : []
+        if let text = key.text {
+            let characters = Array(text.utf16)
+            event.keyboardSetUnicodeString(stringLength: characters.count, unicodeString: characters)
+        }
+        return event
+    }
+
+    private static func location(of tap: PasteEventTap) -> CGEventTapLocation {
+        switch tap {
+        case .session:
+            .cgSessionEventTap
+        case .annotatedSession:
+            .cgAnnotatedSessionEventTap
+        case .hid:
+            .cghidEventTap
+        }
     }
 
     /// The key the user presses for ⌘V on the layout in use now (`PasteKey`). Read on every paste: the user can

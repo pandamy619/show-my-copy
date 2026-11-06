@@ -19,7 +19,8 @@ protocol PasteAccessChecking: AnyObject {
 /// Sends ⌘V to the app in front, as if the user pressed it. The real one is `SystemPasteKeystrokes`.
 @MainActor
 protocol PasteKeystrokePosting: AnyObject {
-    /// Posts ⌘V down and up. Returns false when the events could not be made. macOS drops posted events without
-    /// telling the app when it lacks the privilege, so callers check `PasteAccessChecking.isGranted()` first.
-    func postPaste() -> Bool
+    /// Posts ⌘V as `style` says. Returns false when the events could not be made; then none was posted. macOS drops
+    /// posted events without telling the app when it lacks the privilege, so callers check
+    /// `PasteAccessChecking.isGranted()` first.
+    func postPaste(_ style: PastePostingStyle) -> Bool
 }

@@ -145,7 +145,8 @@ final class AppContainer: HistoryShowing {
             settings: settings,
             frontmostApp: services.system.frontmostApp,
             ownBundleIdentifier: Bundle.main.bundleIdentifier,
-            sleep: services.paste.sleep
+            sleep: services.paste.sleep,
+            tuning: services.paste.tuning
         )
     }
 
