@@ -1198,7 +1198,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Return копирует запись. ⌥Return ещё и вставляет её в приложение, в котором вы работали."
+            "value" : "Enter копирует запись. ⌥Enter ещё и вставляет её в приложение, в котором вы работали."
           }
         }
       }
@@ -1208,7 +1208,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Return вставляет запись в приложение, в котором вы работали. ⌥Return только копирует её."
+            "value" : "Enter вставляет запись в приложение, в котором вы работали. ⌥Enter только копирует её."
           }
         }
       }
@@ -1239,6 +1239,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Стрелка вправо открывает просмотр."
+          }
+        }
+      }
+    },
+    "Run from Xcode, the permission is checked for Xcode. Run the built app directly." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "При запуске из Xcode macOS проверяет разрешение у Xcode. Запустите собранное приложение напрямую."
           }
         }
       }
@@ -1358,7 +1368,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Show My Copy не разрешено вставлять, поэтому Return только копирует."
+            "value" : "Нет разрешения на вставку — Enter пока только копирует запись."
           }
         }
       }

@@ -133,6 +133,10 @@ struct GeneralSettingsSection: View {
                 Text("Allow it in Privacy & Security → Accessibility in System Settings.")
                 Text("To paste, Show My Copy sends ⌘V to the app you were using after you choose an entry.")
                 Text("It never reads what you type.")
+                #if DEBUG
+                    // A build run from Xcode asks macOS about Xcode's permission, so it never shows as allowed.
+                    Text("Run from Xcode, the permission is checked for Xcode. Run the built app directly.")
+                #endif
             }
             // macOS shows its own alert only the first time the app asks (turning the setting on); after that the user
             // can allow the app only in this list.

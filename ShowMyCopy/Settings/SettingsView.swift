@@ -35,7 +35,8 @@ struct SettingsView<ShortcutRecorder: View>: View {
                 }
                 .tag(section)
             }
-            .navigationSplitViewColumnWidth(190)
+            // Wider than Show My IP's 190 so the Russian section names fit.
+            .navigationSplitViewColumnWidth(220)
             .toolbar(removing: .sidebarToggle)
         } detail: {
             detail(for: navigation.shown)
