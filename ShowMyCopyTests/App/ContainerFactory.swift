@@ -6,11 +6,17 @@ import Testing
 /// Stands in for the SwiftUI settings window and remembers what the container built it from.
 @MainActor
 final class SettingsWindowSpy: SettingsWindowShowing {
-    private(set) var showCount = 0
+    /// The page asked for each time the window was shown; nil keeps the one it shows.
+    private(set) var shownSections: [SettingsSection?] = []
     var settings: AppSettings?
+    var copyText: (@MainActor (String) -> Void)?
 
-    func show() {
-        showCount += 1
+    var showCount: Int {
+        shownSections.count
+    }
+
+    func show(section: SettingsSection?) {
+        shownSections.append(section)
     }
 }
 
@@ -55,8 +61,9 @@ enum ContainerFactory {
             paste: paste,
             memoryReader: NoMemoryUsage(),
             loginItem: loginItem,
-            makeSettingsWindow: { settings in
+            makeSettingsWindow: { settings, copyText in
                 settingsWindow.settings = settings
+                settingsWindow.copyText = copyText
                 return settingsWindow
             }
         )

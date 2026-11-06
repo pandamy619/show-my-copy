@@ -34,7 +34,7 @@ struct HistoryWindowPasteTests {
             copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
             paster: paster,
             monitor: monitor,
-            onOpenSettings: {}
+            onOpenSettings: { _ in }
         )
     }
 

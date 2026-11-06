@@ -21,7 +21,7 @@ struct HistoryWindowCopyTextTests {
             copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
             paster: EntryPasterSpy(),
             monitor: monitor,
-            onOpenSettings: {}
+            onOpenSettings: { _ in }
         )
     }
 

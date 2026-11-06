@@ -28,7 +28,7 @@ struct HistoryWindowControllerTests {
             copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
             paster: EntryPasterSpy(),
             monitor: monitor,
-            onOpenSettings: {}
+            onOpenSettings: { _ in }
         )
     }
 
@@ -87,7 +87,7 @@ struct HistoryWindowControllerTests {
         let copier = EntryCopierSpy()
         let controller = HistoryWindowController(
             model: HistoryWindowModel(history: history), copier: copier, paster: EntryPasterSpy(),
-            monitor: ChangeTrackerSpy(), onOpenSettings: {})
+            monitor: ChangeTrackerSpy(), onOpenSettings: { _ in })
         history.record(text: "older", sourceApp: nil, at: start)
         let older = try #require(history.entries.first)
 
@@ -264,7 +264,7 @@ struct HistoryWindowControllerTests {
             copier: EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor),
             paster: EntryPasterSpy(),
             monitor: monitor,
-            onOpenSettings: {}
+            onOpenSettings: { _ in }
         )
         return (controller, deleter)
     }
