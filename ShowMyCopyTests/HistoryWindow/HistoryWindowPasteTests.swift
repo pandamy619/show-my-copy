@@ -140,8 +140,8 @@ struct HistoryWindowPasteTests {
     }
 
     /// The paster waits until the window server no longer shows the window, and does not paste while it is open,
-    /// such as when the user opens it again. Whether the window server still shows a closed panel while it fades out
-    /// can only be seen on screen: that is checked by hand.
+    /// such as when the user opens it again. That the panel closes at once, without a fade, can only be seen on
+    /// screen: that is checked by hand.
     @Test func thePasteIsToldWhenTheWindowIsOpen() throws {
         pasteboard.copy("older")
         monitor.poll()

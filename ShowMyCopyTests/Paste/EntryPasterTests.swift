@@ -44,7 +44,7 @@ struct EntryPasterTests {
         var value = PasteTuning.standard
     }
 
-    /// Whether the window server still shows the history window; tests change it as it fades out or opens again.
+    /// Whether the window server still shows the history window; tests change it as it lingers or opens again.
     @MainActor
     private final class HistoryWindowState {
         var isGone = true
@@ -84,6 +84,13 @@ struct EntryPasterTests {
         pasteboard.write(.text("chosen"), concealed: false) ?? -1
     }
 
+    @Test func standardTimingGivesTheAppInFront150MillisecondsToFocus() {
+        // The window is gone at once without a fade; the settle wait is what Chromium and Electron apps need.
+        #expect(PasteTiming.standard.settleDelay == .milliseconds(150))
+        #expect(PasteTiming.standard.longestWaitForWindow == .milliseconds(250))
+        #expect(PasteTiming.standard.longestWait == .milliseconds(400))
+    }
+
     @Test func pastesOnceTheWindowIsGoneAndTheAppHadTimeToFocus() async throws {
         try await ContainerFactory.withDefaults { defaults in
             let (paster, _) = makePaster(defaults: defaults, front: Front(textEdit))
@@ -101,7 +108,8 @@ struct EntryPasterTests {
         }
     }
 
-    /// The panel can stay on screen for a moment after it was ordered out, while it fades out.
+    /// The panel closes without a fade, so it is usually gone at the first check. The window server may still list it
+    /// for a moment after it was ordered out, and the paster does not rely on it being gone at once.
     @Test func waitsWhileTheWindowIsStillOnScreen() async throws {
         try await ContainerFactory.withDefaults { defaults in
             let (paster, _) = makePaster(defaults: defaults, front: Front(textEdit))

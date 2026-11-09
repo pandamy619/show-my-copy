@@ -10,6 +10,13 @@ struct HistoryPanelTests {
         #expect(panel.sharingType == NSWindow.SharingType.none)
     }
 
+    @Test func panelOpensAndClosesWithoutAnimation() {
+        // Without a fade the panel is gone from the screen as soon as it is ordered out, so a paste waits only for
+        // the app in front to focus its field again (`PasteTiming`). It also appears at once, like Maccy's.
+        let panel = HistoryPanel(contentRect: NSRect(origin: .zero, size: HistoryPanelPlacement.fullSize))
+        #expect(panel.animationBehavior == NSWindow.AnimationBehavior.none)
+    }
+
     @Test func titleBarShowsNothingOverTheSearchField() {
         // The content runs under the title bar, so the search field sits at the top edge. Nothing of the title bar
         // may show over it: no title, no buttons, no separator line.
