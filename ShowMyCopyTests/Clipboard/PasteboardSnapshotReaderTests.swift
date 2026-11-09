@@ -85,6 +85,25 @@ struct PasteboardSnapshotReaderTests {
         #expect(pasteboard.stringCallCount == 0)
     }
 
+    @Test func textTheAppDoesNotRecordIsSkippedBeforeAnyDataIsRead() {
+        pasteboard.copy("~/Documents", markers: [PasteboardMarker.unrecorded, PasteboardMarker.source])
+        #expect(read(savesPasswords: true) == .skipped(.unrecorded))
+        #expect(pasteboard.dataReadCount == 0)
+        #expect(pasteboard.stringCallCount == 0)
+    }
+
+    @Test func textTheAppDoesNotRecordIsSkippedAlsoAsAPassword() {
+        pasteboard.copy("~/Documents", markers: [PasteboardMarker.unrecorded])
+        #expect(read(fromPasswordManager: true, savesPasswords: true) == .skipped(.unrecorded))
+        #expect(pasteboard.dataReadCount == 0)
+    }
+
+    @Test func sourceMarkerAloneDoesNotSkipTheItem() {
+        // Every app that follows nspasteboard.org writes it, and an entry copied back carries it too.
+        pasteboard.copy("from another app", markers: [PasteboardMarker.source])
+        #expect(read() == .content(.text("from another app"), isSecret: false))
+    }
+
     @Test func secretIsReadWhenPasswordsAreSaved() {
         pasteboard.copy("hunter2", markers: [PasteboardMarker.concealed])
         #expect(read(savesPasswords: true) == .content(.text("hunter2"), isSecret: true))

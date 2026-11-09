@@ -123,6 +123,8 @@ struct EntryCopierTests {
 
         EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor).copy(older)
         #expect(pasteboard.writtenConcealed == [false])
+        // The history holds it, so at the next launch it is made current again, not skipped.
+        #expect(pasteboard.writtenUnrecordedTexts.isEmpty)
     }
 
     @Test func concealedEntryIsWrittenConcealedAndStaysConcealed() throws {

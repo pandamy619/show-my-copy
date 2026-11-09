@@ -16,7 +16,7 @@ struct EntryCopierTextTests {
         MonitorFactory.make(pasteboard: pasteboard, history: history, frontmostApp: { [finder] in finder })
     }
 
-    @Test func copiedTextIsWrittenAsPlainText() {
+    @Test func copiedTextIsWrittenAsPlainTextTheAppDoesNotRecord() {
         let monitor = makeMonitor()
         monitor.poll()
 
@@ -26,6 +26,8 @@ struct EntryCopierTextTests {
         #expect(changeCount == pasteboard.changeCount)
         #expect(pasteboard.writtenPayloads == [.text("~/Documents")])
         #expect(pasteboard.writtenConcealed == [false])
+        // Marked, so the monitor skips it unread when it finds it at the next launch.
+        #expect(pasteboard.writtenUnrecordedTexts == ["~/Documents"])
     }
 
     @Test func copiedTextIsNotRecorded() {

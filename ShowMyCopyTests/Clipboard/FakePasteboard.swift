@@ -34,6 +34,8 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     private(set) var writtenPayloads: [PasteboardPayload] = []
     /// For each write, whether it was marked as concealed.
     private(set) var writtenConcealed: [Bool] = []
+    /// The text of every `writeUnrecorded(_:)` write. Such writes are in `writtenTexts` and `writtenPayloads` too.
+    private(set) var writtenUnrecordedTexts: [String] = []
     /// How often the text was read, as a string or as data, to check that secrets are not read when they are not
     /// kept.
     private(set) var stringReadCount = 0
@@ -173,7 +175,8 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         }
         writtenPayloads.append(payload)
         writtenConcealed.append(concealed)
-        let markers = concealed ? [PasteboardMarker.concealed] : []
+        // Like `SystemPasteboard`, every write names this app with the source marker.
+        let markers = (concealed ? [PasteboardMarker.concealed] : []) + [PasteboardMarker.source]
         switch payload {
         case .text(let text):
             writtenTexts.append(text)
@@ -185,6 +188,19 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
         case .files(let urls):
             copyFiles(urls, markers: markers)
         }
+        return changeCount
+    }
+
+    @discardableResult
+    func writeUnrecorded(_ text: String) -> Int? {
+        guard !writeFails else {
+            return nil
+        }
+        writtenPayloads.append(.text(text))
+        writtenConcealed.append(false)
+        writtenTexts.append(text)
+        writtenUnrecordedTexts.append(text)
+        copy(text, markers: [PasteboardMarker.unrecorded, PasteboardMarker.source])
         return changeCount
     }
 }

@@ -113,6 +113,7 @@ struct SystemPasteboardTests {
     private let backend = FakePasteboardBackend()
     private let sourceType = NSPasteboard.PasteboardType(PasteboardMarker.source)
     private let concealedType = NSPasteboard.PasteboardType(PasteboardMarker.concealed)
+    private let unrecordedType = NSPasteboard.PasteboardType(PasteboardMarker.unrecorded)
 
     @Test func writeReturnsTheChangeCountOfItsOwnItem() throws {
         backend.changeCount = 41
@@ -161,10 +162,45 @@ struct SystemPasteboardTests {
         #expect(pasteboard.string() == "from another app")
     }
 
-    @Test func plainWriteHasNoConcealedMarker() {
+    @Test func plainWriteHasNoConcealedOrUnrecordedMarker() {
         let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: "com.example.ShowMyCopy")
         pasteboard.write("hello")
         #expect(!pasteboard.types.contains(concealedType))
+        #expect(!pasteboard.types.contains(unrecordedType))
+    }
+
+    @Test func unrecordedWriteIsMarkedNamesTheAppAndStaysOnThisMac() throws {
+        backend.changeCount = 41
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: "com.example.ShowMyCopy")
+
+        let changeCount = try #require(pasteboard.writeUnrecorded("~/Documents"))
+        #expect(changeCount == 42)
+        #expect(backend.preparedOptions == [.currentHostOnly])
+        #expect(pasteboard.string() == "~/Documents")
+        #expect(backend.string(forType: unrecordedType) == "")
+        #expect(backend.string(forType: sourceType) == "com.example.ShowMyCopy")
+        #expect(!pasteboard.types.contains(concealedType))
+    }
+
+    @Test func unrecordedWriteFailsWhenTheTextCannotBeSet() {
+        backend.failingTypes = [.string]
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: "com.example.ShowMyCopy")
+        #expect(pasteboard.writeUnrecorded("~/Documents") == nil)
+    }
+
+    @Test func unrecordedWriteKeepsTheTextWhenItsMarkerCannotBeSet() {
+        backend.failingTypes = [unrecordedType]
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: "com.example.ShowMyCopy")
+        // Without the marker the text is only recorded at the next launch: the copy the user asked for still works.
+        #expect(pasteboard.writeUnrecorded("~/Documents") != nil)
+        #expect(pasteboard.string() == "~/Documents")
+    }
+
+    @Test func unrecordedWriteFailsWhenAnotherAppWritesRightAfterTheText() {
+        backend.afterSetString = { $0.otherAppCopies("from another app") }
+        let pasteboard = SystemPasteboard(pasteboard: backend, bundleIdentifier: "com.example.ShowMyCopy")
+        #expect(pasteboard.writeUnrecorded("~/Documents") == nil)
+        #expect(pasteboard.string() == "from another app")
     }
 
     @Test func concealedWriteIsMarkedAndStaysOnThisMac() throws {
