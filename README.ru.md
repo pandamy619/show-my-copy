@@ -15,6 +15,8 @@
 
 <p align="center"><a href="README.md">English version</a></p>
 
+<p align="center"><img src=".github/images/history.png" width="480" alt="Окно истории: что сейчас в буфере, закреплённая картинка и недавний текст"></p>
+
 ## Установка
 
 1. Скачайте [ShowMyCopy.dmg](https://github.com/pandamy619/show-my-copy/releases/latest/download/ShowMyCopy.dmg) из последнего [релиза](https://github.com/pandamy619/show-my-copy/releases). Чтобы проверить файл, сравните вывод `shasum -a 256 ShowMyCopy.dmg` с `ShowMyCopy.dmg.sha256` из того же релиза.
@@ -56,6 +58,9 @@ Show My Copy на ранней стадии разработки. Скачайт
 Приложение никуда не отправляет ничего из скопированного: что оно хранит, где и как долго и как всё удалить, описано в [политике конфиденциальности](PRIVACY.ru.md).
 
 Удалённые записи могут оставаться в свободном месте файла истории, пока их не перезапишут. Пароль, скопированный без пометки из приложения, которое не известно как менеджер паролей (например, из расширения браузера), может сохраниться как обычный текст — подробности и известные ограничения в [SECURITY.md](SECURITY.md).
+
+<p align="center"><img src=".github/images/swipe.png" width="480" alt="Строка, сдвинутая влево: Просмотр, Закрепить и Удалить"></p>
+<p align="center"><img src=".github/images/settings.png" width="560" alt="Настройки с боковой панелью разделов"></p>
 
 ## Сборка
 

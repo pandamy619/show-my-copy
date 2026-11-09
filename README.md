@@ -15,6 +15,8 @@
 
 <p align="center"><a href="README.ru.md">Русская версия</a></p>
 
+<p align="center"><img src=".github/images/history.png" width="480" alt="The history window with the clipboard now, a pinned image and recent text"></p>
+
 ## Installation
 
 1. Download [ShowMyCopy.dmg](https://github.com/pandamy619/show-my-copy/releases/latest/download/ShowMyCopy.dmg) from the latest [release](https://github.com/pandamy619/show-my-copy/releases). To check the download, compare `shasum -a 256 ShowMyCopy.dmg` with `ShowMyCopy.dmg.sha256` from the same release.
@@ -56,6 +58,9 @@ Show My Copy is in early development. Download the latest [release](https://gith
 The app sends nothing you copy anywhere: see the [privacy policy](PRIVACY.md) for what the app stores, where and for how long, and how to delete all of it.
 
 Deleted entries can stay in the history file's free space until they are overwritten. A password copied without a marker from an app that is not a known password manager, such as a browser extension, can still be kept like normal text — see [SECURITY.md](SECURITY.md) for the details and known limitations.
+
+<p align="center"><img src=".github/images/swipe.png" width="480" alt="A row swiped to the left shows Show Preview, Pin and Delete"></p>
+<p align="center"><img src=".github/images/settings.png" width="560" alt="Settings with a sidebar of sections"></p>
 
 ## Building
 
