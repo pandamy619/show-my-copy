@@ -15,9 +15,18 @@
 
 <p align="center"><a href="README.ru.md">Русская версия</a></p>
 
+## Installation
+
+1. Download [ShowMyCopy.dmg](https://github.com/pandamy619/show-my-copy/releases/latest/download/ShowMyCopy.dmg) from the latest [release](https://github.com/pandamy619/show-my-copy/releases). To check the download, compare `shasum -a 256 ShowMyCopy.dmg` with `ShowMyCopy.dmg.sha256` from the same release.
+2. Drag **Show My Copy** to **Applications**.
+3. Launch it. The app is not signed by Apple, so macOS blocks the first launch: open **System Settings → Privacy & Security** and click **Open Anyway**. This is needed once.
+4. Press ⌥⌘V to open the history. Settings open from the history window or when you launch the app again.
+
+Requires macOS 15 Sequoia or later. Because the app is not signed by Apple, after an update macOS may ask again for the Keychain key that encrypts saved passwords (click **Always Allow**) and for the paste permission in **Privacy & Security → Accessibility**.
+
 ## Current status (0.1.0)
 
-Show My Copy is in early development. There are no releases yet; build it from source. What works now:
+Show My Copy is in early development. Download the latest [release](https://github.com/pandamy619/show-my-copy/releases) or build it from source. What works now:
 
 - **Background history of text, rich text, images and files.** What you copy is collected quietly, with the app it came from. Text is kept up to 1 MB per copy, and styled text keeps its formatting when copied back. Images (up to 20 MB each) are kept as files in the app's sandbox with a small thumbnail (images over 120 megapixels without one); copied files are kept as references (path and name), never as copies. An image is listed as soon as you copy it and gets its thumbnail a moment later, and copies made meanwhile are not missed. Copied photos and videos get a small thumbnail when you copy them (a frame for a video). The history window shows thumbnails of images, photos and videos and icons of other files, with a mark on files that may have been moved or deleted.
 - **History survives a restart.** It is saved only on your Mac, in the app's sandbox, and left out of backups. Saved passwords are encrypted with a key kept in your Keychain, which is used only if you save passwords.

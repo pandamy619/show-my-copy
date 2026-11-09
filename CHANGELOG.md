@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.0] - 2026-11-09
 
-First version, 0.1.0. Not released yet. Requires macOS 15 Sequoia or later.
+First version. Requires macOS 15 Sequoia or later.
 
 ### Recording
 

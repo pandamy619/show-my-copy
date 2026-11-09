@@ -1,6 +1,6 @@
 SOURCES := ShowMyCopy ShowMyCopyTests ShowMyCopyControl
 
-.PHONY: lint format test security security-selftest build-release
+.PHONY: lint format test security security-selftest build-release release
 
 lint:
 	swiftlint lint --strict --quiet
@@ -20,11 +20,12 @@ test:
 		-testLanguage en -testRegion US -resultBundlePath build/Tests.xcresult -quiet
 
 # Proves every check in check_security.py, check_privacy_manifest.py and check_store_metadata.py can fail
-# (fixtures, fake codesign); runs on Linux too.
+# (fixtures, fake codesign), and that prepare_release.py refuses a tag that does not match; runs on Linux too.
 security-selftest:
 	python3 -I scripts/test_check_security.py
 	python3 -I scripts/test_check_privacy_manifest.py
 	python3 -I scripts/test_check_store_metadata.py
+	python3 -I scripts/test_prepare_release.py
 
 security: build-release
 	./scripts/check_security.sh build/Build/Products/Release/ShowMyCopy.app
@@ -33,3 +34,8 @@ security: build-release
 build-release:
 	xcodebuild build -project ShowMyCopy.xcodeproj -scheme ShowMyCopy -configuration Release \
 		-destination 'platform=macOS,arch=arm64' -derivedDataPath build CODE_SIGN_IDENTITY=- -quiet
+
+# build/ShowMyCopy.dmg and its SHA-256: a universal, ad-hoc signed Release build that passed the security checks.
+# Run by .github/workflows/release.yml for a tag vX.Y.Z.
+release:
+	./scripts/release.sh
