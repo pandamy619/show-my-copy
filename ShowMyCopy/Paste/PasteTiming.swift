@@ -9,7 +9,8 @@
 ///
 /// So the paster first waits until the window server no longer shows the panel, checking every `pollInterval` for at
 /// most `longestWaitForWindow`, and then waits `settleDelay` more for the app to make its window key and focus its
-/// field. Altogether it waits at most `longestWait`.
+/// field. Altogether it waits at most `longestWait`. The panel closes without a fade (`HistoryPanel`), so it is
+/// usually gone at the first check and the settle wait is all a paste waits.
 struct PasteTiming: Equatable, Sendable {
     /// How often the paster checks whether the panel is gone.
     var pollInterval: Duration
@@ -19,7 +20,8 @@ struct PasteTiming: Equatable, Sendable {
     var settleDelay: Duration
 
     /// Short enough that the paste feels immediate, long enough for Chromium and Electron apps. The panel is usually
-    /// gone after one or two checks, so a paste usually waits about 0.15 to 0.2 seconds.
+    /// gone at the first check, so a paste usually waits about 0.15 seconds. The settle wait can be tuned in Debug
+    /// builds (`PasteTuning.current()`).
     static let standard = PasteTiming(
         pollInterval: .milliseconds(10),
         longestWaitForWindow: .milliseconds(250),

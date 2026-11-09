@@ -36,7 +36,9 @@ final class HistoryPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        animationBehavior = .utilityWindow
+        // No fade in or out, as in Maccy. Closed, the panel is gone from the screen at once, so a paste waits only
+        // for the app in front to focus its field again (`PasteTiming`), and it appears at once when opened.
+        animationBehavior = NSWindow.AnimationBehavior.none
         // The panel shows clipboard contents, so keep it out of screen sharing, screenshots and recordings.
         // This is the documented opt-out. Capture through ScreenCaptureKit on newer macOS versions may still
         // include the window.

@@ -38,7 +38,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     }
 
     /// Whether the panel is off screen as far as the window server knows: not visible, not key, and not among the
-    /// app's windows on screen, which it still is while it fades out. The paster waits for this before it sends ⌘V.
+    /// app's windows on screen. The panel closes without a fade, so this is usually true as soon as it is ordered
+    /// out; the paster still waits for it before it sends ⌘V, in case the window server lists it a moment longer.
     var isGoneFromScreen: Bool {
         guard let panel else {
             return true
