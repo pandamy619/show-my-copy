@@ -4,10 +4,11 @@ import Testing
 
 @testable import ShowMyCopy
 
-/// One test at a time: a test that waits for a resize suspends, and a test that opens its own panel meanwhile takes
-/// the key window from it, which closes the waiting test's panel. Only one panel is ever open in the app.
+/// One test at a time, and none while another suite has a window open (`OneWindowAtATime`): a test that waits for a
+/// resize suspends, and a test that opens its own panel meanwhile takes the key window from it, which closes the
+/// waiting test's panel. Only one panel is ever open in the app.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .oneWindowAtATime)
 struct HistoryWindowControllerTests {
     private let pasteboard = FakePasteboard()
     private let history = InMemoryHistoryStore()

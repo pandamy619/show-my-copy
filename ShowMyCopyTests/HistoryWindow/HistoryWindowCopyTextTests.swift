@@ -5,7 +5,7 @@ import Testing
 
 /// Text the user selects in the history window and copies by hand, such as a file's folder in the preview.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .oneWindowAtATime)
 struct HistoryWindowCopyTextTests {
     private let pasteboard = FakePasteboard()
     private let history = InMemoryHistoryStore()

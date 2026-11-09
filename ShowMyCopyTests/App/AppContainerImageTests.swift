@@ -5,6 +5,7 @@ import Testing
 @testable import ShowMyCopy
 
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerImageTests {
     private let pasteboard = FakePasteboard()
     private let base = InMemoryBlobStore()

@@ -6,6 +6,7 @@ import Testing
 /// Opening at login as the container wires it: off unless the user turns it on, offered once in the first launch's
 /// Settings.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerLaunchAtLoginTests {
     private let loginItem = FakeLoginItem()
     private let settingsWindow = SettingsWindowSpy()

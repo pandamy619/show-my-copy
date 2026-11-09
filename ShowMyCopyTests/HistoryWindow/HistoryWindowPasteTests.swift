@@ -5,7 +5,7 @@ import Testing
 
 /// Return and ⌥Return in the history window with Settings → General → Paste after choosing an entry off and on.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .oneWindowAtATime)
 struct HistoryWindowPasteTests {
     private let pasteboard = FakePasteboard()
     private let history = InMemoryHistoryStore()

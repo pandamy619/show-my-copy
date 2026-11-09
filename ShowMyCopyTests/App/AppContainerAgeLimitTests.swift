@@ -7,6 +7,7 @@ import Testing
 /// The age limit as the app runs it: 8 hours unless the user chose otherwise, applied at launch, while the app idles,
 /// after wake and unlock, and in the open history window. The clock is a fake that moves only when a test moves it.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerAgeLimitTests {
     private let start = ContainerFactory.date
     private let clock = ManualDate(ContainerFactory.date)

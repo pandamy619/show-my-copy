@@ -9,7 +9,7 @@ import Testing
 ///
 /// One test at a time, like `HistoryWindowControllerTests`: only one panel is ever open in the app.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .oneWindowAtATime)
 struct HistoryWindowDragTests {
     private let pasteboard = FakePasteboard()
     private let history = InMemoryHistoryStore()

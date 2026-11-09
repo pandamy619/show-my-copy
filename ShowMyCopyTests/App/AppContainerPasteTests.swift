@@ -5,6 +5,7 @@ import Testing
 
 /// Pasting after choosing an entry as the container wires it: off and never asked for until the user turns it on.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerPasteTests {
     private let pasteboard = FakePasteboard()
     private let keystrokes = FakePasteKeystrokes()

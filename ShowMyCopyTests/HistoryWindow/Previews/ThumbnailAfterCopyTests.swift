@@ -9,6 +9,7 @@ import Testing
 /// must show the thumbnail once the background work hands it to the history, without a relaunch. Runs on a new
 /// saved history whose image folder does not exist yet, as at the first launch.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct ThumbnailAfterCopyTests {
     private let pasteboard = FakePasteboard()
     private let decoder = FakeImageDecoder()

@@ -7,6 +7,7 @@ import Testing
 /// Saved passwords as the app runs them: when one leaves the history, it leaves the clipboard too, if the clipboard
 /// still holds exactly that password. The clock is a fake that moves only when a test moves it.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerPasswordClipboardTests {
     private let start = ContainerFactory.date
     private let clock = ManualDate(ContainerFactory.date)

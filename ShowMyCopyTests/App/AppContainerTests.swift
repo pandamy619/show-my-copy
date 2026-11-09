@@ -11,6 +11,7 @@ final class LimitAtFirstRead {
 }
 
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerTests {
     /// On the container's clock, so the age limit measures entries against the same time as the monitor.
     private let store = InMemoryHistoryStore(

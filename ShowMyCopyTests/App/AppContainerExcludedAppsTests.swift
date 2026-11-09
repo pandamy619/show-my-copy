@@ -6,6 +6,7 @@ import Testing
 /// The excluded apps as the app runs them: the list in Settings is the one the monitor checks, and it is read from
 /// UserDefaults at launch.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerExcludedAppsTests {
     private let pasteboard = FakePasteboard()
     private let store = InMemoryHistoryStore(

@@ -13,6 +13,7 @@ final class HistoryShowingSpy: HistoryShowing {
 }
 
 @MainActor
+@Suite(.oneWindowAtATime)
 struct HistoryRequestsTests {
     @Test func requestShowsTheHistory() {
         let requests = HistoryRequests()

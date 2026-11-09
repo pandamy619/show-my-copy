@@ -8,6 +8,7 @@ import Testing
 /// app starts on the same saved records with something still on the pasteboard. Every launch builds a new store and
 /// container on the same `FakeHistoryPersistence` and blob store, like a new process on the same files.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppRelaunchTests {
     private let records = FakeHistoryPersistence()
     private let base = InMemoryBlobStore()

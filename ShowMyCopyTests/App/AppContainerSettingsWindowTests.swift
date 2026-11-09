@@ -5,6 +5,7 @@ import Testing
 
 /// What the container asks of the settings window: which page it opens on, and copying without recording.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerSettingsWindowTests {
     private let pasteboard = FakePasteboard()
     private let store = InMemoryHistoryStore(now: { ContainerFactory.date })

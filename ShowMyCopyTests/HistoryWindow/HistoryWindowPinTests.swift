@@ -6,6 +6,7 @@ import Testing
 /// ⌘P pins and unpins the selected entry; the window lists the entry on the clipboard, then the pinned entries in
 /// the order they were pinned, then the rest.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct HistoryWindowPinTests {
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
     private let clock = ManualDate(Date(timeIntervalSince1970: 1_790_000_100))
@@ -214,6 +215,7 @@ struct HistoryWindowPinTests {
 
 /// ⌘P reaches the open history window as a key equivalent, before the search field or Print.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct HistoryWindowControllerPinTests {
     private let pasteboard = FakePasteboard()
     private let history = InMemoryHistoryStore()

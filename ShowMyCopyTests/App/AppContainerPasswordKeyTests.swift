@@ -7,6 +7,7 @@ import Testing
 /// Saved passwords wait on disk until the key loads in the background: started at launch, and tried again when the
 /// user comes back to an unlocked Mac.
 @MainActor
+@Suite(.oneWindowAtATime)
 struct AppContainerPasswordKeyTests {
     private let disk = FakeHistoryPersistence()
     private let distributed = FakeNotifications()
