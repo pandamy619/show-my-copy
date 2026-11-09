@@ -12,6 +12,14 @@ enum PasteboardMarker {
     /// Holds the bundle identifier of the app that wrote the item. This app adds it to items it writes back.
     static let source = "org.nspasteboard.source"
 
+    /// This app's own marker, not one from nspasteboard.org. It marks text the app put on the pasteboard that no
+    /// history entry holds, such as a folder copied from the preview (`EntryCopier.copyText(_:)`), and holds an empty
+    /// string. The app never records an item with it, also when it finds one at launch or after a pause, and it skips
+    /// the item by this type alone, before reading anything else. `source` cannot do that: every app that follows
+    /// nspasteboard.org writes that type, with its own bundle identifier as the value, and an entry copied back
+    /// carries it too. Other apps do not know this type and treat the text as a normal copy.
+    static let unrecorded = "com.pandamy619.ShowMyCopy.unrecorded"
+
     /// Older markers that password managers use instead of `concealed`.
     static let legacyPassword: Set<String> = [
         "com.agilebits.onepassword",

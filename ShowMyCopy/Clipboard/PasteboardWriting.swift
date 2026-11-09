@@ -21,6 +21,12 @@ protocol PasteboardWriting: AnyObject {
     @discardableResult
     func write(_ payload: PasteboardPayload, concealed: Bool) -> Int?
 
+    /// Puts plain text this app made itself, which no entry holds, on the pasteboard, marked with
+    /// `PasteboardMarker.unrecorded`, so the monitor never records it, also when it finds it at the next launch.
+    /// Returns the change count as `write(_:concealed:)` does.
+    @discardableResult
+    func writeUnrecorded(_ text: String) -> Int?
+
     /// Empties the pasteboard, but only while its change count is still `changeCount`: nothing was copied since the
     /// app saw it. Returns the change count of the emptied pasteboard, or nil when another app wrote to it and it
     /// was left as it is.

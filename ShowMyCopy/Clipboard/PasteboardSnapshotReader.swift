@@ -15,6 +15,8 @@ enum CapturedItem: Equatable, Sendable {
     enum SkipReason: Equatable, Sendable {
         /// Marked as transient or auto-generated: never kept.
         case marked
+        /// Text this app put there itself that no entry holds (`PasteboardMarker.unrecorded`): never kept.
+        case unrecorded
         /// A password while passwords are not saved (its contents were not read), or a password without text,
         /// such as an image marked as concealed: a secret is never kept as an image or files.
         case secret
@@ -117,6 +119,12 @@ struct PasteboardSnapshotReader {
     }
 
     private func skipReason(_ markers: Markers, isSecret: Bool, savesPasswords: Bool) -> CapturedItem.SkipReason? {
+        if markers.isUnrecorded {
+            // While the app runs, the monitor is told about such a write and never reads it. This is the item still
+            // on the pasteboard at launch.
+            AppLogger.clipboard.debug("Skipped text this app put on the pasteboard and does not record")
+            return .unrecorded
+        }
         if markers.isAlwaysSkipped {
             AppLogger.clipboard.debug("Skipped an item marked as transient or auto-generated")
             return .marked
@@ -136,17 +144,20 @@ struct PasteboardSnapshotReader {
     private struct Markers {
         var isSecret: Bool
         var isAlwaysSkipped: Bool
-        /// The types that hold data, without the nspasteboard.org markers.
+        var isUnrecorded: Bool
+        /// The types that hold data, without the markers.
         var contentTypes: Set<NSPasteboard.PasteboardType>
     }
 
     private func currentMarkers() -> Markers {
         let types = Set(pasteboard.types)
         let names = Set(types.map(\.rawValue))
-        let markerNames = PasteboardMarker.secret.union(PasteboardMarker.alwaysSkipped).union([PasteboardMarker.source])
+        let markerNames = PasteboardMarker.secret.union(PasteboardMarker.alwaysSkipped)
+            .union([PasteboardMarker.source, PasteboardMarker.unrecorded])
         return Markers(
             isSecret: !names.isDisjoint(with: PasteboardMarker.secret),
             isAlwaysSkipped: !names.isDisjoint(with: PasteboardMarker.alwaysSkipped),
+            isUnrecorded: names.contains(PasteboardMarker.unrecorded),
             contentTypes: types.filter { !markerNames.contains($0.rawValue) }
         )
     }

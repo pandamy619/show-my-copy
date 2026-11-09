@@ -74,6 +74,15 @@ final class SystemPasteboard: PasteboardReading {
 extension SystemPasteboard: PasteboardWriting {
     @discardableResult
     func write(_ payload: PasteboardPayload, concealed: Bool) -> Int? {
+        write(payload, concealed: concealed, unrecorded: false)
+    }
+
+    @discardableResult
+    func writeUnrecorded(_ text: String) -> Int? {
+        write(.text(text), concealed: false, unrecorded: true)
+    }
+
+    private func write(_ payload: PasteboardPayload, concealed: Bool, unrecorded: Bool) -> Int? {
         // `.currentHostOnly` keeps an entry the user picked off Universal Clipboard, so history from this Mac is
         // not sent to the user's other devices again. For a password it also keeps it off the user's other devices.
         //
@@ -90,6 +99,11 @@ extension SystemPasteboard: PasteboardWriting {
         }
         guard writeContent(payload) else {
             return nil
+        }
+        if unrecorded {
+            // Lets the monitor skip the text unread when it finds it at the next launch. Without the marker the text
+            // is only recorded then, as a copy from an unknown app, so it is not worth failing the copy for.
+            _ = pasteboard.setString("", forType: NSPasteboard.PasteboardType(PasteboardMarker.unrecorded))
         }
         if let bundleIdentifier {
             // Tells other clipboard tools which app wrote the item. Losing this marker is not worth failing for.

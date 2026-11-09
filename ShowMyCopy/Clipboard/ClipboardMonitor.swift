@@ -125,7 +125,8 @@ final class ClipboardMonitor: PasteboardChangeTracking {
         lastChangeCount
     }
 
-    /// Checks the pasteboard once. The first call records whatever is on the pasteboard at launch.
+    /// Checks the pasteboard once. The first call records whatever is on the pasteboard at launch, except text this
+    /// app put there and does not record, which the reader skips by its marker (`PasteboardMarker.unrecorded`).
     func poll() {
         expiry.removeExpired()
         let date = now()

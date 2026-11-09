@@ -63,12 +63,16 @@ final class EntryCopier: EntryCopying {
     }
 
     /// Puts text the user selected in the history window and copied with ⌘C, such as the folder of a copied file in
-    /// the preview, on the pasteboard as plain text, with the app's source marker, and does not record it.
+    /// the preview, on the pasteboard as plain text, with the app's source marker and `PasteboardMarker.unrecorded`,
+    /// and does not record it.
     ///
     /// The history panel does not make the app active, so a copy the monitor found on its own would be recorded as
     /// one from the app in front, which did not make it, and would add an entry for a detail of an entry already
     /// there. So, as in `copy(_:)`, the monitor first records anything copied since its last poll and is then told
-    /// about the write. The clipboard now holds what no entry holds, so no entry is current any more.
+    /// about the write. The clipboard now holds what no entry holds, so no entry is current any more. When the app
+    /// quits and starts again with the text still on the clipboard, the monitor skips it by the `unrecorded` marker,
+    /// before reading it. An entry copied back with `copy(_:)` has no such marker: the history holds it, and at the
+    /// next launch it is found and made current again.
     ///
     /// Returns nil, and leaves the history and the monitor alone, for empty text or when the write failed.
     @discardableResult
@@ -77,7 +81,7 @@ final class EntryCopier: EntryCopying {
             return nil
         }
         monitor.poll()
-        guard let changeCount = pasteboard.write(text) else {
+        guard let changeCount = pasteboard.writeUnrecorded(text) else {
             AppLogger.clipboard.info("Could not put the selected text on the pasteboard")
             return nil
         }
