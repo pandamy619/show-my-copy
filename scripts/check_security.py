@@ -126,6 +126,9 @@ DEBUG_ONLY_STRINGS: Dict[str, str] = {
     "debug.paste.": "the prefix of the UserDefaults keys Debug builds read to tune pasting on the Mac "
     "(PasteTuning.overridden(by:), for example debug.paste.settleMs). Release builds always paste the standard way "
     "and must not read them (SECURITY.md)",
+    "debug.screenshots.": "the prefix of the UserDefaults keys Debug builds read to let screenshots show the history "
+    "window (HistoryWindowController.debugAllowsScreenCaptureKey). A Release build always keeps the window out of "
+    "screen sharing and screenshots (SECURITY.md)",
 }
 TESTS_FOLDER = "ShowMyCopyTests/"
 

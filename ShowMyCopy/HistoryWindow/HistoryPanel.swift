@@ -45,6 +45,14 @@ final class HistoryPanel: NSPanel {
         sharingType = NSWindow.SharingType.none
     }
 
+    /// Whether screen sharing, screenshots and recordings may show the panel. Off, because the panel shows clipboard
+    /// contents. Only a Debug build turns it on, to take screenshots for the README (`HistoryWindowController.show()`).
+    var allowsScreenCapture = false {
+        didSet {
+            sharingType = allowsScreenCapture ? NSWindow.SharingType.readOnly : NSWindow.SharingType.none
+        }
+    }
+
     override var canBecomeKey: Bool {
         true
     }

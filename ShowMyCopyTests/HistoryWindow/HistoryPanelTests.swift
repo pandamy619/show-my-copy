@@ -8,6 +8,16 @@ struct HistoryPanelTests {
     @Test func panelIsLeftOutOfScreenSharing() {
         let panel = HistoryPanel(contentRect: NSRect(origin: .zero, size: HistoryPanelPlacement.fullSize))
         #expect(panel.sharingType == NSWindow.SharingType.none)
+        #expect(!panel.allowsScreenCapture)
+    }
+
+    @Test func screenCaptureCanBeAllowedAndTakenBack() {
+        // Only Debug builds allow it, for README screenshots.
+        let panel = HistoryPanel(contentRect: NSRect(origin: .zero, size: HistoryPanelPlacement.fullSize))
+        panel.allowsScreenCapture = true
+        #expect(panel.sharingType == NSWindow.SharingType.readOnly)
+        panel.allowsScreenCapture = false
+        #expect(panel.sharingType == NSWindow.SharingType.none)
     }
 
     @Test func panelOpensAndClosesWithoutAnimation() {

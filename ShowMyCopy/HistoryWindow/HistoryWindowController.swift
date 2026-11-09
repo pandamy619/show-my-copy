@@ -67,6 +67,10 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         // Size for what the list shows now, then place, so the first frame on screen is already right.
         let size = HistoryPanelPlacement.size(showsEntries: model.showsEntries)
         panel.setFrame(NSRect(origin: Self.origin(for: size), size: size), display: false)
+        #if DEBUG
+            // Read on every opening, so turning it on or off needs no relaunch.
+            panel.allowsScreenCapture = UserDefaults.standard.bool(forKey: Self.debugAllowsScreenCaptureKey)
+        #endif
         panel.makeKeyAndOrderFront(nil)
         monitor.historyWindowOpened(true)
     }
@@ -293,3 +297,14 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         return HistoryPanelPlacement.origin(for: size, in: visibleFrame)
     }
 }
+
+#if DEBUG
+    extension HistoryWindowController {
+        /// Debug builds only: lets screenshots show the history window, for the README. Release builds contain neither
+        /// the key nor the code that reads it (`make security` checks this, `DEBUG_ONLY_STRINGS`).
+        ///
+        ///     defaults write com.pandamy619.ShowMyCopy debug.screenshots.allowCapture -bool YES
+        ///     defaults delete com.pandamy619.ShowMyCopy debug.screenshots.allowCapture
+        static let debugAllowsScreenCaptureKey = "debug.screenshots.allowCapture"
+    }
+#endif

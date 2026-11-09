@@ -95,6 +95,7 @@ PASTE_DEBUG_KEY = "debug.paste.settleMs"
 DEBUG_ONLY_STRING_FILES = {
     DEBUG_MARKER: "ShowMyCopy/App/AppDelegate.swift",
     "debug.paste.": "ShowMyCopy/Paste/PasteDebugTuning.swift",
+    "debug.screenshots.": "ShowMyCopy/HistoryWindow/HistoryWindowController.swift",
 }
 
 
