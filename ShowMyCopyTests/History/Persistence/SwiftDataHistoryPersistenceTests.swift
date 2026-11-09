@@ -225,7 +225,8 @@ struct SwiftDataHistoryPersistenceTests {
     func storeFolderIsExcludedFromBackups() throws {
         try withTemporaryDirectory { directory in
             _ = open(in: directory)
-            #expect(try BackupExclusion.isExcluded(directory))
+            let isExcluded = try BackupExclusion.isExcluded(directory)
+            #expect(isExcluded)
         }
     }
 
