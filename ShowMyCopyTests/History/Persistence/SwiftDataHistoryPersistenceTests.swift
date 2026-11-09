@@ -15,6 +15,33 @@ extension SwiftDataHistoryPersistence {
     }
 }
 
+/// Whether a folder is excluded from backups, read back from the disk.
+enum BackupExclusion {
+    /// Read through a new URL, so the value comes from the disk and not from what the setter cached.
+    static func isExcluded(_ directory: URL) throws -> Bool {
+        let fresh = URL(filePath: directory.path(percentEncoded: false), directoryHint: .isDirectory)
+        return try fresh.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true
+    }
+
+    /// Whether the temporary folder's volume keeps the exclusion at all. Some volumes, such as those of GitHub's
+    /// macOS runners, accept it without keeping it; the app only logs that, so there is nothing to test there.
+    static func isKeptByThisVolume() -> Bool {
+        let probe = FileManager.default.temporaryDirectory
+            .appending(path: "ShowMyCopyTests-backup-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: probe) }
+        do {
+            try FileManager.default.createDirectory(at: probe, withIntermediateDirectories: true)
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            var excluded = probe
+            try excluded.setResourceValues(values)
+            return try isExcluded(probe)
+        } catch {
+            return false
+        }
+    }
+}
+
 @MainActor
 struct SwiftDataHistoryPersistenceTests {
     private let date = Date(timeIntervalSince1970: 1_790_000_000)
@@ -191,11 +218,14 @@ struct SwiftDataHistoryPersistenceTests {
         }
     }
 
-    @Test func storeFolderIsExcludedFromBackups() throws {
+    @Test(
+        .enabled(
+            if: BackupExclusion.isKeptByThisVolume(),
+            "The temporary folder's volume does not keep the exclusion from backups, as on GitHub's macOS runners"))
+    func storeFolderIsExcludedFromBackups() throws {
         try withTemporaryDirectory { directory in
             _ = open(in: directory)
-            let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
-            #expect(values.isExcludedFromBackup == true)
+            #expect(try BackupExclusion.isExcluded(directory))
         }
     }
 
