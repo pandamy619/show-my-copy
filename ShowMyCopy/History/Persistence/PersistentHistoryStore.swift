@@ -21,8 +21,9 @@ import os
 /// Each write is one transaction (`HistoryPersistence.apply`), so a failed one leaves the disk as it was. It never
 /// loses what is in memory either: it is logged, shown through `storageError`, and the next change writes what the
 /// failed ones did not, so the disk catches up with memory as soon as writing works. A write touches only the
-/// records of entries this session loaded or made, never the others on disk: images left unloaded
-/// without a blob store, or the whole saved history when it could not be read. Only Clear History deletes those.
+/// records of entries this session loaded or made, never the others on disk: images left unloaded without a blob
+/// store, records a newer version of the app wrote, or the whole saved history when it could not be read. Only
+/// Clear History deletes those.
 @MainActor
 @Observable
 final class PersistentHistoryStore: HistoryStore, HistoryStorage {

@@ -72,7 +72,7 @@ struct KeychainSecretSealerTests {
         let sealer = try makeSealer()
         var sealed = try sealer.seal(secret)
         sealed[sealed.startIndex] = 2
-        #expect(throws: SecretSealingError.unsupportedFormatVersion(2)) {
+        #expect(throws: SecretSealingError.newerFormatVersion(2)) {
             try sealer.open(sealed)
         }
         #expect(throws: SecretSealingError.missingFormatVersion) {

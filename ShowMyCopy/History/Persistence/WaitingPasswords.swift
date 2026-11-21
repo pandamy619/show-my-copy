@@ -32,7 +32,8 @@ struct WaitingPasswords: Sendable {
     }
 
     /// Opens the records with `coder`. Returns the entries it opened and the IDs of those it cannot open, which are
-    /// of no use any more; those whose key still cannot be used go on waiting.
+    /// of no use any more; those whose key still cannot be used go on waiting. One sealed by a newer version of the
+    /// app is neither: it stops waiting and stays on disk as it is, for that version.
     mutating func open(with coder: StoredEntryCoder) -> (entries: [ClipboardEntry], unreadable: [UUID]) {
         var entries: [ClipboardEntry] = []
         var unreadable: [UUID] = []
@@ -45,6 +46,8 @@ struct WaitingPasswords: Sendable {
                 unreadable.append(record.id)
             case .waitsForKey:
                 waiting.append(record)
+            case .newerFormat:
+                AppLogger.history.info("Leaving a saved password of a newer version alone")
             }
         }
         records = waiting

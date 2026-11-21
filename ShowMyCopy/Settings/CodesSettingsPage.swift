@@ -106,7 +106,7 @@ struct CodesSettingsPage: View {
         case .loading, .ready:
             return nil
         case .unavailable(.keyLockedOut):
-            return "The Keychain is locked, so saved accounts are not loaded yet."
+            return "The Keychain is locked: saved accounts are not loaded yet, new ones are kept until the app quits."
         case .unavailable(.keyUnavailable):
             return "The Keychain key is unavailable, so accounts are kept only until the app quits."
         case .unavailable(.damaged):
@@ -148,6 +148,9 @@ struct CodesSettingsPage: View {
         }
         if summary.screenshotRemoved {
             parts.append(Text("The screenshot was removed from the history and the clipboard."))
+        }
+        if summary.screenshotKeptUnsaved {
+            parts.append(Text("The screenshot was kept, because the accounts are not saved on this Mac yet."))
         }
         return parts.dropFirst().reduce(parts[0]) { $0 + Text(verbatim: " ") + $1 }
     }

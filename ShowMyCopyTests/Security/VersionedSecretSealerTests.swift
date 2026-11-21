@@ -32,11 +32,21 @@ struct VersionedSecretSealerTests {
         #expect(try sealer.open(slice) == secret)
     }
 
-    @Test(arguments: [UInt8(0), 2, 0xFF])
-    func unknownFormatVersionIsRejected(version: UInt8) throws {
+    @Test(arguments: [UInt8(2), 0xFF])
+    func aNewerFormatVersionIsReportedAsSuch(version: UInt8) throws {
+        // The caller leaves such data alone for the newer version that wrote it.
         var sealed = try sealer.seal(secret)
         sealed[sealed.startIndex] = version
-        #expect(throws: SecretSealingError.unsupportedFormatVersion(version)) {
+        #expect(throws: SecretSealingError.newerFormatVersion(version)) {
+            try sealer.open(sealed)
+        }
+        #expect(!SecretSealingError.newerFormatVersion(version).isAboutTheKey)
+    }
+
+    @Test func aFormatVersionNoVersionWroteIsRejected() throws {
+        var sealed = try sealer.seal(secret)
+        sealed[sealed.startIndex] = 0
+        #expect(throws: SecretSealingError.unsupportedFormatVersion(0)) {
             try sealer.open(sealed)
         }
     }

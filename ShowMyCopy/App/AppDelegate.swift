@@ -131,8 +131,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Images and thumbnails of copies made just before quitting or logging out are still being saved: let them
-    /// reach the history first, for at most `AppContainer.quitBudget`.
+    /// reach the history first, for at most `AppContainer.quitBudget`. A one-time code on the clipboard is taken off
+    /// first (`AppContainer.prepareToQuit`).
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        container?.prepareToQuit()
         guard let container, container.isCapturing else {
             return .terminateNow
         }

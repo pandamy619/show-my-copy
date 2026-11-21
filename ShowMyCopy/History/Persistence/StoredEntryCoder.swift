@@ -4,7 +4,9 @@ import Foundation
 ///
 /// Without a sealer concealed entries are not written at all: they stay in memory until they expire or the app quits,
 /// and saved concealed records cannot be opened. A sealer whose key cannot be used now (not loaded yet, locked,
-/// denied) is told apart from data that cannot be opened: such a record waits on disk (`Decoded.waitsForKey`).
+/// denied) is told apart from data that cannot be opened: such a record waits on disk (`Decoded.waitsForKey`). So is
+/// a record a newer version of the app wrote, in a kind, a sealed format or a payload layout this version does not
+/// know (`Decoded.newerFormat`): it is left on disk for that version, never deleted as damaged.
 struct StoredEntryCoder: Sendable {
     /// What a saved record turned out to be.
     enum Decoded: Equatable, Sendable {
@@ -15,6 +17,10 @@ struct StoredEntryCoder: Sendable {
         /// A password that cannot be opened now because the key cannot be used now: not loaded yet, the Mac is
         /// locked or access was denied. The data may be fine, so it is kept and opened once the key loads.
         case waitsForKey
+        /// Written by a newer version of the app: an unknown kind, sealed format version or payload format byte above
+        /// the ones this version writes. The data is most likely fine for that version, so it is left on disk
+        /// untouched, with its blobs, and never deleted for being unreadable here.
+        case newerFormat
     }
 
     /// Sealed data is padded to a multiple of this many bytes, so its size does not tell a password's length.
@@ -67,7 +73,8 @@ struct StoredEntryCoder: Sendable {
     /// gets them back after its payload is opened.
     func decode(_ record: StoredEntryRecord) -> Decoded {
         guard let kind = ClipboardContent.Kind(rawValue: record.kind) else {
-            return .unreadable
+            // A kind of content this version does not record: a newer one does.
+            return .newerFormat
         }
         var payload = record.payload
         if record.isConcealed {
@@ -76,12 +83,14 @@ struct StoredEntryCoder: Sendable {
                 payload = opened
             case .waitsForKey:
                 return .waitsForKey
+            case .newerFormat:
+                return .newerFormat
             case .unreadable:
                 return .unreadable
             }
         }
         guard let content = ClipboardContent(kind: kind, storedPayload: payload) else {
-            return .unreadable
+            return StoredPayload.isNewerFormat(payload) ? .newerFormat : .unreadable
         }
         let sourceApp: SourceApp? =
             if record.sourceAppBundleIdentifier == nil && record.sourceAppName == nil {
@@ -106,6 +115,7 @@ struct StoredEntryCoder: Sendable {
     private enum Opened {
         case opened(Data)
         case waitsForKey
+        case newerFormat
         case unreadable
     }
 
@@ -118,6 +128,8 @@ struct StoredEntryCoder: Sendable {
             padded = try sealer.open(sealed)
         } catch let error as SecretSealingError where error.isAboutTheKey {
             return .waitsForKey
+        } catch SecretSealingError.newerFormatVersion {
+            return .newerFormat
         } catch {
             return .unreadable
         }

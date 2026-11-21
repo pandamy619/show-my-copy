@@ -3,8 +3,10 @@ import Foundation
 /// Seals secrets as `[format version] + cipher output`.
 ///
 /// The leading byte lets a later version change the cipher or the key without guessing what old data is. Data with
-/// an unknown version is rejected rather than tried with the current cipher. The version byte is also passed to the
-/// cipher as authenticated data, so changing it is detected even if a later format would accept the new value.
+/// an unknown version is rejected rather than tried with the current cipher: a version above the current one was
+/// written by a newer app (`newerFormatVersion`), so the caller leaves the data for it; one below it was written by
+/// nothing and is damaged. The version byte is also passed to the cipher as authenticated data, so changing it is
+/// detected even if a later format would accept the new value.
 struct VersionedSecretSealer<Cipher: AuthenticatedCipher>: SecretSealing {
     /// Version 1: AES-256-GCM, `nonce (12 bytes) + ciphertext + tag (16 bytes)`, header authenticated.
     static var formatVersion: UInt8 { 1 }
@@ -24,6 +26,7 @@ struct VersionedSecretSealer<Cipher: AuthenticatedCipher>: SecretSealing {
 
     func open(_ sealed: Data) throws -> Data {
         guard let version = sealed.first else { throw SecretSealingError.missingFormatVersion }
+        guard version <= Self.formatVersion else { throw SecretSealingError.newerFormatVersion(version) }
         guard version == Self.formatVersion else { throw SecretSealingError.unsupportedFormatVersion(version) }
         // Rebased copy: `sealed` may be a slice whose indices do not start at zero.
         let box = Data(sealed.dropFirst())

@@ -151,13 +151,14 @@ struct PersistentHistoryStoreTests {
         #expect(disk.record(plainID) != nil)
     }
 
-    @Test func aRecordOfAnUnknownKindIsDeleted() throws {
+    @Test func aRecordOfAnUnknownKindIsLeftOnDiskForTheNewerVersionThatWroteIt() throws {
         let id = makeStore().record(text: "hologram", sourceApp: nil, at: start)
         let record = try #require(disk.record(id))
-        disk.records[id] = record.replacingKind(with: "hologram")
+        let hologram = record.replacingKind(with: "hologram")
+        disk.records[id] = hologram
 
         #expect(makeStore().entries.isEmpty)
-        #expect(disk.record(id) == nil)
+        #expect(disk.record(id) == hologram)
     }
 
     // MARK: - Removing on load

@@ -138,14 +138,44 @@ struct StoredEntryCoderTests {
         #expect(coder.decode(record.replacingPayload(with: Data())) == .unreadable)
     }
 
-    @Test func textWithoutTheFormatByteIsUnreadable() throws {
+    @Test func textWithoutTheFormatByteIsNotRead() throws {
         let record = try #require(try coder.record(for: entry("plain")))
-        #expect(coder.decode(record.replacingPayload(with: Data("plain".utf8))) == .unreadable)
+        // Only the first byte tells a newer format from damage: a stray byte above the format is left alone, one
+        // below it (no version wrote it) is deleted.
+        #expect(coder.decode(record.replacingPayload(with: Data("plain".utf8))) == .newerFormat)
+        #expect(coder.decode(record.replacingPayload(with: Data([0] + "plain".utf8))) == .unreadable)
     }
 
-    @Test func unknownKindIsUnreadable() throws {
+    // A newer version of the app may add a kind, a sealed format or a payload layout: its records are left alone.
+
+    @Test func unknownKindIsANewerFormat() throws {
         let record = try #require(try coder.record(for: entry("plain")))
-        #expect(coder.decode(record.replacingKind(with: "hologram")) == .unreadable)
+        #expect(coder.decode(record.replacingKind(with: "hologram")) == .newerFormat)
+    }
+
+    @Test func payloadOfANewerFormatIsANewerFormat() throws {
+        let record = try #require(try coder.record(for: entry("plain")))
+        #expect(coder.decode(record.replacingPayload(with: Data([StoredPayload.format + 1, 0x68]))) == .newerFormat)
+        #expect(coder.decode(record.replacingPayload(with: Data([0, 0x68]))) == .unreadable)
+        #expect(StoredPayload.isNewerFormat(Data([2])))
+        #expect(!StoredPayload.isNewerFormat(Data([StoredPayload.format])))
+        #expect(!StoredPayload.isNewerFormat(Data()))
+    }
+
+    @Test func recordSealedByANewerVersionIsANewerFormat() throws {
+        let record = try #require(try coder.record(for: entry("hunter2", concealed: true)))
+        let newer = StoredEntryCoder(sealer: DataTroubleSealer(error: .newerFormatVersion(2)), hasher: hasher)
+        #expect(newer.decode(record) == .newerFormat)
+        let damaged = StoredEntryCoder(sealer: DataTroubleSealer(error: .unsupportedFormatVersion(0)), hasher: hasher)
+        #expect(damaged.decode(record) == .unreadable)
+    }
+
+    @Test func sealedPayloadOfANewerFormatIsANewerFormat() throws {
+        // The sealed data opens, and what is inside has a format byte this version does not write.
+        let sealer = FakeSecretSealer()
+        let record = try #require(try coder.record(for: entry("hunter2", concealed: true)))
+        let inside = try sealer.seal(Data([0, 0, 0, 1, StoredPayload.format + 1]) + Data(count: 59))
+        #expect(coder.decode(record.replacingPayload(with: inside)) == .newerFormat)
     }
 }
 

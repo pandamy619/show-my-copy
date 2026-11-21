@@ -25,10 +25,13 @@ struct OneTimeCodeAccount: Equatable, Hashable, Sendable {
     let secret: Data
     let algorithm: Algorithm
     let digits: Digits
-    /// How long one code is valid, in seconds. 30 everywhere in practice.
+    /// How long one code is valid, in seconds. 30 everywhere in practice; always within `periodRange`.
     let period: Int
 
     static let defaultPeriod = 30
+    /// The periods an account may have: above it a code would not change for hours, and a copied code would stay on
+    /// the clipboard as long (`CodeCopier`). An address or a saved record outside it is rejected.
+    static let periodRange = 1...300
 
     /// What the entry is called in a list: "Issuer (name)", or whichever of them is known.
     var displayName: String {

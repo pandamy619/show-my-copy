@@ -8,8 +8,15 @@ import Foundation
 /// layout for each kind and no other version. Integers are big-endian; strings are UTF-8; variable-length parts
 /// are length-prefixed, except text, which is the rest of the payload.
 enum StoredPayload {
-    /// The first byte of every payload. A payload that starts with another byte is unreadable.
+    /// The first byte of every payload. A payload that starts with a lower byte is unreadable; one that starts with
+    /// a higher byte was written by a newer version of the app (`isNewerFormat`).
     static let format: UInt8 = 1
+
+    /// Whether `payload` is in a format a newer version of the app introduced: its format byte is above `format`.
+    /// Such a payload is not damaged, only not readable here, and is left for that version.
+    static func isNewerFormat(_ payload: Data) -> Bool {
+        payload.first.map { $0 > format } == true
+    }
 
     static func encode(_ content: ClipboardContent) -> Data {
         var writer = Writer()

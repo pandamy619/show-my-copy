@@ -8,6 +8,8 @@ enum SymmetricKeyStoreError: Error, Equatable, Sendable {
     case duplicateItem
     /// The store needs the Mac unlocked or would have to ask the user, and asking is not allowed.
     case interactionNotAllowed
+    /// The store is not available right now (`errSecNotAvailable` just after login, `errSecIO`), and may be soon.
+    case notAvailableNow
     /// The user or the system refused access to the stored key.
     case accessDenied
     /// The store returned something that is not key data.

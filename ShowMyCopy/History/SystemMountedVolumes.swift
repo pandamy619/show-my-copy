@@ -18,21 +18,25 @@ struct SystemMountedVolumes: MountedVolumesReading {
         guard found > 0 else {
             return nil
         }
-        return buffer.prefix(Int(found)).map { info in
-            var info = info
-            return MountedVolume(
-                mountPoint: Self.string(&info.f_mntonname),
-                fileSystem: Self.string(&info.f_fstypename),
-                isLocal: info.f_flags & UInt32(MNT_LOCAL) != 0
-            )
+        var volumes: [MountedVolume] = []
+        for var info in buffer.prefix(Int(found)) {
+            // A mount point that is not UTF-8 cannot be matched against paths, and a path on that volume would then
+            // be taken for one on the volume above it, the startup disk included. Treat every path as remote instead.
+            guard let mountPoint = Self.string(&info.f_mntonname), let fileSystem = Self.string(&info.f_fstypename)
+            else {
+                return nil
+            }
+            volumes.append(
+                MountedVolume(
+                    mountPoint: mountPoint, fileSystem: fileSystem, isLocal: info.f_flags & UInt32(MNT_LOCAL) != 0))
         }
+        return volumes
     }
 
-    /// A C string kept in a fixed-size array of `statfs`, up to its terminating zero. Empty when it is not UTF-8,
-    /// which matches no path, so such a volume is never taken for the startup disk.
-    private static func string<Characters>(_ characters: inout Characters) -> String {
+    /// A C string kept in a fixed-size array of `statfs`, up to its terminating zero, or nil when it is not UTF-8.
+    private static func string<Characters>(_ characters: inout Characters) -> String? {
         withUnsafeBytes(of: &characters) { bytes in
-            String(bytes: bytes.prefix { $0 != 0 }, encoding: .utf8) ?? ""
+            String(bytes: bytes.prefix { $0 != 0 }, encoding: .utf8)
         }
     }
 }

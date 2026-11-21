@@ -71,7 +71,9 @@ enum OTPAuthURL {
 
     private static func period(from text: String?) throws(ParsingError) -> Int {
         guard let text, !text.isEmpty else { return OneTimeCodeAccount.defaultPeriod }
-        guard let seconds = Int(text), seconds > 0 else { throw .invalidPeriod(text) }
+        guard let seconds = Int(text), OneTimeCodeAccount.periodRange.contains(seconds) else {
+            throw .invalidPeriod(text)
+        }
         return seconds
     }
 }

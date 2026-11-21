@@ -22,9 +22,9 @@ import Security
 ///    keychain file is in Time Machine backups and Migration Assistant can copy it to a new Mac.
 ///
 /// Only `errSecMissingEntitlement` moves on to the next keychain (see `SealingKey.loadOrCreate`), so a key that
-/// exists but cannot be read now is never replaced by a new one elsewhere. Should the app gain a keychain access
-/// group later, it starts with a new key in the data protection keychain and old sealed data can no longer be
-/// opened, which the storage layer handles by dropping it.
+/// exists but cannot be read now is never replaced by a new one elsewhere, and every keychain is searched before a
+/// key is made in any: should the app gain a keychain access group later, it goes on using the key in the login
+/// keychain, so what was sealed with it still opens.
 struct KeychainSymmetricKeyStore: SymmetricKeyStore, Sendable {
     enum Backend: Sendable {
         case dataProtection
@@ -97,6 +97,7 @@ struct KeychainSymmetricKeyStore: SymmetricKeyStore, Sendable {
         case errSecMissingEntitlement: .missingEntitlement
         case errSecDuplicateItem: .duplicateItem
         case errSecInteractionNotAllowed: .interactionNotAllowed
+        case errSecNotAvailable, errSecIO: .notAvailableNow
         case errSecAuthFailed, errSecUserCanceled: .accessDenied
         default: .unexpectedStatus(status)
         }

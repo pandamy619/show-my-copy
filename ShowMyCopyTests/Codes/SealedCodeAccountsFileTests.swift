@@ -105,6 +105,10 @@ struct SealedCodeAccountsFileTests {
         records[0]["algorithm"] = "MD5"
         object["accounts"] = records
         #expect(SealedCodeAccountsFile.decode(try JSONSerialization.data(withJSONObject: object)) == .damaged)
+        records[0]["algorithm"] = "SHA1"
+        records[0]["period"] = OneTimeCodeAccount.periodRange.upperBound + 1
+        object["accounts"] = records
+        #expect(SealedCodeAccountsFile.decode(try JSONSerialization.data(withJSONObject: object)) == .damaged)
         #expect(SealedCodeAccountsFile.decode(Data("not json".utf8)) == .damaged)
     }
 }

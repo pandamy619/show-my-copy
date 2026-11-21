@@ -97,6 +97,18 @@ struct OTPAuthURLTests {
         }
     }
 
+    @Test func thePeriodIsBounded() throws {
+        // A code with a period of hours would never change, and a copied one would stay on the clipboard as long.
+        let longest = try OTPAuthURL.account(from: "otpauth://totp/a?secret=JBSWY3DPEHPK3PXP&period=300")
+        #expect(longest.period == 300)
+        #expect(OneTimeCodeAccount.periodRange == 1...300)
+        for period in ["301", "99999999999999999999", "-30"] {
+            #expect(throws: OTPAuthURL.ParsingError.invalidPeriod(period)) {
+                try OTPAuthURL.account(from: "otpauth://totp/a?secret=JBSWY3DPEHPK3PXP&period=\(period)")
+            }
+        }
+    }
+
     @Test func ignoresParametersItDoesNotKnow() throws {
         let account = try OTPAuthURL.account(from: "otpauth://totp/a?secret=JBSWY3DPEHPK3PXP&image=x&counter=3")
         #expect(account.secret == secret)

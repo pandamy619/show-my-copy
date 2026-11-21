@@ -97,6 +97,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window.titleVisibility = .hidden
         window.toolbarStyle = .unified
         window.isReleasedWhenClosed = false
+        // Settings → Codes takes a code's secret or its otpauth:// address in plain text, and a recording of the
+        // window would give whoever has it the codes for good. The same opt-out as the history window
+        // (`HistoryPanel`); capture through ScreenCaptureKit on newer macOS versions may still include the window.
+        window.sharingType = NSWindow.SharingType.none
         window.delegate = self
         window.collectionBehavior.insert(.moveToActiveSpace)
         window.center()

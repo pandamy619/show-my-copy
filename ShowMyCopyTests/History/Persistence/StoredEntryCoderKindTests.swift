@@ -103,8 +103,11 @@ struct StoredEntryCoderKindTests {
         #expect(coder.decode(record.replacingPayload(with: record.payload.dropLast())) == .unreadable)
         #expect(coder.decode(record.replacingPayload(with: record.payload + Data([0]))) == .unreadable)
         var otherFormat = record.payload
-        otherFormat[otherFormat.startIndex] = 9
+        otherFormat[otherFormat.startIndex] = 0
         #expect(coder.decode(record.replacingPayload(with: otherFormat)) == .unreadable)
+        // A higher format byte was written by a newer version: not damaged, left alone.
+        otherFormat[otherFormat.startIndex] = 9
+        #expect(coder.decode(record.replacingPayload(with: otherFormat)) == .newerFormat)
         #expect(coder.decode(record.replacingPayload(with: Data())) == .unreadable)
     }
 

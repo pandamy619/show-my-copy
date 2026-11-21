@@ -24,6 +24,8 @@ final class AppContainer: HistoryShowing {
     let copier: EntryCopier
     /// The accounts whose one-time codes the history window lists.
     let codes: CodeAccountStore
+    /// Puts a code on the clipboard and takes it off again; at quit, at once (`prepareToQuit`).
+    let codeCopier: CodeCopier
     let historyWindow: HistoryWindowController
     let settingsWindow: any SettingsWindowShowing
     private let sleep: @Sendable (Duration) async throws -> Void
@@ -82,6 +84,7 @@ final class AppContainer: HistoryShowing {
         self.activityObserver = activityObserver
         self.copier = copier
         self.codes = codes.store
+        self.codeCopier = codes.copier
         self.historyWindow = historyWindow
         self.settingsWindow = settingsWindow
         self.sleep = system.sleep
@@ -286,6 +289,12 @@ final class AppContainer: HistoryShowing {
     /// Whether the data or thumbnails of a recorded copy are still being saved.
     var isCapturing: Bool {
         monitor.isEnriching
+    }
+
+    /// What the app does before it quits, whether or not it waits for captures: a one-time code it put on the
+    /// clipboard is taken off now, since the clearing scheduled for the end of its period would never run.
+    func prepareToQuit() {
+        codeCopier.clearCopiedCode()
     }
 
     /// Waits until the images and thumbnails of the copies recorded so far are in the history, so quitting right

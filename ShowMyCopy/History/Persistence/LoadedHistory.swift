@@ -11,6 +11,9 @@ struct FoundRecords: Sendable {
     var duplicates: [UUID] = []
     /// Passwords whose key cannot be used now: kept on disk unopened, and opened once it can.
     var unopened: [StoredEntryRecord] = []
+    /// Records a newer version of the app wrote (`StoredEntryCoder.Decoded.newerFormat`): left on disk untouched,
+    /// with their blobs, for that version. Listed so the count can be logged.
+    var newer: [UUID] = []
 }
 
 /// The saved history found at launch, read and sorted: what `PersistentHistoryStore` starts from.
@@ -110,7 +113,7 @@ struct LoadedHistory: Sendable {
 /// How `PersistentHistoryStore` sorts the records it loads at launch and finds the blobs no record uses.
 enum SavedRecords {
     /// Sorts the saved records into entries to load and records to delete. Records with blobs while there is no
-    /// blob store are in neither: they stay on disk.
+    /// blob store, and records of a newer version of the app, are in neither: they stay on disk.
     static func sort(
         _ records: [StoredEntryRecord],
         coder: StoredEntryCoder,
@@ -145,7 +148,13 @@ enum SavedRecords {
                 found.unreadable.append(record.id)
             case .waitsForKey:
                 found.unopened.append(record)
+            case .newerFormat:
+                found.newer.append(record.id)
             }
+        }
+        if !found.newer.isEmpty {
+            AppLogger.history.info(
+                "Leaving \(found.newer.count, privacy: .public) saved entries of a newer version of the app alone")
         }
         return found
     }

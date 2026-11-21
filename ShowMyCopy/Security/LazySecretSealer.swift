@@ -10,8 +10,9 @@ import Synchronization
 ///
 /// What the first load found is kept for the session, so the same prompt is not shown over and over:
 /// - a sealer that was created is reused;
-/// - a locked Mac, or a Keychain that may not ask the user (`interactionNotAllowed`), is tried again by the next
-///   `loadKey()`, which the app calls when the user is back at the unlocked Mac;
+/// - a locked Mac, a Keychain that may not ask the user (`interactionNotAllowed`) or one that is not available right
+///   now (`notAvailableNow`) is tried again by the next `loadKey()`, which the app calls when the user is back at the
+///   unlocked Mac;
 /// - any other failure, such as the user denying access, is thrown again by every call and tried again only by the
 ///   next launch.
 ///
@@ -94,9 +95,9 @@ final class LazySecretSealer: SecretSealing {
         }
     }
 
-    /// Only a Keychain that is locked or may not ask now is worth asking again in this session.
+    /// Only a Keychain that is locked, may not ask now or is not available now is worth asking again in this session.
     private static func keyState(after error: SecretSealingError) -> SealingKeyState {
-        error == .keyUnavailable(.interactionNotAllowed) ? .lockedOut : .unavailable
+        error.isTemporary ? .lockedOut : .unavailable
     }
 
     /// The sealer, or the reason there is none yet, without waiting.

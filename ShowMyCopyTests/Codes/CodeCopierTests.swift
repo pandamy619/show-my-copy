@@ -90,6 +90,46 @@ struct CodeCopierTests {
         #expect(pasteboard.clearedChangeCounts == [second])
     }
 
+    @Test func quittingEmptiesTheClipboardWhenItStillHoldsTheCode() async throws {
+        let (copier, monitor) = makeCopier()
+        let changeCount = try #require(copier.copy(account))
+        await timers.waitForSleep(of: .seconds(30))
+
+        copier.clearCopiedCode()
+        await copier.pendingClear?.value
+
+        #expect(pasteboard.clearedChangeCounts == [changeCount])
+        #expect(pasteboard.text == nil)
+        #expect(monitor.handledChangeCount == pasteboard.changeCount)
+        #expect(copier.pendingClear == nil)
+        // Done once: the scheduled clearing was cancelled and a second call finds nothing to clear.
+        copier.clearCopiedCode()
+        #expect(pasteboard.clearedChangeCounts == [changeCount])
+    }
+
+    @Test func quittingLeavesTheClipboardAloneWhenSomethingWasCopiedSince() async throws {
+        let (copier, _) = makeCopier()
+        copier.copy(account)
+        await timers.waitForSleep(of: .seconds(30))
+        pasteboard.copy("something else")
+
+        copier.clearCopiedCode()
+
+        #expect(pasteboard.clearedChangeCounts.isEmpty)
+        #expect(pasteboard.text == "something else")
+        #expect(copier.pendingClear == nil)
+    }
+
+    @Test func quittingWithoutACopiedCodeDoesNothing() {
+        let (copier, _) = makeCopier()
+        pasteboard.copy("text")
+
+        copier.clearCopiedCode()
+
+        #expect(pasteboard.clearedChangeCounts.isEmpty)
+        #expect(pasteboard.text == "text")
+    }
+
     @Test func aFailedWriteChangesNothing() {
         pasteboard.writeFails = true
         let (copier, _) = makeCopier()

@@ -99,13 +99,34 @@ struct SealingKeyTests {
         #expect(fallback.added == [key])
     }
 
-    @Test func fallbackIsNotUsedWhenTheFirstStoreWorks() throws {
+    @Test func aKeyInALaterStoreIsUsedRatherThanANewOneMadeInTheFirst() throws {
+        // The key was made in the login keychain before this build could use the data protection keychain: a new
+        // key there would orphan everything sealed with it.
         let primary = InMemorySymmetricKeyStore()
         let fallback = InMemorySymmetricKeyStore(key: existingKey)
+        let generator = Generator()
+        let key = try SealingKey.loadOrCreate(in: [primary, fallback], generate: generator.generate)
+        #expect(key == existingKey)
+        #expect(primary.added.isEmpty)
+        #expect(generator.callCount == 0)
+    }
+
+    @Test func aNewKeyGoesInTheFirstStoreOnceEveryStoreWasSearched() throws {
+        let primary = InMemorySymmetricKeyStore()
+        let fallback = InMemorySymmetricKeyStore()
         let key = try SealingKey.loadOrCreate(in: [primary, fallback], generate: Generator().generate)
-        #expect(key != existingKey)
         #expect(primary.added == [key])
-        #expect(fallback.loadCount == 0)
+        #expect(fallback.added.isEmpty)
+        #expect(fallback.loadCount == 1)
+    }
+
+    @Test func aLaterStoreThatCannotBeReadStopsTheSearchBeforeAKeyIsMade() {
+        let primary = InMemorySymmetricKeyStore()
+        let fallback = InMemorySymmetricKeyStore(loadError: .interactionNotAllowed)
+        #expect(throws: SecretSealingError.keyUnavailable(.interactionNotAllowed)) {
+            try SealingKey.loadOrCreate(in: [primary, fallback], generate: Generator().generate)
+        }
+        #expect(primary.added.isEmpty)
     }
 
     @Test(arguments: [

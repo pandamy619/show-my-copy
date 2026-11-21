@@ -4,7 +4,8 @@ import Foundation
 ///
 /// The code is written like text copied from the preview (`EntryCopier.copyText`): with `PasteboardMarker.unrecorded`,
 /// so the history never records it, and with the concealed marker, so other clipboard managers skip it. One code
-/// period after the copy, the clipboard is emptied when it still holds the code, as for a password whose time is up.
+/// period after the copy, the clipboard is emptied when it still holds the code, as for a password whose time is up;
+/// quitting before then empties it at once (`clearCopiedCode`), since nothing would afterwards.
 @MainActor
 final class CodeCopier: CodeCopying {
     private let history: any HistoryStore
@@ -14,6 +15,8 @@ final class CodeCopier: CodeCopying {
     private let sleep: @Sendable (Duration) async throws -> Void
     /// The clearing scheduled by the last copy. Tests await it.
     private(set) var pendingClear: Task<Void, Never>?
+    /// The pasteboard change of the last code copied, while its clearing is still to come.
+    private var pendingChangeCount: Int?
 
     init(
         history: any HistoryStore,
@@ -49,17 +52,30 @@ final class CodeCopier: CodeCopying {
     /// replaces the clearing scheduled before: only the latest code is taken off.
     private func scheduleClear(changeCount: Int, after delay: Duration) {
         pendingClear?.cancel()
+        pendingChangeCount = changeCount
         pendingClear = Task { [sleep] in
             do {
                 try await sleep(delay)
             } catch {
-                return  // Replaced by a newer copy.
+                return  // Replaced by a newer copy, or cleared at once by `clearCopiedCode`.
             }
-            guard let cleared = pasteboard.clearContents(ifChangeCountIs: changeCount) else {
-                return
-            }
-            monitor.acknowledge(changeCount: cleared)
-            AppLogger.clipboard.debug("Emptied the pasteboard, which held a code whose time is up")
+            clearCopiedCode()
         }
+    }
+
+    /// Empties the pasteboard now when it still holds the last code copied, without waiting for its period to end:
+    /// at quit, which would otherwise leave the code there for good.
+    func clearCopiedCode() {
+        pendingClear?.cancel()
+        pendingClear = nil
+        guard let changeCount = pendingChangeCount else {
+            return
+        }
+        pendingChangeCount = nil
+        guard let cleared = pasteboard.clearContents(ifChangeCountIs: changeCount) else {
+            return
+        }
+        monitor.acknowledge(changeCount: cleared)
+        AppLogger.clipboard.debug("Emptied the pasteboard, which held a code whose time is up")
     }
 }

@@ -12,33 +12,48 @@ enum SealingKey {
 
     /// Returns the stored key, or creates, stores and returns a new one.
     ///
-    /// `stores` are tried in order. A store is skipped only when this build is not entitled to use it at all
-    /// (`.missingEntitlement`). Any other error stops the search: the key may exist but be unreadable right now
-    /// (locked Mac, access denied), and a new key elsewhere would silently orphan everything sealed with it.
-    /// A stored key of the wrong length is rejected and left in place for the same reason.
+    /// Every store is searched, in order, before a key is made anywhere: a key in a later store (the login keychain,
+    /// from before a build could use the data protection keychain) must go on being used, or everything sealed with
+    /// it is silently orphaned. A new key goes in the first store that takes it. A store is skipped only when this
+    /// build is not entitled to use it at all (`.missingEntitlement`). Any other error stops the search: the key may
+    /// exist but be unreadable right now (locked Mac, access denied), and a new key elsewhere would orphan
+    /// everything sealed with it. A stored key of the wrong length is rejected and left in place for the same reason.
     static func loadOrCreate(
         in stores: [any SymmetricKeyStore],
         generate: () -> Data
     ) throws(SecretSealingError) -> Data {
+        var usable: [any SymmetricKeyStore] = []
         for store in stores {
             do {
-                return try loadOrCreate(in: store, generate: generate)
+                if let key = try load(from: store) { return key }
+                usable.append(store)
             } catch {
-                switch error {
-                case .store(.missingEntitlement): continue
-                case .store(let storeError): throw .keyUnavailable(storeError)
-                case .sealing(let keyError): throw keyError
-                }
+                try skipOrRethrow(error)
+            }
+        }
+        for store in usable {
+            do {
+                return try create(in: store, generate: generate)
+            } catch {
+                try skipOrRethrow(error)
             }
         }
         throw .keyUnavailable(.missingEntitlement)
     }
 
-    private static func loadOrCreate(
+    /// Returns for a store this build may not use, so the next one is tried; any other failure ends the search.
+    private static func skipOrRethrow(_ error: KeyStoreFailure) throws(SecretSealingError) {
+        switch error {
+        case .store(.missingEntitlement): return
+        case .store(let storeError): throw .keyUnavailable(storeError)
+        case .sealing(let keyError): throw keyError
+        }
+    }
+
+    private static func create(
         in store: any SymmetricKeyStore,
         generate: () -> Data
     ) throws(KeyStoreFailure) -> Data {
-        if let key = try load(from: store) { return key }
         let key = try validatedNewKey(generate())
         do {
             try store.addKey(key)

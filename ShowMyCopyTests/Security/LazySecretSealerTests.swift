@@ -117,6 +117,18 @@ struct LazySecretSealerTests {
         #expect(factory.calls == 2)
     }
 
+    @Test func triesAgainAfterTheKeychainWasNotAvailable() async throws {
+        // `errSecNotAvailable` right after login, or an I/O error: not a refusal, worth asking again this session.
+        let factory = SealerFactorySpy(failure: .keyUnavailable(.notAvailableNow))
+        let sealer = factory.makeLazySealer()
+
+        #expect(await sealer.loadKey() == .lockedOut)
+
+        factory.setFailure(nil)
+        #expect(await sealer.loadKey() == .ready)
+        #expect(factory.calls == 2)
+    }
+
     static let unavailableForTheSession: [SecretSealingError] = [
         .keyUnavailable(.missingEntitlement), .keyUnavailable(.unexpectedStatus(-25_293)),
         .keyUnavailable(.unexpectedItemData), .invalidKeyLength(16),

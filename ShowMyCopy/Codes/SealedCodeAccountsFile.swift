@@ -51,7 +51,9 @@ struct SealedCodeAccountsFile: CodeAccountsPersisting {
         do {
             json = try sealer.open(sealed)
         } catch let error as SecretSealingError where error.isAboutTheKey {
-            return error == .keyUnavailable(.interactionNotAllowed) ? .keyLockedOut : .keyUnavailable
+            return error.isTemporary ? .keyLockedOut : .keyUnavailable
+        } catch SecretSealingError.newerFormatVersion {
+            return .newerFormat
         } catch {
             AppLogger.security.error("The saved code accounts could not be opened; they are left as they are")
             return .damaged
@@ -149,7 +151,7 @@ struct SealedCodeAccountsFile: CodeAccountsPersisting {
         }
         var accounts: [CodeAccount] = []
         for record in file.accounts {
-            guard !record.secret.isEmpty, record.period > 0,
+            guard !record.secret.isEmpty, OneTimeCodeAccount.periodRange.contains(record.period),
                 let algorithm = OneTimeCodeAccount.Algorithm(rawValue: record.algorithm),
                 let digits = OneTimeCodeAccount.Digits(rawValue: record.digits)
             else {

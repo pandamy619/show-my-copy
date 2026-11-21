@@ -1858,12 +1858,12 @@
         }
       }
     },
-    "The Keychain is locked, so saved accounts are not loaded yet." : {
+    "The Keychain is locked: saved accounts are not loaded yet, new ones are kept until the app quits." : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Связка ключей заблокирована, поэтому сохранённые аккаунты ещё не загружены."
+            "value" : "Связка ключей заблокирована: сохранённые аккаунты ещё не загружены, новые хранятся до выхода из приложения."
           }
         }
       }
@@ -1964,6 +1964,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "После этого снимок удаляется из истории и из буфера обмена."
+          }
+        }
+      }
+    },
+    "The screenshot was kept, because the accounts are not saved on this Mac yet." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Снимок экрана оставлен, потому что аккаунты ещё не сохранены на этом Маке."
           }
         }
       }
