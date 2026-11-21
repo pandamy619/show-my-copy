@@ -11,6 +11,16 @@
         }
       }
     },
+    "%@, code %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, код %@"
+          }
+        }
+      }
+    },
     "%lld days" : {
       "localizations" : {
         "en" : {
@@ -219,6 +229,68 @@
         }
       }
     },
+    "%lld seconds left" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осталось %lld с"
+          }
+        }
+      }
+    },
+    "%lld were in the list already." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld was in the list already."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld were in the list already."
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld уже были в списке."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld уже были в списке."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld уже был в списке."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld уже были в списке."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "1 hour" : {
       "localizations" : {
         "ru" : {
@@ -269,12 +341,124 @@
         }
       }
     },
+    "Account" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Аккаунт"
+          }
+        }
+      }
+    },
+    "Accounts" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Аккаунты"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить"
+          }
+        }
+      }
+    },
+    "Add accounts" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить аккаунты"
+          }
+        }
+      }
+    },
     "Add an Open App" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Добавить открытое приложение"
+          }
+        }
+      }
+    },
+    "Add the service or the account name for this key." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Укажите сервис или имя аккаунта для этого ключа."
+          }
+        }
+      }
+    },
+    "Added %lld accounts." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Added %lld account."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Added %lld accounts."
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Добавлено %lld аккаунта."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Добавлено %lld аккаунтов."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Добавлен %lld аккаунт."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Добавлено %lld аккаунта."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Address or key" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Адрес или ключ"
           }
         }
       }
@@ -305,16 +489,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Также удалить закреплённые записи"
-          }
-        }
-      }
-    },
-    "and %lld more" : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "и ещё %lld"
           }
         }
       }
@@ -369,6 +543,16 @@
         }
       }
     },
+    "Choosing one copies it. The code leaves the clipboard when its time is up." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбор кода копирует его. Когда время кода истекает, он удаляется из буфера обмена."
+          }
+        }
+      }
+    },
     "Clear History…" : {
       "localizations" : {
         "ru" : {
@@ -385,6 +569,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Закрыть просмотр"
+          }
+        }
+      }
+    },
+    "Codes" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Коды"
           }
         }
       }
@@ -425,6 +619,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Скопировать"
+          }
+        }
+      }
+    },
+    "Copy the code" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопировать код"
+          }
+        }
+      }
+    },
+    "Copy the screenshot to this Mac and click Read QR Code from Clipboard." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопируйте снимок на этот Mac и нажмите «Прочитать QR-код из буфера обмена»."
           }
         }
       }
@@ -509,6 +723,26 @@
         }
       }
     },
+    "For a key: GitHub, Google…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для ключа: GitHub, Google…"
+          }
+        }
+      }
+    },
+    "For a key: your name or e-mail" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для ключа: ваше имя или e-mail"
+          }
+        }
+      }
+    },
     "Frees %@." : {
       "localizations" : {
         "ru" : {
@@ -529,12 +763,52 @@
         }
       }
     },
+    "From Google Authenticator: Transfer accounts → Export accounts, then screenshot the QR code." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Из Google Authenticator: «Перенос аккаунтов» → «Экспорт аккаунтов», затем сделайте снимок экрана с QR-кодом."
+          }
+        }
+      }
+    },
+    "From a service: paste the otpauth:// address or the key shown next to its QR code." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Из сервиса: вставьте адрес otpauth:// или ключ, показанный рядом с его QR-кодом."
+          }
+        }
+      }
+    },
     "General" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Основные"
+          }
+        }
+      }
+    },
+    "Hide codes" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрыть коды"
+          }
+        }
+      }
+    },
+    "Hide codes (⌘K)" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрыть коды (⌘K)"
           }
         }
       }
@@ -629,22 +903,22 @@
         }
       }
     },
-    "Image unavailable" : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Изображение недоступно"
-          }
-        }
-      }
-    },
     "Image %@ at %@" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Изображение %@ в %@"
+          }
+        }
+      }
+    },
+    "Image unavailable" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изображение недоступно"
           }
         }
       }
@@ -749,6 +1023,16 @@
         }
       }
     },
+    "MIT License" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лицензия MIT"
+          }
+        }
+      }
+    },
     "May have been moved or deleted" : {
       "localizations" : {
         "ru" : {
@@ -759,12 +1043,22 @@
         }
       }
     },
-    "MIT License" : {
+    "No QR code was found in the copied image." : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Лицензия MIT"
+            "value" : "В скопированном изображении QR-код не найден."
+          }
+        }
+      }
+    },
+    "No accounts yet." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Аккаунтов пока нет."
           }
         }
       }
@@ -815,6 +1109,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Нет данных"
+          }
+        }
+      }
+    },
+    "Not supported: %@ (counter-based or an unknown algorithm)." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не поддерживаются: %@ (по счётчику или неизвестный алгоритм)."
           }
         }
       }
@@ -880,6 +1184,26 @@
         }
       }
     },
+    "Only time-based codes (TOTP) are supported, as in Google Authenticator." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поддерживаются только коды по времени (TOTP), как в Google Authenticator."
+          }
+        }
+      }
+    },
+    "Only time-based codes are supported. Secrets are encrypted and kept only on this Mac." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поддерживаются только коды по времени. Секреты зашифрованы и хранятся только на этом Mac."
+          }
+        }
+      }
+    },
     "Open Clipboard History" : {
       "localizations" : {
         "ru" : {
@@ -930,6 +1254,17 @@
         }
       }
     },
+    "PRIVACY.md" : {
+      "comment" : "The privacy policy's file name in the source code, in this language.",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRIVACY.ru.md"
+          }
+        }
+      }
+    },
     "Password, hidden" : {
       "localizations" : {
         "ru" : {
@@ -976,6 +1311,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Вставлять после выбора"
+          }
+        }
+      }
+    },
+    "Paste an address or a key first." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сначала вставьте адрес или ключ."
           }
         }
       }
@@ -1060,23 +1405,22 @@
         }
       }
     },
-    "PRIVACY.md" : {
-      "comment" : "The privacy policy's file name in the source code, in this language.",
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PRIVACY.ru.md"
-          }
-        }
-      }
-    },
     "Quit Show My Copy" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Завершить Show My Copy"
+          }
+        }
+      }
+    },
+    "Read QR Code from Clipboard" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прочитать QR-код из буфера обмена"
           }
         }
       }
@@ -1244,6 +1588,7 @@
       }
     },
     "Run from Xcode, the permission is checked for Xcode. Run the built app directly." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ru" : {
           "stringUnit" : {
@@ -1279,6 +1624,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Поиск"
+          }
+        }
+      }
+    },
+    "Service" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сервис"
           }
         }
       }
@@ -1403,6 +1758,26 @@
         }
       }
     },
+    "Show codes" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показать коды"
+          }
+        }
+      }
+    },
+    "Show codes (⌘K)" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показать коды (⌘K)"
+          }
+        }
+      }
+    },
     "Show history" : {
       "localizations" : {
         "ru" : {
@@ -1483,6 +1858,86 @@
         }
       }
     },
+    "The Keychain is locked, so saved accounts are not loaded yet." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Связка ключей заблокирована, поэтому сохранённые аккаунты ещё не загружены."
+          }
+        }
+      }
+    },
+    "The Keychain key is unavailable, so accounts are kept only until the app quits." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ключ в связке ключей недоступен, поэтому аккаунты хранятся только до выхода из приложения."
+          }
+        }
+      }
+    },
+    "The accounts could not be saved. They are kept until the app quits." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Аккаунты не удалось сохранить. Они хранятся до выхода из приложения."
+          }
+        }
+      }
+    },
+    "The accounts were saved by a newer Show My Copy. New ones are kept until the app quits." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Аккаунты сохранены более новой версией Show My Copy. Новые хранятся до выхода из приложения."
+          }
+        }
+      }
+    },
+    "The button next to the gear in the history window (or ⌘K) shows the codes." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кнопка рядом с шестерёнкой в окне истории (или ⌘K) показывает коды."
+          }
+        }
+      }
+    },
+    "The clipboard holds no image." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В буфере обмена нет изображения."
+          }
+        }
+      }
+    },
+    "The saved accounts could not be opened and are left alone. New ones are kept until the app quits." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранённые аккаунты не удалось открыть, файл оставлен как есть. Новые хранятся до выхода из приложения."
+          }
+        }
+      }
+    },
+    "The saved accounts could not be read. New ones are kept until the app quits." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранённые аккаунты не удалось прочитать. Новые хранятся до выхода из приложения."
+          }
+        }
+      }
+    },
     "The saved history could not be loaded." : {
       "localizations" : {
         "ru" : {
@@ -1503,12 +1958,62 @@
         }
       }
     },
+    "The screenshot is then removed from the history and the clipboard." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "После этого снимок удаляется из истории и из буфера обмена."
+          }
+        }
+      }
+    },
+    "The screenshot was removed from the history and the clipboard." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Снимок экрана удалён из истории и из буфера обмена."
+          }
+        }
+      }
+    },
+    "They are hidden each time the window opens." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "При каждом открытии окна они скрыты."
+          }
+        }
+      }
+    },
+    "This address could not be read. Check that it is complete." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Адрес не удалось прочитать. Проверьте, что он полный."
+          }
+        }
+      }
+    },
     "This app has no bundle identifier, so it cannot be excluded." : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "У этого приложения нет идентификатора пакета, поэтому его нельзя исключить."
+          }
+        }
+      }
+    },
+    "This is not an otpauth address, an export or a Base32 key." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это не адрес otpauth, не экспорт и не ключ Base32."
           }
         }
       }
@@ -1669,6 +2174,16 @@
         }
       }
     },
+    "This was QR code %lld of %lld." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это был QR-код %lld из %lld."
+          }
+        }
+      }
+    },
     "To paste, Show My Copy sends ⌘V to the app you were using after you choose an entry." : {
       "localizations" : {
         "ru" : {
@@ -1719,6 +2234,16 @@
         }
       }
     },
+    "Unnamed account" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Аккаунт без имени"
+          }
+        }
+      }
+    },
     "Unpin" : {
       "localizations" : {
         "ru" : {
@@ -1765,6 +2290,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Если выключено, пароли и всё, что вы копируете из менеджера паролей, не сохраняются."
+          }
+        }
+      }
+    },
+    "and %lld more" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "и ещё %lld"
+          }
+        }
+      }
+    },
+    "otpauth://… or a key" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "otpauth://… или ключ"
           }
         }
       }

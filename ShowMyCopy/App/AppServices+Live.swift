@@ -8,7 +8,7 @@ extension AppServices {
     /// open apps and an open panel for picking any app, and the SwiftUI settings window with the shortcut recorder.
     /// This file is the only place that names the macOS implementations the app runs on.
     @MainActor
-    static func live(blobs: InFlightBlobStore?) -> AppServices {
+    static func live(blobs: InFlightBlobStore?, sealer: any SecretSealing) -> AppServices {
         let keystrokes = SystemPasteKeystrokes()
         return AppServices(
             pasteboard: SystemPasteboard(),
@@ -40,6 +40,10 @@ extension AppServices {
                 },
                 tuning: { PasteTuning.current() }
             ),
+            codes: Codes(
+                persistence: SealedCodeAccountsFile.openDefault(sealer: sealer) ?? UnsavedCodeAccounts(),
+                qrReader: VisionQRCodeReader()
+            ),
             memoryReader: TaskMemoryReader(),
             loginItem: MainAppLoginItem(),
             makeSettingsWindow: { settings, copyText in
@@ -65,8 +69,25 @@ extension InFlightBlobStore {
     }
 }
 
+extension LazySecretSealer {
+    /// The key of saved passwords and code accounts, read from the Keychain, or created there, when first asked for
+    /// with `loadKey()`, off the main thread: getting it can show a Keychain prompt, which users who save neither
+    /// should never see.
+    static func keychain() -> LazySecretSealer {
+        LazySecretSealer { () throws(SecretSealingError) -> any SecretSealing in
+            do throws(SecretSealingError) {
+                return try KeychainSecretSealer()
+            } catch {
+                AppLogger.history.error(
+                    "No key for saved secrets; they stay in memory: \(String(describing: error), privacy: .private)")
+                throw error
+            }
+        }
+    }
+}
+
 extension AppHistory {
-    /// The history saved on disk, with passwords encrypted by a key kept in the Keychain.
+    /// The history saved on disk, with passwords encrypted by a key kept in the Keychain (`sealer`).
     ///
     /// The key is read or created only when a password is saved or a saved one is loaded: getting it can show a
     /// Keychain prompt, which users who never save passwords should not see. It is read off the main thread
@@ -77,16 +98,9 @@ extension AppHistory {
     /// disk cannot be opened, the history is kept in memory only and `storageError` tells why. Image data is in
     /// `blobs`; the store deletes it with its entries and sweeps what no entry uses at launch.
     @MainActor
-    static func loadSaved(blobs: (any BlobStore)?, defaults: UserDefaults) async -> AppHistory {
-        let sealer = LazySecretSealer { () throws(SecretSealingError) -> any SecretSealing in
-            do throws(SecretSealingError) {
-                return try KeychainSecretSealer()
-            } catch {
-                AppLogger.history.error(
-                    "No key for saved passwords; they stay in memory: \(String(describing: error), privacy: .private)")
-                throw error
-            }
-        }
+    static func loadSaved(
+        blobs: (any BlobStore)?, defaults: UserDefaults, sealer: any SecretSealing
+    ) async -> AppHistory {
         let opened = SwiftDataHistoryPersistence.openDefault()
         // Loading deletes the entries the limits do not allow, and saved passwords when saving them is off, so
         // load with the limits and the password choice the user saved, not the defaults. `AppContainer.start()`

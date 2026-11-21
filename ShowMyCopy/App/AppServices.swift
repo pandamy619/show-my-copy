@@ -73,10 +73,17 @@ struct AppServices {
         var tuning: @MainActor () -> PasteTuning
     }
 
+    /// One-time codes (Settings → Codes): where the accounts are saved and how QR codes are read.
+    struct Codes {
+        var persistence: any CodeAccountsPersisting
+        var qrReader: any QRCodeReading
+    }
+
     var pasteboard: any PasteboardReading & PasteboardWriting
     var system: System
     var media: Media
     var paste: Paste
+    var codes: Codes
     /// Reads the app's memory for Settings → Storage.
     var memoryReader: any MemoryUsageReading
     /// The app's login item, for Settings → General → Open at login.
@@ -102,4 +109,6 @@ struct AppSettings {
     /// Whether Return pastes the chosen entry, and whether macOS allows it. The history window and the paster read
     /// the same object.
     let paste: PasteSettings
+    /// The accounts whose one-time codes the history window shows, and how to add them.
+    let codes: CodesSettings
 }

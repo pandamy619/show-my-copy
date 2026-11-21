@@ -8,6 +8,8 @@ enum SettingsSection: CaseIterable, Identifiable, Hashable, Sendable {
     /// What the history takes, the size limit and Clear History.
     case storage
     case passwords
+    /// One-time codes, as in Google Authenticator, and the accounts they belong to.
+    case codes
     case excludedApps
     case about
 
@@ -17,6 +19,7 @@ enum SettingsSection: CaseIterable, Identifiable, Hashable, Sendable {
         case blue
         case indigo
         case orange
+        case green
         case red
     }
 
@@ -38,6 +41,8 @@ enum SettingsSection: CaseIterable, Identifiable, Hashable, Sendable {
             "internaldrive"
         case .passwords:
             "key.fill"
+        case .codes:
+            "123.rectangle.fill"
         case .excludedApps:
             "hand.raised.fill"
         case .about:
@@ -55,6 +60,8 @@ enum SettingsSection: CaseIterable, Identifiable, Hashable, Sendable {
             .indigo
         case .passwords:
             .orange
+        case .codes:
+            .green
         case .excludedApps:
             .red
         }

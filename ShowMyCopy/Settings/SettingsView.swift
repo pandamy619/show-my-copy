@@ -56,6 +56,8 @@ struct SettingsView<ShortcutRecorder: View>: View {
             StorageSettingsPage(settings: settings.history, usage: settings.storage)
         case .passwords:
             PasswordsSettingsPage(passwords: settings.passwords)
+        case .codes:
+            CodesSettingsPage(codes: settings.codes)
         case .excludedApps:
             Form {
                 ExcludedAppsSection(apps: settings.excludedApps)

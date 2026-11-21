@@ -13,6 +13,8 @@ extension SettingsSection {
             "Storage"
         case .passwords:
             "Passwords"
+        case .codes:
+            "Codes"
         case .excludedApps:
             "Excluded apps"
         case .about:
@@ -33,6 +35,8 @@ extension SettingsSection.Tint {
             .indigo
         case .orange:
             .orange
+        case .green:
+            .green
         case .red:
             .red
         }

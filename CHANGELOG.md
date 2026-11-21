@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Codes
+
+- One-time codes, as in Google Authenticator (TOTP, RFC 6238; SHA-1, SHA-256 or SHA-512; 6 or 8 digits), computed on this Mac from the accounts' secrets and the clock, never from the network. The history window lists them in a Codes section right under the search bar, above the clipboard row, each with its current code and a countdown, redrawn every second. The section is hidden each time the window opens, so codes are never on screen unasked; the button next to the gear, shown only with accounts, or ⌘K slides it in and out (with Reduce Motion it just appears). The arrow keys walk entries and codes alike; Enter or a click copies the selected code and pastes it when Paste after choosing an entry is on, ⌥Enter does the other. Search matches the service and account name only, never the code.
+- A copied code is written with the concealed marker and the app's unrecorded marker, so it is never recorded in the history and clipboard managers that honour the marker skip it, and the clipboard is emptied one code period (30 seconds) after the copy if it still holds exactly that code.
+- Settings → Codes lists the accounts, removes one with a button, and adds accounts from an `otpauth://` address, several of them one per line, a Google Authenticator export address (`otpauth-migration://`, read with a protobuf reader of the app's own, in batches), or a bare Base32 key with the service and account name typed next to it. Read QR Code from Clipboard reads the QR code in an image on the clipboard with Vision on the device, for a screenshot of the export brought from the phone; after accounts were read from it, the screenshot is deleted from the history and the clipboard is emptied when nothing was copied since. Counter-based (HOTP), MD5 and empty accounts in an export are reported as skipped, not imported silently; accounts already in the list are counted as duplicates.
+- The accounts are saved in `Application Support/ShowMyCopy/Codes/Accounts.sealed`, one JSON file sealed with AES-256-GCM under the same Keychain key as saved passwords, written whole and atomically, in a folder excluded from backups. The file is opened only when it exists, in the background, and again when the user is back at an unlocked Mac; while the key is unavailable or the file cannot be opened or was saved by a newer version, it is left as it is and never written over, accounts added meanwhile are kept until the app quits and Settings say so.
+
 ## [0.1.0] - 2026-11-09
 
 First version. Requires macOS 15 Sequoia or later.

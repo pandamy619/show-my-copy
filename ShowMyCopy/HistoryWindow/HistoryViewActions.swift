@@ -2,6 +2,8 @@
 struct HistoryViewActions {
     /// Copies the entry, and pastes it into the app in front when the flag is true.
     let choose: @MainActor (ClipboardEntry, Bool) -> Void
+    /// Copies the account's code, and pastes it when the flag is true.
+    let chooseCode: @MainActor (CodeAccount, Bool) -> Void
     let close: @MainActor () -> Void
     /// Shows Settings on a page, or on the page they show with nil (the gear button and ⌘,).
     let openSettings: @MainActor (SettingsSection?) -> Void

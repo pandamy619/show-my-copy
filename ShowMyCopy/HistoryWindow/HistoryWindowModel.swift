@@ -19,10 +19,17 @@ final class HistoryWindowModel {
     private let fileAvailability: any FileAvailabilityChecking
     /// Settings → General → Paste after choosing an entry, read on every Return.
     private let pastesAfterChoosing: @MainActor () -> Bool
+    /// The accounts whose codes the window lists (`codeRows`). Nil: no codes section.
+    let codes: CodeAccountStore?
 
     /// Why the last paste only copied, told once in the window opening now (`EntryPasting.takeFallbackHint()`). The
     /// view shows it above the list until the user dismisses it; opening or closing the window clears it.
     var pasteHint: PasteFallback?
+
+    /// Whether the Codes section is shown (`codeRows`), under the search bar. Off each time the window opens: codes
+    /// appear only after the user asks for them with the button next to the gear, so they are never on screen
+    /// unasked.
+    var showsCodes = false
 
     /// Whether the last pin or Undo here unpinned the oldest pinned entry to keep `RetentionPolicy.maximumPinned`
     /// (`noticingPinLimit`). The view shows one line above the list until the user dismisses it.
@@ -49,13 +56,13 @@ final class HistoryWindowModel {
         }
     }
 
-    /// The selected entry. It is kept by ID, so the selection stays on the same entry when a copy arrives or an
-    /// entry moves to the top or to another section while the window is open. Read `selectedIndex`, which finds its
-    /// row.
-    private var selectedID: ClipboardEntry.ID?
+    /// The selected row, entry or code. It is kept by ID, so the selection stays on the same row when a copy
+    /// arrives or an entry moves to the top or to another section while the window is open. Read `selectedRowID`,
+    /// `selectedEntry` or `selectedCode`, which find it among the rows listed now.
+    private var selectedID: UUID?
 
-    /// The row of the selected entry when it was selected. Used when there is no selected entry or it is gone,
-    /// so the selection stays near where it was instead of jumping to the top.
+    /// The row that was selected when it was selected (`rows`). Used when the selected row is gone, so the
+    /// selection stays near where it was instead of jumping to the top.
     private var selectedRow = 0
 
     /// Changes every time the window is shown, so the view can move focus to the search field.
@@ -68,10 +75,12 @@ final class HistoryWindowModel {
         history: any HistoryStore,
         deleter: any EntryDeleting,
         previews: PreviewServices = PreviewServices(),
+        codes: CodeAccountStore? = nil,
         pastesAfterChoosing: @escaping @MainActor () -> Bool
     ) {
         self.history = history
         self.deleter = deleter
+        self.codes = codes
         preview = EntryPreviewModel(services: previews)
         thumbnails = ThumbnailProvider(blobs: previews.blobs, decoder: previews.images)
         imageBlobs = previews.blobs
@@ -128,15 +137,9 @@ final class HistoryWindowModel {
         return positions.sections(in: entries)
     }
 
-    /// The listed entries in the order the window shows them: the arrow keys move through these.
+    /// The listed entries in the order the window shows them.
     var items: [ClipboardEntry] {
         sections.rows
-    }
-
-    /// Whether the window lists any entries. False for an empty history and for a search with no matches: then
-    /// the window shrinks to the search bar and a one-line message. Observable, like `items`.
-    var showsEntries: Bool {
-        !items.isEmpty
     }
 
     /// The entry whose text is on the clipboard now. Nil after a copy that was not recorded, such as a password
@@ -145,38 +148,62 @@ final class HistoryWindowModel {
         history.currentEntryID
     }
 
+    /// The selected row within `rows`, the rows listed now: the row with the selected ID, or the row nearest to
+    /// where the selection was when that row is gone. Nil with nothing listed.
+    func selectedRowIndex(in rows: [HistoryRowItem]) -> Int? {
+        if let selectedID, let index = rows.firstIndex(where: { $0.id == selectedID }) {
+            return index
+        }
+        return Self.clamped(selectedRow, count: rows.count)
+    }
+
+    /// The ID of the selected row, entry or code, for the view to highlight it.
+    var selectedRowID: UUID? {
+        let rows = rows
+        return selectedRowIndex(in: rows).map { rows[$0].id }
+    }
+
+    /// The selected row, entry or code.
+    var selectedItem: HistoryRowItem? {
+        let rows = rows
+        return selectedRowIndex(in: rows).map { rows[$0] }
+    }
+
+    /// The selected entry within the listed entries, or nil when a code is selected or nothing is listed.
     var selectedIndex: Int? {
         selectedIndex(in: items)
     }
 
-    /// The selected index within an already filtered list, so callers don't filter the history twice.
+    /// The selected entry's index within an already filtered list, so callers don't filter the history twice.
     func selectedIndex(in items: [ClipboardEntry]) -> Int? {
-        if let selectedID, let index = items.firstIndex(where: { $0.id == selectedID }) {
-            return index
-        }
-        return Self.clamped(selectedRow, count: items.count)
-    }
-
-    var selectedEntry: ClipboardEntry? {
-        let items = items
-        guard let index = selectedIndex(in: items) else {
+        guard let selected = selectedEntry else {
             return nil
         }
-        return items[index]
+        return items.firstIndex { $0.id == selected.id }
+    }
+
+    /// The selected entry; nil when a code is selected.
+    var selectedEntry: ClipboardEntry? {
+        selectedItem?.entry
+    }
+
+    /// The selected account; nil when an entry is selected.
+    var selectedCode: CodeAccount? {
+        selectedItem?.code
     }
 
     func moveSelection(_ direction: Direction) {
-        let items = items
-        guard let current = selectedIndex(in: items) else {
+        let rows = rows
+        guard let current = selectedRowIndex(in: rows) else {
             selectedID = nil
             selectedRow = 0
             return
         }
         switch direction {
         case .up:
-            select(row: max(current - 1, 0), in: items)
+            select(row: max(current - 1, 0), in: rows)
         case .down:
-            select(row: min(current + 1, items.count - 1), in: items)
+            select(row: min(current + 1, rows.count - 1), in: rows)
         }
     }
 
@@ -192,57 +219,27 @@ final class HistoryWindowModel {
         selectFirst()
         pasteHint = nil
         showsPinLimitNotice = false
+        showsCodes = false
         presentationCount += 1
+    }
+
+    /// Whether ⌘Z has an entry to bring back.
+    var canUndoDelete: Bool {
+        deleter.canUndoDelete
+    }
+
+    /// Shows the Codes section, or hides it when it is shown, for the button next to the gear and ⌘K. Showing it
+    /// selects the first code, so Return right after copies it; hiding it selects the first row again.
+    func toggleCodes() {
+        swipe.close()
+        showsCodes.toggle()
+        selectFirst()
     }
 
     /// Whether choosing an entry pastes it: as Settings say, or the other way round with ⌥ (`isAlternate`). For
     /// Return and ⌥Return, and for a click or ⌥-click on a row.
     func choosingPastes(isAlternate: Bool) -> Bool {
         pastesAfterChoosing() != isAlternate
-    }
-
-    /// Handles a key press. `isCaretAtEnd` is false while the caret of the search field is not after its last
-    /// character: then Left and Right Arrow move the caret instead.
-    ///
-    /// Up and Down Arrow move the selection, and the open preview follows it. Right Arrow opens the preview, like
-    /// opening a folder in a column view; Left Arrow and Esc close it. Esc with no preview closes the window, and
-    /// Return copies the selected entry back, and pastes it when Settings say so; ⌥Return does the other. ⌘⌫ deletes
-    /// the selected entry and ⌘Z brings it back; with nothing to delete or bring back they are left to the search
-    /// field. ⌘P pins or unpins the selected entry.
-    func handleKey(_ key: Key, isCaretAtEnd: Bool) -> KeyResult {
-        // Any of these keys closes a swiped row, as typing does.
-        swipe.close()
-        switch key {
-        case .delete, .undo, .pin:
-            return handleCommandKey(key)
-        case .up, .down:
-            moveSelection(key == .up ? .up : .down)
-            if preview.isOpen {
-                showPreviewOfSelection()
-            }
-            return .handled
-        case .right:
-            guard !preview.isOpen, isCaretAtEnd, let entry = selectedEntry, EntryPreviewModel.canPreview(entry) else {
-                return .ignored
-            }
-            preview.open(entry)
-            return .handled
-        case .left:
-            guard preview.isOpen else {
-                return .ignored
-            }
-            preview.close()
-            return .handled
-        case .escape:
-            guard preview.isOpen else {
-                return .close
-            }
-            preview.close()
-            return .handled
-        case .return, .optionReturn:
-            let pastes = choosingPastes(isAlternate: key == .optionReturn)
-            return selectedEntry.map { .choose($0, pastes: pastes) } ?? .handled
-        }
     }
 
     /// Opens the preview of the selected entry, or closes it when there is none or it cannot be previewed. For the
@@ -257,11 +254,13 @@ final class HistoryWindowModel {
 
     /// Selects `entry` and shows its preview, for the row's "Show Preview" action.
     func showPreview(of entry: ClipboardEntry) {
-        let items = items
-        if let row = items.firstIndex(where: { $0.id == entry.id }) {
-            select(row: row, in: items)
-        }
+        select(id: entry.id)
         preview.open(entry)
+    }
+
+    /// Selects the row of the account, for a click on its row.
+    func select(_ account: CodeAccount) {
+        select(id: account.id)
     }
 
     /// The preview to show: the open preview's entry while it is still listed. An entry removed from the history
@@ -304,13 +303,21 @@ final class HistoryWindowModel {
     }
 
     private func selectFirst() {
-        select(row: 0, in: items)
+        select(row: 0, in: rows)
     }
 
-    /// Selects the entry in `row`, or only remembers the row when the list is empty.
-    private func select(row: Int, in items: [ClipboardEntry]) {
+    /// Selects the listed row with `id`, when there is one.
+    private func select(id: UUID) {
+        let rows = rows
+        if let row = rows.firstIndex(where: { $0.id == id }) {
+            select(row: row, in: rows)
+        }
+    }
+
+    /// Selects the row at `row`, or only remembers the row when the list is empty.
+    private func select(row: Int, in rows: [HistoryRowItem]) {
         selectedRow = row
-        let id = items.indices.contains(row) ? items[row].id : nil
+        let id = rows.indices.contains(row) ? rows[row].id : nil
         if id != selectedID {
             // A new selection closes a swiped row.
             swipe.close()
@@ -329,37 +336,15 @@ final class HistoryWindowModel {
 // MARK: - Deleting
 
 extension HistoryWindowModel {
-    /// ⌘⌫ and ⌘Z, left to the search field when there is nothing to delete or bring back, and ⌘P, always handled.
-    fileprivate func handleCommandKey(_ key: Key) -> KeyResult {
-        if key == .pin {
-            if let entry = selectedEntry {
-                togglePin(entry)
-            }
-            return .handled
-        }
-        if key == .undo {
-            guard deleter.canUndoDelete else {
-                return .ignored
-            }
-            undoDelete()
-            return .handled
-        }
-        guard let entry = selectedEntry else {
-            return .ignored
-        }
-        delete(entry)
-        return .handled
-    }
-
     /// Deletes `entry`, for ⌘⌫, the row's "Delete" action, VoiceOver and swipe to delete. The window stays open. When
     /// the entry was selected, the entry after it is selected, or the one before it when it was the last.
     func delete(_ entry: ClipboardEntry) {
         swipe.close()
-        let items = items
-        let row = items.firstIndex { $0.id == entry.id }
-        let wasSelected = row != nil && row == selectedIndex(in: items)
+        let rows = rows
+        let row = rows.firstIndex { $0.id == entry.id }
+        let wasSelected = row != nil && row == selectedRowIndex(in: rows)
         let neighbours = row.map { row in
-            [row + 1, row - 1].filter(items.indices.contains).map { items[$0].id }
+            [row + 1, row - 1].filter(rows.indices.contains).map { rows[$0].id }
         }
         deleter.delete(entry.id)
         revealedIDs.remove(entry.id)
@@ -370,7 +355,7 @@ extension HistoryWindowModel {
             return
         }
         // The neighbours by ID: a copy recorded meanwhile may have moved the rows.
-        let remaining = self.items
+        let remaining = self.rows
         let neighbourRow = neighbours.lazy.compactMap { id in remaining.firstIndex { $0.id == id } }.first
         select(row: neighbourRow ?? max(min(row, remaining.count - 1), 0), in: remaining)
     }
@@ -381,10 +366,7 @@ extension HistoryWindowModel {
         guard let id = noticingPinLimit(acting: nil, { deleter.undoDelete() }) else {
             return
         }
-        let items = items
-        if let row = items.firstIndex(where: { $0.id == id }) {
-            select(row: row, in: items)
-        }
+        select(id: id)
     }
 
     /// The window closed: the deleted entry can no longer come back, and its files are deleted.

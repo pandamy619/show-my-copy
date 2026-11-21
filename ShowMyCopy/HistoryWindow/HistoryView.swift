@@ -6,6 +6,8 @@ struct HistoryView: View {
     @Bindable var model: HistoryWindowModel
     /// Copies the entry, and pastes it into the app in front when the flag is true.
     let onChoose: @MainActor (ClipboardEntry, Bool) -> Void
+    /// Copies the account's code, and pastes it when the flag is true.
+    let onChooseCode: @MainActor (CodeAccount, Bool) -> Void
     let onClose: @MainActor () -> Void
     let onOpenSettings: @MainActor (SettingsSection?) -> Void
     /// A row is being dragged into another app (`RowDragSource`).
@@ -14,17 +16,18 @@ struct HistoryView: View {
     let onCopyText: @MainActor (String) -> Void
 
     @FocusState private var isSearchFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
 
     private let icons = WorkspaceFileIconProvider()
 
     var body: some View {
         let sections = model.sections
-        let items = sections.rows
-        let selectedID = model.selectedIndex(in: items).map { items[$0].id }
+        let codes = model.codeRows
+        let selectedID = model.selectedRowID
         VStack(spacing: 0) {
             searchBar
             Divider()
-            if items.isEmpty {
+            if sections.isEmpty && codes.isEmpty {
                 // The window controller shrinks the panel to exactly these rows.
                 emptyState
             } else {
@@ -32,7 +35,7 @@ struct HistoryView: View {
                 HistoryNotices(model: model, onOpenSettings: onOpenSettings)
                 let previewed = model.previewedEntry
                 // The list stays underneath the preview, so it keeps its scroll position.
-                list(sections: sections, selectedID: selectedID, now: Date())
+                list(sections: sections, codes: codes, selectedID: selectedID, now: Date())
                     .opacity(previewed == nil ? 1 : 0)
                     .allowsHitTesting(previewed == nil)
                     .accessibilityHidden(previewed != nil)
@@ -73,7 +76,7 @@ struct HistoryView: View {
         .onExitCommand { onClose() }
     }
 
-    private static let handledKeys: Set<KeyEquivalent> = [
+    static let handledKeys: Set<KeyEquivalent> = [
         .upArrow, .downArrow, .leftArrow, .rightArrow, .return, .escape,
     ]
 
@@ -88,6 +91,9 @@ struct HistoryView: View {
                 .focused($isSearchFocused)
                 .onKeyPress(keys: Self.handledKeys) { handleKey($0) }
                 .onSubmit { chooseSelected() }
+            if model.hasCodes {
+                codesButton
+            }
             Button {
                 onOpenSettings(nil)
             } label: {
@@ -103,9 +109,26 @@ struct HistoryView: View {
         .frame(height: HistoryPanelPlacement.searchBarHeight)
     }
 
+    /// Shows or hides the Codes section. Only with accounts to show; hidden each time the window opens. The section
+    /// slides in under the search bar and out again; with Reduce Motion it just appears.
+    private var codesButton: some View {
+        Button {
+            withAnimation(reducesMotion ? nil : .snappy(duration: 0.25)) {
+                model.toggleCodes()
+            }
+        } label: {
+            Image(systemName: model.showsCodes ? "123.rectangle.fill" : "123.rectangle")
+                .imageScale(.large)
+        }
+        .buttonStyle(.borderless)
+        .keyboardShortcut("k", modifiers: .command)
+        .help(model.showsCodes ? Text("Hide codes (⌘K)") : Text("Show codes (⌘K)"))
+        .accessibilityLabel(model.showsCodes ? Text("Hide codes") : Text("Show codes"))
+    }
+
     /// One slim row under the search bar, like Spotlight with no results.
     private var emptyState: some View {
-        let isHistoryEmpty = model.history.entries.isEmpty
+        let isHistoryEmpty = model.history.entries.isEmpty && model.query.isEmpty
         return HStack(spacing: 8) {
             Image(systemName: isHistoryEmpty ? "doc.on.clipboard" : "magnifyingglass")
                 .accessibilityHidden(true)
@@ -118,12 +141,17 @@ struct HistoryView: View {
         .frame(height: HistoryPanelPlacement.messageRowHeight)
     }
 
-    private func list(sections: HistorySections, selectedID: ClipboardEntry.ID?, now: Date) -> some View {
+    private func list(
+        sections: HistorySections, codes: [CodeAccount], selectedID: UUID?, now: Date
+    ) -> some View {
         // After a skipped copy (a password, an image) nothing in the history is on the clipboard, and a pinned entry
         // on the clipboard stays among the pinned ones: then there is no "Current clipboard" row.
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
+                    if !codes.isEmpty {
+                        codesSection(codes, selectedID: selectedID, aboveEntries: !sections.isEmpty)
+                    }
                     if let current = sections.current {
                         sectionHeader("Current clipboard")
                         row(current, selectedID: selectedID, now: now)
@@ -155,11 +183,26 @@ struct HistoryView: View {
                 }
             }
             .onChange(of: model.presentationCount) {
-                if let first = sections.rows.first {
+                if let first = model.rows.first {
                     proxy.scrollTo(first.id, anchor: .top)
                 }
             }
         }
+    }
+
+    /// The Codes section, first under the search bar, when the user asked for it; it slides in and out.
+    private func codesSection(_ codes: [CodeAccount], selectedID: UUID?, aboveEntries: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            sectionHeader("Codes")
+            CodeRows(accounts: codes, selectedID: selectedID, model: model) { account, isAlternate in
+                codeRowClicked(account, isAlternate: isAlternate)
+            }
+            if aboveEntries {
+                Divider()
+                    .padding(.vertical, 4)
+            }
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private func sectionHeader(_ title: LocalizedStringKey) -> some View {
@@ -172,7 +215,7 @@ struct HistoryView: View {
             .accessibilityAddTraits(.isHeader)
     }
 
-    private func row(_ entry: ClipboardEntry, selectedID: ClipboardEntry.ID?, now: Date) -> some View {
+    private func row(_ entry: ClipboardEntry, selectedID: UUID?, now: Date) -> some View {
         let isSelected = entry.id == selectedID
         let isRevealed = model.isRevealed(entry.id)
         // The eye button sits next to the row's button, not inside it: a button inside another button's label
@@ -221,77 +264,14 @@ struct HistoryView: View {
         onChoose(entry, model.choosingPastes(isAlternate: isAlternate))
     }
 
-    private func handleKey(_ press: KeyPress) -> KeyPress.Result {
-        // While an input method composes text (Japanese, Chinese, Korean), these keys move between and confirm
-        // its candidates or cancel the composition. Leave them to the search field.
-        guard !Self.isComposingText else {
-            return .ignored
+    /// A click on the row of an account copies its code, like Return on it.
+    private func codeRowClicked(_ account: CodeAccount, isAlternate: Bool) {
+        guard !model.closeSwipedRow() else {
+            return
         }
-        guard let key = Self.historyKey(for: press) else {
-            return .ignored
-        }
-        switch model.handleKey(key, isCaretAtEnd: Self.isCaretAtEnd) {
-        case .handled:
-            return .handled
-        case .ignored:
-            return .ignored
-        case .choose(let entry, let pastes):
-            onChoose(entry, pastes)
-            return .handled
-        case .close:
-            onClose()
-            return .handled
-        }
+        onChooseCode(account, model.choosingPastes(isAlternate: isAlternate))
     }
 
-    /// The model's name for a key press, or nil for one the history window leaves to the search field.
-    private static func historyKey(for press: KeyPress) -> HistoryWindowModel.Key? {
-        // Shift, Option, Command or Control with Left or Right Arrow select text or move by word in the search field.
-        let editingModifiers: EventModifiers = [.shift, .option, .command, .control]
-        let isEditing = !press.modifiers.isDisjoint(with: editingModifiers)
-        switch press.key {
-        case .upArrow:
-            return .up
-        case .downArrow:
-            return .down
-        case .leftArrow:
-            return isEditing ? nil : .left
-        case .rightArrow:
-            return isEditing ? nil : .right
-        case .return:
-            // ⌥Return does the other of what Return does. With ⌘ or ⌃ as well it is plain Return, as before.
-            let isOptionOnly = press.modifiers.intersection([.option, .command, .control]) == .option
-            return isOptionOnly ? .optionReturn : .return
-        case .escape:
-            return .escape
-        default:
-            return nil
-        }
-    }
-
-    /// True when the caret of the search field is after its last character with nothing selected, or the search
-    /// field is not being edited. Only then does Right Arrow open the preview instead of moving the caret.
-    @MainActor private static var isCaretAtEnd: Bool {
-        guard let editor = NSApplication.shared.keyWindow?.firstResponder as? NSTextView else {
-            return true
-        }
-        let selection = editor.selectedRange()
-        return selection.length == 0 && selection.location >= (editor.string as NSString).length
-    }
-
-    /// True while the search field holds marked text: input that an input method has not committed yet.
-    @MainActor private static var isComposingText: Bool {
-        guard let editor = NSApplication.shared.keyWindow?.firstResponder as? NSTextView else {
-            return false
-        }
-        return editor.hasMarkedText()
-    }
-
-    private func chooseSelected() {
-        if let entry = model.selectedEntry {
-            onChoose(entry, model.choosingPastes(isAlternate: false))
-        }
-    }
 }
 
 private struct HistoryRow: View {

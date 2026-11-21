@@ -192,15 +192,16 @@ final class FakePasteboard: PasteboardReading, PasteboardWriting {
     }
 
     @discardableResult
-    func writeUnrecorded(_ text: String) -> Int? {
+    func writeUnrecorded(_ text: String, concealed: Bool) -> Int? {
         guard !writeFails else {
             return nil
         }
         writtenPayloads.append(.text(text))
-        writtenConcealed.append(false)
+        writtenConcealed.append(concealed)
         writtenTexts.append(text)
         writtenUnrecordedTexts.append(text)
-        copy(text, markers: [PasteboardMarker.unrecorded, PasteboardMarker.source])
+        let markers = (concealed ? [PasteboardMarker.concealed] : []) + [PasteboardMarker.unrecorded]
+        copy(text, markers: markers + [PasteboardMarker.source])
         return changeCount
     }
 }

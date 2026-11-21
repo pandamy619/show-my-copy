@@ -7,6 +7,8 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     let model: HistoryWindowModel
     private let monitor: any PasteboardChangeTracking
     private let copier: any EntryCopying
+    /// Copies an account's code. Nil in a window without codes.
+    private let codeCopier: (any CodeCopying)?
     private let paster: any EntryPasting
     /// Shows Settings on a page, or on the page they show with nil.
     private let onOpenSettings: @MainActor (SettingsSection?) -> Void
@@ -21,12 +23,14 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
     init(
         model: HistoryWindowModel,
         copier: any EntryCopying,
+        codeCopier: (any CodeCopying)? = nil,
         paster: any EntryPasting,
         monitor: any PasteboardChangeTracking,
         onOpenSettings: @escaping @MainActor (SettingsSection?) -> Void
     ) {
         self.model = model
         self.copier = copier
+        self.codeCopier = codeCopier
         self.paster = paster
         self.monitor = monitor
         self.onOpenSettings = onOpenSettings
@@ -139,6 +143,23 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Copies the account's code as it is now and closes the window, then pastes it when `pastes` is true, like
+    /// `choose(_:pastes:)`. The code is never recorded, and leaves the clipboard when its time is up (`CodeCopier`).
+    func chooseCode(_ account: CodeAccount, pastes: Bool) {
+        guard isVisible, let codeCopier else {
+            return
+        }
+        guard let changeCount = codeCopier.copy(account) else {
+            return
+        }
+        hide()
+        if pastes {
+            paster.paste(copiedAt: changeCount) { [weak self] in
+                self?.isGoneFromScreen ?? true
+            }
+        }
+    }
+
     /// Copies text the user selected in the window, such as a file's folder in the preview, without recording it
     /// (`EntryCopying.copyText(_:)`). The window stays open: the user copied a detail, not an entry.
     func copySelectedText(_ text: String) {
@@ -159,6 +180,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
             return false
         case .choose(let entry, let pastes):
             choose(entry, pastes: pastes)
+            return true
+        case .copyCode(let account, let pastes):
+            chooseCode(account, pastes: pastes)
             return true
         case .close:
             hide()
@@ -264,6 +288,9 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         let actions = HistoryViewActions(
             choose: { [weak self] entry, pastes in
                 self?.choose(entry, pastes: pastes)
+            },
+            chooseCode: { [weak self] account, pastes in
+                self?.chooseCode(account, pastes: pastes)
             },
             close: { [weak self] in
                 self?.hide()

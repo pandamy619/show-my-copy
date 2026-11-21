@@ -78,8 +78,8 @@ extension SystemPasteboard: PasteboardWriting {
     }
 
     @discardableResult
-    func writeUnrecorded(_ text: String) -> Int? {
-        write(.text(text), concealed: false, unrecorded: true)
+    func writeUnrecorded(_ text: String, concealed: Bool) -> Int? {
+        write(.text(text), concealed: concealed, unrecorded: true)
     }
 
     private func write(_ payload: PasteboardPayload, concealed: Bool, unrecorded: Bool) -> Int? {

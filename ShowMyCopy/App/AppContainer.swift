@@ -22,6 +22,8 @@ final class AppContainer: HistoryShowing {
     let monitor: ClipboardMonitor
     let activityObserver: SystemActivityObserver
     let copier: EntryCopier
+    /// The accounts whose one-time codes the history window lists.
+    let codes: CodeAccountStore
     let historyWindow: HistoryWindowController
     let settingsWindow: any SettingsWindowShowing
     private let sleep: @Sendable (Duration) async throws -> Void
@@ -38,25 +40,16 @@ final class AppContainer: HistoryShowing {
         let media = services.media
         // Empties the pasteboard of a password that leaves the history through expiry or the password setting.
         let pasteboardClearer = PasswordPasteboardClearer(history: store, pasteboard: services.pasteboard)
-        let settings = Self.makeSettings(
+        let (passwords, excludedApps) = Self.makeCaptureSettings(
             history: history, services: services, defaults: defaults, pasteboardClearer: pasteboardClearer)
 
-        // The monitor reads the password setting and the excluded apps on every change, so a new choice applies to
-        // the next copy.
-        let monitor = ClipboardMonitor(
-            pasteboard: services.pasteboard,
-            history: store,
-            schedule: PollingSchedule(sleep: system.sleep, activity: system.pollingActivity),
-            expiry: HistoryExpiry(history: store, pasteboardClearer: pasteboardClearer, now: system.now),
-            clearedClipboard: ClearedClipboardCheck(history: store),
-            capture: Self.makeCapture(store: store, media: media),
-            frontmostApp: system.frontmostApp,
-            now: system.now,
-            passwordPolicy: { [passwords = settings.passwords] in passwords.policy },
-            isExcluded: { [excludedApps = settings.excludedApps] in excludedApps.excludes(bundleIdentifier: $0) }
-        )
-        // Only the monitor knows which pasteboard change a password was recorded at.
-        pasteboardClearer.connect(to: monitor)
+        let monitor = Self.makeMonitor(
+            store: store, services: services, pasteboardClearer: pasteboardClearer, passwords: passwords,
+            excludedApps: excludedApps)
+        let codes = Self.makeCodes(store: store, services: services, monitor: monitor)
+        let settings = Self.makeSettings(
+            history: history, services: services, defaults: defaults,
+            shared: SharedSettings(passwords: passwords, excludedApps: excludedApps, codes: codes.settings))
         let copier = EntryCopier(
             history: store, pasteboard: services.pasteboard, monitor: monitor, blobs: media.blobs, now: system.now)
         // Text selected in Settings, such as the address in About, is copied like a folder from the history window's
@@ -67,8 +60,10 @@ final class AppContainer: HistoryShowing {
         let deleter = EntryDeleter(
             history: store, pasteboard: services.pasteboard, monitor: monitor, blobs: media.blobs, now: system.now)
         let historyWindow = HistoryWindowController(
-            model: Self.makeHistoryModel(store: store, deleter: deleter, media: media, paste: settings.paste),
+            model: Self.makeHistoryModel(
+                store: store, deleter: deleter, media: media, codes: codes.store, paste: settings.paste),
             copier: copier,
+            codeCopier: codes.copier,
             paster: Self.makePaster(services: services, settings: settings.paste),
             monitor: monitor,
             onOpenSettings: { [weak settingsWindow] section in
@@ -76,14 +71,9 @@ final class AppContainer: HistoryShowing {
             }
         )
 
-        let activityObserver = SystemActivityObserver(
-            monitor: monitor,
-            workspace: system.workspaceNotifications,
-            distributed: system.distributedNotifications,
-            isScreenLocked: system.isScreenLocked,
-            isSessionActive: system.isSessionActive
-        )
-        Self.connect(activityObserver, to: historyWindow, storage: history.storage)
+        let activityObserver = Self.makeActivityObserver(
+            system: system, monitor: monitor, historyWindow: historyWindow, storage: history.storage,
+            codes: codes.store)
 
         self.store = store
         self.storage = history.storage
@@ -91,36 +81,85 @@ final class AppContainer: HistoryShowing {
         self.monitor = monitor
         self.activityObserver = activityObserver
         self.copier = copier
+        self.codes = codes.store
         self.historyWindow = historyWindow
         self.settingsWindow = settingsWindow
         self.sleep = system.sleep
     }
 
-    /// Every setting, read from `defaults` and applied to `history`.
-    private static func makeSettings(
+    /// The clipboard monitor. It reads the password setting and the excluded apps on every change, so a new choice
+    /// applies to the next copy.
+    private static func makeMonitor(
+        store: any HistoryStore,
+        services: AppServices,
+        pasteboardClearer: PasswordPasteboardClearer,
+        passwords: PasswordSettings,
+        excludedApps: ExcludedApps
+    ) -> ClipboardMonitor {
+        let system = services.system
+        let monitor = ClipboardMonitor(
+            pasteboard: services.pasteboard,
+            history: store,
+            schedule: PollingSchedule(sleep: system.sleep, activity: system.pollingActivity),
+            expiry: HistoryExpiry(history: store, pasteboardClearer: pasteboardClearer, now: system.now),
+            clearedClipboard: ClearedClipboardCheck(history: store),
+            capture: Self.makeCapture(store: store, media: services.media),
+            frontmostApp: system.frontmostApp,
+            now: system.now,
+            passwordPolicy: { passwords.policy },
+            isExcluded: { excludedApps.excludes(bundleIdentifier: $0) }
+        )
+        // Only the monitor knows which pasteboard change a password was recorded at.
+        pasteboardClearer.connect(to: monitor)
+        return monitor
+    }
+
+    /// The settings made before the rest: the monitor reads the first two, and the codes come with the monitor.
+    private struct SharedSettings {
+        let passwords: PasswordSettings
+        let excludedApps: ExcludedApps
+        let codes: CodesSettings
+    }
+
+    /// The settings the clipboard monitor reads on every copy: the password choice and the excluded apps. Made
+    /// before the monitor, which the other settings come after.
+    private static func makeCaptureSettings(
         history: AppHistory,
         services: AppServices,
         defaults: UserDefaults,
         pasteboardClearer: PasswordPasteboardClearer
+    ) -> (PasswordSettings, ExcludedApps) {
+        let passwords = PasswordSettings(
+            history: history, defaults: defaults, now: services.system.now, pasteboardClearer: pasteboardClearer)
+        let excludedApps = ExcludedApps(
+            defaults: defaults,
+            running: services.system.runningApps,
+            chooser: services.system.appChooser,
+            ownBundleIdentifier: Bundle.main.bundleIdentifier
+        )
+        return (passwords, excludedApps)
+    }
+
+    /// Every setting, read from `defaults` and applied to `history`, with those made before (`shared`).
+    private static func makeSettings(
+        history: AppHistory,
+        services: AppServices,
+        defaults: UserDefaults,
+        shared: SharedSettings
     ) -> AppSettings {
         AppSettings(
             store: history.store,
             history: HistorySettings(history: history.store, defaults: defaults, now: services.system.now),
-            passwords: PasswordSettings(
-                history: history, defaults: defaults, now: services.system.now, pasteboardClearer: pasteboardClearer),
+            passwords: shared.passwords,
             storage: StorageUsage(history: history, memoryReader: services.memoryReader),
             launchAtLogin: LaunchAtLoginSettings(service: services.loginItem),
-            excludedApps: ExcludedApps(
-                defaults: defaults,
-                running: services.system.runningApps,
-                chooser: services.system.appChooser,
-                ownBundleIdentifier: Bundle.main.bundleIdentifier
-            ),
+            excludedApps: shared.excludedApps,
             paste: PasteSettings(
                 defaults: defaults,
                 accessChecker: services.paste.access,
                 accessibilitySettings: services.paste.systemSettings
-            )
+            ),
+            codes: shared.codes
         )
     }
 
@@ -129,12 +168,13 @@ final class AppContainer: HistoryShowing {
         store: any HistoryStore,
         deleter: EntryDeleter,
         media: AppServices.Media,
+        codes: CodeAccountStore,
         paste: PasteSettings
     ) -> HistoryWindowModel {
         // Rows read thumbnails and the preview reads full images from the same blobs the store keeps.
         let previews = PreviewServices(blobs: media.blobs, images: media.previewImages, richText: media.previewRichText)
         return HistoryWindowModel(
-            history: store, deleter: deleter, previews: previews, pastesAfterChoosing: { paste.isOn })
+            history: store, deleter: deleter, previews: previews, codes: codes, pastesAfterChoosing: { paste.isOn })
     }
 
     /// Pastes into the app in front, never into this one.
@@ -150,20 +190,34 @@ final class AppContainer: HistoryShowing {
         )
     }
 
-    private static func connect(
-        _ activityObserver: SystemActivityObserver,
-        to historyWindow: HistoryWindowController,
-        storage: any HistoryStorage
-    ) {
+    /// Watches sleep, the lock screen and user switches, and connects what happens then to the window and the
+    /// saved secrets.
+    private static func makeActivityObserver(
+        system: AppServices.System,
+        monitor: ClipboardMonitor,
+        historyWindow: HistoryWindowController,
+        storage: any HistoryStorage,
+        codes: CodeAccountStore
+    ) -> SystemActivityObserver {
+        let activityObserver = SystemActivityObserver(
+            monitor: monitor,
+            workspace: system.workspaceNotifications,
+            distributed: system.distributedNotifications,
+            isScreenLocked: system.isScreenLocked,
+            isSessionActive: system.isSessionActive
+        )
         // Close the history when the Mac sleeps, locks or switches users, so it is not on screen for whoever
         // wakes or unlocks it next.
         activityObserver.onUserAway = { [weak historyWindow] in
             historyWindow?.hide()
         }
-        // Saved passwords wait while the Keychain is locked: try the key again when the user is back.
-        activityObserver.onUserBack = { [weak storage] in
+        // Saved passwords and code accounts wait while the Keychain is locked: try the key again when the user is
+        // back.
+        activityObserver.onUserBack = { [weak storage, weak codes] in
             loadPasswordKey(of: storage)
+            loadCodes(codes)
         }
+        return activityObserver
     }
 
     /// Images are recorded only with a way to make thumbnails, and copied photo and video files get thumbnails only
@@ -189,8 +243,9 @@ final class AppContainer: HistoryShowing {
         activityObserver.start()
         monitor.start()
         // Saved passwords are opened once their key is loaded, off the main actor: reading the Keychain can wait
-        // for the user to answer a prompt, and the launch does not wait for it.
+        // for the user to answer a prompt, and the launch does not wait for it. The same for code accounts.
         Self.loadPasswordKey(of: storage)
+        Self.loadCodes(codes)
     }
 
     /// Loads the key of saved passwords in the background, when passwords wait for it.

@@ -84,10 +84,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // One store for the history and the work that saves images in the background, so neither deletes what the
         // other is about to use.
         let blobs = InFlightBlobStore.openSaved()
+        // One key for saved passwords and code accounts, asked of the Keychain once.
+        let sealer = LazySecretSealer.keychain()
         // The saved history is decoded in the background; the app starts watching the clipboard once it is loaded.
         Task {
-            let history = await AppHistory.loadSaved(blobs: blobs, defaults: .standard)
-            finishLaunching(history: history, blobs: blobs, firstLaunch: firstLaunch)
+            let history = await AppHistory.loadSaved(blobs: blobs, defaults: .standard, sealer: sealer)
+            finishLaunching(history: history, blobs: blobs, sealer: sealer, firstLaunch: firstLaunch)
         }
     }
 
@@ -106,8 +108,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             running: running)
     }
 
-    private func finishLaunching(history: AppHistory, blobs: InFlightBlobStore?, firstLaunch: FirstLaunch) {
-        let container = AppContainer(history: history, services: .live(blobs: blobs), defaults: .standard)
+    private func finishLaunching(
+        history: AppHistory, blobs: InFlightBlobStore?, sealer: any SecretSealing, firstLaunch: FirstLaunch
+    ) {
+        let container = AppContainer(
+            history: history, services: .live(blobs: blobs, sealer: sealer), defaults: .standard)
         KeyboardShortcuts.onKeyDown(for: .toggleHistoryWindow) { [weak container] in
             container?.toggleHistory()
         }

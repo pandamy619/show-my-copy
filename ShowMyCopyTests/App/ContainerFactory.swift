@@ -41,7 +41,8 @@ enum ContainerFactory {
         media: AppServices.Media = .none,
         settingsWindow: SettingsWindowSpy = SettingsWindowSpy(),
         loginItem: FakeLoginItem = FakeLoginItem(),
-        paste: AppServices.Paste = .fake()
+        paste: AppServices.Paste = .fake(),
+        codes: AppServices.Codes = .fake()
     ) -> AppServices {
         AppServices(
             pasteboard: pasteboard,
@@ -59,6 +60,7 @@ enum ContainerFactory {
             ),
             media: media,
             paste: paste,
+            codes: codes,
             memoryReader: NoMemoryUsage(),
             loginItem: loginItem,
             makeSettingsWindow: { settings, copyText in
