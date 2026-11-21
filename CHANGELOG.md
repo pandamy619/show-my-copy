@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0] - 2026-11-21
+
+One-time codes from Google Authenticator, and the fixes of a security audit of 0.1.0. Requires macOS 15 Sequoia or later.
 
 ### Codes
 

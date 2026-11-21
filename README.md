@@ -26,7 +26,7 @@
 
 Requires macOS 15 Sequoia or later. Because the app is not signed by Apple, after an update macOS may ask again for the Keychain key that encrypts saved passwords (click **Always Allow**) and for the paste permission in **Privacy & Security → Accessibility**.
 
-## Current status (0.1.0)
+## Current status (0.2.0)
 
 Show My Copy is in early development. Download the latest [release](https://github.com/pandamy619/show-my-copy/releases) or build it from source. What works now:
 
