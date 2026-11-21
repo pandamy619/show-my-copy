@@ -64,6 +64,9 @@ struct AppServices {
         var access: any PasteAccessChecking
         /// Sends ⌘V.
         var keystrokes: any PasteKeystrokePosting
+        /// The process of the app in front, so ⌘V goes to the very process that was in front, not another copy of
+        /// the same app. Nil when no app is in front.
+        var frontmostProcess: @MainActor () -> pid_t?
         /// Opens Privacy & Security → Accessibility in System Settings, for the button under the setting.
         var systemSettings: any AccessibilitySettingsOpening
         /// How the paster waits for the history window to give key focus back (`PasteTiming`): exactly, unlike

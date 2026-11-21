@@ -21,6 +21,29 @@ import sys
 from typing import Dict, List, Optional, Tuple
 
 PROJECT = "ShowMyCopy.xcodeproj"
+PACKAGE_RESOLVED = PROJECT + "/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+DEPENDENCIES_FILE = "docs/DEPENDENCIES.md"
+# How many leading characters of a package's resolved revision DEPENDENCIES.md must quote, in backticks.
+REVISION_PREFIX = 7
+
+# Mach-O code in the signed app may link none of these frameworks (`otool -L`) and reference none of these symbols
+# (`nm -u`): the app never talks to the network, and the signed binary is where that is finally checked.
+FORBIDDEN_LINKED_LIBRARIES = (
+    "CFNetwork.framework",
+    "Network.framework",
+    "NetworkExtension.framework",
+    "WebKit.framework",
+    "SafariServices.framework",
+)
+FORBIDDEN_SYMBOLS = re.compile(
+    r"NSURLSession|NSURLConnection|CFURLSession|CFHTTPMessage|CFHTTPStream|nw_connection|nw_listener|nw_browser"
+    r"|nw_path_monitor|CFSocket|CFStreamCreatePairWithSocket|CFReadStreamCreateWithFTPURL"
+    r"|(?<![A-Za-z0-9])_(socket|connect|bind|listen|accept|getaddrinfo|sendto|recvfrom)$"
+)
+MACH_O_MAGIC = (
+    b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe",
+    b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",
+)
 
 # --------------------------------------------------------------------------------------------
 # Allowlists. This is the ONE place to extend what the app may do. Adding an entry here is a
@@ -572,6 +595,81 @@ def check_packages(objects: dict) -> List[str]:
     return errors
 
 
+def _project_packages(objects: dict) -> Dict[str, Tuple[str, str]]:
+    """{package name (the repository's last path component): (repository URL, exact version)}."""
+    packages = {}
+    for obj in objects.values():
+        if isinstance(obj, dict) and obj.get("isa") == "XCRemoteSwiftPackageReference":
+            url = str(obj.get("repositoryURL", ""))
+            requirement = obj.get("requirement") if isinstance(obj.get("requirement"), dict) else {}
+            name = url.rstrip("/").rsplit("/", 1)[-1]
+            if name.endswith(".git"):
+                name = name[:-4]
+            packages[name] = (url, str(requirement.get("version", "")))
+    return packages
+
+
+def check_resolved_packages(root: str, objects: dict) -> List[str]:
+    """Package.resolved pins exactly the project's packages, at their exact versions, and every package is listed in
+    DEPENDENCIES.md with that version and the revision it resolved to: a package that was not reviewed, or moved to a
+    revision nobody looked at, fails."""
+    packages = _project_packages(objects)
+    if not packages:
+        return []
+    errors = []
+    resolved_path = os.path.join(root, PACKAGE_RESOLVED)
+    try:
+        with open(resolved_path, encoding="utf-8") as handle:
+            resolved = json.load(handle)
+    except (OSError, ValueError) as error:
+        return ["cannot read %s: %s" % (PACKAGE_RESOLVED, error)]
+    pins = {}
+    for pin in resolved.get("pins", []) if isinstance(resolved, dict) else []:
+        if isinstance(pin, dict):
+            pins[str(pin.get("identity", "")).lower()] = pin
+    try:
+        with open(os.path.join(root, DEPENDENCIES_FILE), encoding="utf-8") as handle:
+            dependencies = handle.read()
+    except OSError as error:
+        return ["cannot read %s: %s" % (DEPENDENCIES_FILE, error)]
+    for name, (url, version) in sorted(packages.items()):
+        pin = pins.pop(name.lower(), None)
+        if pin is None:
+            errors.append("%s: package %s (%s) is not pinned" % (PACKAGE_RESOLVED, name, url))
+            continue
+        state = pin.get("state") if isinstance(pin.get("state"), dict) else {}
+        pinned_version = str(state.get("version", ""))
+        revision = str(state.get("revision", ""))
+        if pinned_version != version:
+            errors.append(
+                "%s: package %s is pinned to %s but the project asks for %s"
+                % (PACKAGE_RESOLVED, name, pinned_version or "(no version)", version or "(no version)")
+            )
+        if not re.fullmatch(r"[0-9a-f]{40}", revision):
+            errors.append("%s: package %s has no revision" % (PACKAGE_RESOLVED, name))
+            continue
+        if not _dependency_listed(dependencies, url, version, revision):
+            errors.append(
+                "%s: package %s must be listed in a table row with %s, version %s and the revision %s (at least %d "
+                "characters, in backticks)" % (DEPENDENCIES_FILE, name, url, version, revision[:7], REVISION_PREFIX)
+            )
+    for identity, pin in sorted(pins.items()):
+        errors.append(
+            "%s: pins %s (%s), which the project does not use" % (PACKAGE_RESOLVED, identity, pin.get("location", "?"))
+        )
+    return errors
+
+
+def _dependency_listed(dependencies: str, url: str, version: str, revision: str) -> bool:
+    for line in dependencies.splitlines():
+        if not line.startswith("|") or url not in line or version not in line:
+            continue
+        for prefix in re.findall(r"`([0-9a-f]{%d,40})`" % REVISION_PREFIX, line):
+            if revision.startswith(prefix):
+                return True
+    return False
+
+
 def check_project(root: str, use_xcodebuild: bool) -> List[str]:
     try:
         targets, objects = project_targets(root)
@@ -584,6 +682,7 @@ def check_project(root: str, use_xcodebuild: bool) -> List[str]:
         for config, settings in sorted(configs.items()):
             errors.extend(check_target_settings(root, name, product_type, config, settings))
     errors.extend(check_packages(objects))
+    errors.extend(check_resolved_packages(root, objects))
     if use_xcodebuild:
         # Second opinion from Xcode itself: resolved settings, including defaults and .xcconfig files.
         config_names = sorted({config for _, _, configs in targets for config in configs})
@@ -975,6 +1074,47 @@ def check_signed_app(app: str) -> List[str]:
         if not _has_hardened_runtime(path):
             errors.append("%s: hardened runtime flag is not set" % where)
     errors.extend(check_app_has_no_debug_only_strings(app))
+    errors.extend(check_app_links_no_network(app))
+    return errors
+
+
+def _mach_o_files(app: str) -> List[str]:
+    found = []
+    for path in _walk(app):
+        if os.path.islink(path):
+            continue
+        try:
+            with open(path, "rb") as handle:
+                magic = handle.read(4)
+        except OSError:
+            continue  # reported by check_app_has_no_debug_only_strings
+        if magic in MACH_O_MAGIC:
+            found.append(path)
+    return found
+
+
+def check_app_links_no_network(app: str) -> List[str]:
+    """No Mach-O file in the app links a networking framework or references a networking symbol."""
+    for tool in ("otool", "nm"):
+        if shutil.which(tool) is None:
+            return ["%s not found; the app's linked libraries and symbols can only be checked on macOS" % tool]
+    errors = []
+    top = os.path.dirname(os.path.abspath(app))
+    for path in _mach_o_files(app):
+        where = os.path.relpath(path, top)
+        links = subprocess.run(["otool", "-L", path], capture_output=True, timeout=300)
+        if links.returncode != 0:
+            errors.append("%s: otool -L failed: %s" % (where, links.stderr.decode(errors="replace").strip()))
+        for line in links.stdout.decode(errors="replace").splitlines()[1:]:
+            library = line.strip().split(" (")[0]
+            if any(library.endswith(name) or ("/" + name + "/") in library for name in FORBIDDEN_LINKED_LIBRARIES):
+                errors.append("%s: links %s" % (where, library))
+        symbols = subprocess.run(["nm", "-u", path], capture_output=True, timeout=300)
+        if symbols.returncode != 0:
+            errors.append("%s: nm -u failed: %s" % (where, symbols.stderr.decode(errors="replace").strip()))
+        for symbol in symbols.stdout.decode(errors="replace").split():
+            if FORBIDDEN_SYMBOLS.search(symbol):
+                errors.append("%s: references the networking symbol %s" % (where, symbol))
     return errors
 
 

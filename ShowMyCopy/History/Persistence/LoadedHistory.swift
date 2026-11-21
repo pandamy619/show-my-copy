@@ -14,6 +14,9 @@ struct FoundRecords: Sendable {
     /// Records a newer version of the app wrote (`StoredEntryCoder.Decoded.newerFormat`): left on disk untouched,
     /// with their blobs, for that version. Listed so the count can be logged.
     var newer: [UUID] = []
+    /// Records whose blobs could not be looked at now (`BlobPresence.unknown`): left on disk, with their blobs, and
+    /// loaded at a launch that can see them.
+    var unchecked: [UUID] = []
 }
 
 /// The saved history found at launch, read and sorted: what `PersistentHistoryStore` starts from.
@@ -113,7 +116,8 @@ struct LoadedHistory: Sendable {
 /// How `PersistentHistoryStore` sorts the records it loads at launch and finds the blobs no record uses.
 enum SavedRecords {
     /// Sorts the saved records into entries to load and records to delete. Records with blobs while there is no
-    /// blob store, and records of a newer version of the app, are in neither: they stay on disk.
+    /// blob store or while a blob cannot be looked at, and records of a newer version of the app, are in neither:
+    /// they stay on disk.
     static func sort(
         _ records: [StoredEntryRecord],
         coder: StoredEntryCoder,
@@ -128,35 +132,79 @@ enum SavedRecords {
                 found.unwanted.append(record.id)
                 continue
             }
-            var missing: Set<BlobID> = []
-            if !record.blobIDs.isEmpty {
-                guard let blobs else {
-                    // Nowhere to read the data from now; a later launch with the blob store loads it.
-                    continue
-                }
-                missing = Set(record.blobIDs.map { BlobID(uuid: $0) }.filter { !blobs.contains($0) })
+            let missing: Set<BlobID>
+            switch missingBlobs(of: record, in: blobs) {
+            case .checked(let gone):
+                missing = gone
+            case .noStore:
+                // Nowhere to read the data from now; a later launch with the blob store loads it.
+                continue
+            case .unknown:
+                // Not deleted for a blob that may well be there: an uncertain state is not a reason to delete.
+                found.unchecked.append(record.id)
+                continue
             }
-            switch coder.decode(record) {
-            case .entry(let entry):
-                // An image whose data is gone is deleted; files whose thumbnails are gone keep their icons.
-                guard let content = entry.content.droppingBlobs(missing) else {
-                    found.unreadable.append(record.id)
-                    continue
-                }
-                found.entries.append(content == entry.content ? entry : entry.replacingContent(content))
-            case .unreadable:
-                found.unreadable.append(record.id)
-            case .waitsForKey:
-                found.unopened.append(record)
-            case .newerFormat:
-                found.newer.append(record.id)
-            }
+            place(record, decodedBy: coder, missing: missing, in: &found)
         }
         if !found.newer.isEmpty {
             AppLogger.history.info(
                 "Leaving \(found.newer.count, privacy: .public) saved entries of a newer version of the app alone")
         }
+        if !found.unchecked.isEmpty {
+            AppLogger.history.error(
+                "Leaving \(found.unchecked.count, privacy: .public) saved entries whose images could not be looked at")
+        }
         return found
+    }
+
+    /// Puts the record where what `coder` makes of it says, with the blobs in `missing` dropped from its content.
+    private static func place(
+        _ record: StoredEntryRecord, decodedBy coder: StoredEntryCoder, missing: Set<BlobID>,
+        in found: inout FoundRecords
+    ) {
+        switch coder.decode(record) {
+        case .entry(let entry):
+            // An image whose data is gone is deleted; files whose thumbnails are gone keep their icons.
+            guard let content = entry.content.droppingBlobs(missing) else {
+                found.unreadable.append(record.id)
+                return
+            }
+            found.entries.append(content == entry.content ? entry : entry.replacingContent(content))
+        case .unreadable:
+            found.unreadable.append(record.id)
+        case .waitsForKey:
+            found.unopened.append(record)
+        case .newerFormat:
+            found.newer.append(record.id)
+        }
+    }
+
+    private enum BlobCheck {
+        case checked(missing: Set<BlobID>)
+        case noStore
+        case unknown
+    }
+
+    /// Which of the record's blobs are gone, or why that cannot be told now.
+    private static func missingBlobs(of record: StoredEntryRecord, in blobs: (any BlobStore)?) -> BlobCheck {
+        guard !record.blobIDs.isEmpty else {
+            return .checked(missing: [])
+        }
+        guard let blobs else {
+            return .noStore
+        }
+        var missing: Set<BlobID> = []
+        for id in record.blobIDs.map({ BlobID(uuid: $0) }) {
+            switch blobs.presence(of: id) {
+            case .present:
+                continue
+            case .missing:
+                missing.insert(id)
+            case .unknown:
+                return .unknown
+            }
+        }
+        return .checked(missing: missing)
     }
 
     /// Keeps one entry per content hash. The history never holds two, but the disk can: two processes of the app

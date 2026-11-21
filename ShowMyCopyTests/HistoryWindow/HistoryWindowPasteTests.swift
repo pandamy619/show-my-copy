@@ -212,6 +212,7 @@ struct HistoryWindowPasteTests {
             let textEdit = SourceApp(bundleIdentifier: "com.apple.TextEdit", name: "TextEdit")
             let paster = EntryPaster(
                 pasteboard: pasteboard, keystrokes: keystrokes, settings: settings, frontmostApp: { textEdit },
+                frontmostProcess: { nil },
                 ownBundleIdentifier: "com.example.ShowMyCopy", sleep: { _ in }, tuning: { .standard })
             let copier = EntryCopier(history: history, pasteboard: pasteboard, monitor: monitor)
             history.record(text: "hunter2", sourceApp: nil, at: start, concealed: true, expiresAt: .distantFuture)

@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 
 @testable import ShowMyCopy
@@ -34,7 +35,7 @@ private final class StoreOpeningSpy {
 
 @MainActor
 struct HistoryStoreOpenerTests {
-    static let sqliteHeader = Data("SQLite format 3\0".utf8) + Data(count: 84)
+    nonisolated static let sqliteHeader = Data("SQLite format 3\0".utf8) + Data(count: 84)
     private let spy = StoreOpeningSpy()
 
     private let now = Date(timeIntervalSince1970: 1_790_000_000)
@@ -64,6 +65,22 @@ struct HistoryStoreOpenerTests {
         try TemporaryFolder.write(data, to: "History.store", in: folder)
         try TemporaryFolder.write(to: "History.store-wal", in: folder)
     }
+
+    /// A real, intact SQLite database with one table, as another build of the app might leave it.
+    nonisolated static func intactDatabase(at url: URL) throws {
+        var database: OpaquePointer?
+        let path = url.path(percentEncoded: false)
+        guard sqlite3_open_v2(path, &database, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK else {
+            throw IntactDatabaseError()
+        }
+        defer { sqlite3_close(database) }
+        guard sqlite3_exec(database, "CREATE TABLE history(id TEXT PRIMARY KEY, body BLOB)", nil, nil, nil) == SQLITE_OK
+        else {
+            throw IntactDatabaseError()
+        }
+    }
+
+    struct IntactDatabaseError: Error {}
 
     private func storeData(in folder: URL, named name: String = "History.store") throws -> Data {
         try #require(FileManager.default.contents(atPath: folder.appending(path: name).path(percentEncoded: false)))
@@ -132,6 +149,28 @@ struct HistoryStoreOpenerTests {
                         == Self.sqliteHeader + Data("history".utf8))
                 #expect(TemporaryFolder.exists("History.store.damaged-wal", in: folder))
                 #expect(!TemporaryFolder.exists("History.store-wal", in: folder))
+            }
+        }
+    }
+
+    /// Another build's schema, a full disk or a busy store leave an intact database: it is never moved aside,
+    /// however many launches fail, since the disk may clear up or the other build run again.
+    @Test func anIntactDatabaseThatCannotBeOpenedIsNeverMovedAside() throws {
+        try TemporaryFolder.with { folder in
+            try TestDefaults.with { defaults in
+                try Self.intactDatabase(at: folder.appending(path: "History.store"))
+                let saved = try storeData(in: folder)
+                spy.failsWhileTheStoreExists = true
+
+                for _ in 0...HistoryStoreOpener.failedLaunchesBeforeReset {
+                    let opened = open(in: folder, defaults: defaults)
+                    #expect(opened.error == .openFailed)
+                    #expect(opened.persistence is InMemoryHistoryPersistence)
+                }
+
+                #expect(defaults.object(forKey: HistoryStoreOpener.failedLaunchesKey) == nil)
+                #expect(try storeData(in: folder) == saved)
+                #expect(!TemporaryFolder.exists("History.store.damaged", in: folder))
             }
         }
     }
@@ -247,6 +286,43 @@ struct HistoryStoreOpenerTests {
                 #expect(abs(date.timeIntervalSince(now)) < 1)
                 #expect(open(in: folder, defaults: defaults, at: now + 3600).leftovers?.hasFiles() == true)
             }
+        }
+    }
+}
+
+struct SQLiteIntegrityTests {
+    @Test func anIntactDatabaseIsIntact() throws {
+        try TemporaryFolder.with { folder in
+            let url = folder.appending(path: "History.store")
+            try HistoryStoreOpenerTests.intactDatabase(at: url)
+            #expect(SQLiteIntegrity.quickCheck(url) == .intact)
+        }
+    }
+
+    @Test(arguments: [
+        HistoryStoreOpenerTests.sqliteHeader + Data("history".utf8), HistoryStoreOpenerTests.sqliteHeader,
+        Data("not a database".utf8),
+    ])
+    func aFileSQLiteCannotReadIsDamaged(contents: Data) throws {
+        try TemporaryFolder.with { folder in
+            try TemporaryFolder.write(contents, to: "History.store", in: folder)
+            #expect(SQLiteIntegrity.quickCheck(folder.appending(path: "History.store")) == .damaged)
+        }
+    }
+
+    @Test func aDatabaseCutShortIsDamaged() throws {
+        try TemporaryFolder.with { folder in
+            let url = folder.appending(path: "History.store")
+            try HistoryStoreOpenerTests.intactDatabase(at: url)
+            let whole = try #require(FileManager.default.contents(atPath: url.path(percentEncoded: false)))
+            try whole.prefix(whole.count / 2).write(to: url)
+            #expect(SQLiteIntegrity.quickCheck(url) == .damaged)
+        }
+    }
+
+    @Test func aMissingFileCannotBeChecked() throws {
+        try TemporaryFolder.with { folder in
+            #expect(SQLiteIntegrity.quickCheck(folder.appending(path: "History.store")) == .unknown)
         }
     }
 }

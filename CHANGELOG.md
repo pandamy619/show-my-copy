@@ -15,6 +15,11 @@
 - History entries saved by a newer version of the app (a kind, encryption format or layout this version does not know) are left on disk untouched, with their images, instead of being deleted as unreadable; Clear History still removes them.
 - The encryption key is looked for in every keychain before a new one is made, so a key in the login keychain goes on being used if a later build can use the data protection keychain. A Keychain that is not available right after login is asked again when the Mac is unlocked, like a locked one.
 - The icon of a copied file that is a symbolic link comes from its name, so the link is never followed; volumes whose names cannot be read make every copied path count as remote.
+- A history store that will not open is moved aside only when SQLite itself finds it damaged on several launches; an intact one (another build's, a full disk) stays where it is. The store's side files are moved before the store, so a failed move cannot leave a log for a new, empty store to replay.
+- An image whose saved file cannot be looked at (not missing, only unreadable now) keeps its entry; before, it was deleted like a missing one.
+- Previews of styled text clamp indents, spacing, line heights, kerning and baseline offsets, and drop tab stops, so an RTF cannot ask for a layout that takes seconds.
+- Paste after choosing an entry checks that the app in front is the same process, not only an app with the same bundle identifier and name.
+- `make security` fails when any code in the app links CFNetwork, Network, WebKit or SafariServices or references a networking symbol, and `make lint` fails when `Package.resolved` or DEPENDENCIES.md disagree with the project's packages.
 
 ## [0.1.0] - 2026-11-09
 

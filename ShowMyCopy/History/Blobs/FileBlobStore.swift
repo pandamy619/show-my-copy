@@ -100,7 +100,21 @@ struct FileBlobStore: BlobStore {
     }
 
     func size(of id: BlobID) -> Int? {
-        fileSize(at: url(for: id))
+        if case .bytes(let size) = fileSize(at: url(for: id)) {
+            return size
+        }
+        return nil
+    }
+
+    func presence(of id: BlobID) -> BlobPresence {
+        switch fileSize(at: url(for: id)) {
+        case .bytes:
+            .present
+        case .missing:
+            .missing
+        case .unreadable:
+            .unknown
+        }
     }
 
     func totalBytes() -> Int64 {
@@ -111,6 +125,14 @@ struct FileBlobStore: BlobStore {
             return 0
         }
         return ids.reduce(0) { $0 + Int64(size(of: $1) ?? 0) }
+    }
+
+    /// What `attributesOfItem` found at a blob's path.
+    private enum FileSize {
+        case bytes(Int)
+        case missing
+        /// The file is there, or may be, but its metadata could not be read.
+        case unreadable
     }
 
     /// Only files named by a blob ID count; anything else in the folder, such as `.DS_Store`, is left alone.
@@ -129,17 +151,20 @@ struct FileBlobStore: BlobStore {
         directory.appending(path: id.uuid.uuidString, directoryHint: .notDirectory)
     }
 
-    private func fileSize(at url: URL) -> Int? {
+    private func fileSize(at url: URL) -> FileSize {
         let path = url.path(percentEncoded: false)
         guard FileManager.default.fileExists(atPath: path) else {
-            return nil
+            return .missing
         }
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: path)
-            return (attributes[.size] as? NSNumber)?.intValue
+            guard let size = (attributes[.size] as? NSNumber)?.intValue else {
+                return .unreadable
+            }
+            return .bytes(size)
         } catch {
             AppLogger.history.error("Could not read the size of a saved image")
-            return nil
+            return .unreadable
         }
     }
 }

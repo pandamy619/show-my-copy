@@ -66,6 +66,10 @@ final class InFlightBlobStore: BlobStore {
         base.size(of: id)
     }
 
+    func presence(of id: BlobID) -> BlobPresence {
+        base.presence(of: id)
+    }
+
     func totalBytes() -> Int64 {
         base.totalBytes()
     }

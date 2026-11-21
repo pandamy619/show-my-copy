@@ -187,6 +187,7 @@ final class AppContainer: HistoryShowing {
             keystrokes: services.paste.keystrokes,
             settings: settings,
             frontmostApp: services.system.frontmostApp,
+            frontmostProcess: services.paste.frontmostProcess,
             ownBundleIdentifier: Bundle.main.bundleIdentifier,
             sleep: services.paste.sleep,
             tuning: services.paste.tuning

@@ -31,11 +31,15 @@ struct EntryPasterTests {
     private let window = HistoryWindowState()
     private let timing = PasteTiming.standard
 
-    /// The app in front, as the paster sees it; tests change it as the user would.
+    /// The app in front and its process, as the paster sees them; tests change them as the user would.
     @MainActor
     private final class Front {
         var app: SourceApp?
-        init(_ app: SourceApp?) { self.app = app }
+        var process: pid_t?
+        init(_ app: SourceApp?, process: pid_t? = 501) {
+            self.app = app
+            self.process = app == nil ? nil : process
+        }
     }
 
     /// What the paster reads for the next paste, as debug overrides change it.
@@ -67,6 +71,7 @@ struct EntryPasterTests {
             keystrokes: keystrokes,
             settings: settings,
             frontmostApp: { front.app },
+            frontmostProcess: { front.process },
             ownBundleIdentifier: ownBundleIdentifier,
             sleep: wait.sleep,
             tuning: tuning
@@ -166,6 +171,7 @@ struct EntryPasterTests {
                 keystrokes: keystrokes,
                 settings: settings,
                 frontmostApp: { textEdit },
+                frontmostProcess: { 501 },
                 ownBundleIdentifier: ownBundleIdentifier,
                 sleep: { _ in throw CancellationError() },
                 tuning: { .standard }
@@ -261,6 +267,19 @@ struct EntryPasterTests {
             let front = Front(textEdit)
             let (paster, _) = makePaster(defaults: defaults, front: front)
             wait.meanwhile = { front.app = safari }
+
+            #expect(await paste(paster, copiedAt: copyChosenEntry()) == .appChanged)
+            #expect(keystrokes.postCount == 0)
+        }
+    }
+
+    /// Two copies of one app look the same by bundle identifier and name; ⌘V goes only to the very process that was
+    /// in front when the window closed.
+    @Test func anotherCopyOfTheSameAppMeanwhileIsNotPastedInto() async throws {
+        try await ContainerFactory.withDefaults { defaults in
+            let front = Front(textEdit, process: 501)
+            let (paster, _) = makePaster(defaults: defaults, front: front)
+            wait.meanwhile = { front.process = 502 }
 
             #expect(await paste(paster, copiedAt: copyChosenEntry()) == .appChanged)
             #expect(keystrokes.postCount == 0)

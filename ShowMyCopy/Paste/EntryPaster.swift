@@ -45,7 +45,8 @@ protocol EntryPasting: AnyObject {
 /// 1. macOS lets the app post key events (checked first too, so a paste without the privilege does not wait),
 /// 2. the clipboard still holds what the app wrote (its change count is the one the copy returned): something copied
 ///    in between would be pasted instead,
-/// 3. the app in front is the one that was in front when the window closed, and not this app,
+/// 3. the app in front is the one that was in front when the window closed, the same process and not only an app
+///    with the same bundle identifier and name (two copies of one app), and not this app,
 /// 4. the history window is not on screen: when it did not go in time, or the user opened it again, ⌘V would land in
 ///    its search field.
 ///
@@ -57,6 +58,8 @@ final class EntryPaster: EntryPasting {
     private let keystrokes: any PasteKeystrokePosting
     private let settings: PasteSettings
     private let frontmostApp: @MainActor () -> SourceApp?
+    /// The process of the app in front, read right after `frontmostApp`, so two copies of one app are told apart.
+    private let frontmostProcess: @MainActor () -> pid_t?
     /// This app's bundle identifier: ⌘V is never sent to this app.
     private let ownBundleIdentifier: String?
     private let sleep: @Sendable (Duration) async throws -> Void
@@ -68,6 +71,7 @@ final class EntryPaster: EntryPasting {
         keystrokes: any PasteKeystrokePosting,
         settings: PasteSettings,
         frontmostApp: @escaping @MainActor () -> SourceApp?,
+        frontmostProcess: @escaping @MainActor () -> pid_t?,
         ownBundleIdentifier: String?,
         sleep: @escaping @Sendable (Duration) async throws -> Void,
         tuning: @escaping @MainActor () -> PasteTuning
@@ -76,6 +80,7 @@ final class EntryPaster: EntryPasting {
         self.keystrokes = keystrokes
         self.settings = settings
         self.frontmostApp = frontmostApp
+        self.frontmostProcess = frontmostProcess
         self.ownBundleIdentifier = ownBundleIdentifier
         self.sleep = sleep
         self.tuning = tuning
@@ -90,11 +95,14 @@ final class EntryPaster: EntryPasting {
             return finished(.noAccess)
         }
         let target = frontmostApp()
+        let targetProcess = frontmostProcess()
         let tuning = tuning()
         return Task { @MainActor in
             await tuning.timing.waitForFocus(windowIsGone: historyWindowIsGone, sleep: sleep)
             return finish(
-                post(copiedAt: changeCount, into: target, historyWindowIsGone: historyWindowIsGone, style: tuning.style)
+                post(
+                    copiedAt: changeCount, into: target, process: targetProcess,
+                    historyWindowIsGone: historyWindowIsGone, style: tuning.style)
             )
         }
     }
@@ -106,6 +114,7 @@ final class EntryPaster: EntryPasting {
     private func post(
         copiedAt changeCount: Int,
         into target: SourceApp?,
+        process: pid_t?,
         historyWindowIsGone: () -> Bool,
         style: PastePostingStyle
     ) -> PasteOutcome {
@@ -116,7 +125,7 @@ final class EntryPaster: EntryPasting {
         guard pasteboard.changeCount == changeCount else {
             return .clipboardChanged
         }
-        guard let target, !isThisApp(target), frontmostApp() == target else {
+        guard let target, !isThisApp(target), frontmostApp() == target, frontmostProcess() == process else {
             return .appChanged
         }
         guard historyWindowIsGone() else {

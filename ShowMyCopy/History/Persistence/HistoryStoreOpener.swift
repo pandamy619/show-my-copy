@@ -18,8 +18,10 @@ struct OpenedHistory {
 /// (`openFailed`). It is moved aside to `History.store.damaged` (`storeReset`), and a new store started, only when
 ///
 /// - the file is not a SQLite database at all, so no build can open it, or
-/// - it failed to open on `failedLaunchesBeforeReset` launches in a row; one launch that opens it starts the count
-///   again. Without this, a database that is damaged inside would keep the history in memory for good.
+/// - SQLite itself finds it damaged (`SQLiteIntegrity.quickCheck`) on `failedLaunchesBeforeReset` launches in a
+///   row; one launch that opens it starts the count again. Without this, a database that is damaged inside would
+///   keep the history in memory for good. A database SQLite finds intact, or cannot check now, never counts: it may
+///   be another build's, or the disk may be full, and it opens again once that passes.
 ///
 /// Only the latest damaged copy is kept, and for `damagedCopyLifetime` at most: it is there so the history can
 /// still be recovered by hand, or opened by the build that wrote it, but it holds everything that was copied and is
@@ -77,13 +79,18 @@ struct HistoryStoreOpener {
             AppLogger.history.error("The history store is not a database; moving it aside")
             return reset()
         case .database:
+            guard SQLiteIntegrity.quickCheck(storeURL) == .damaged else {
+                AppLogger.history.error(
+                    "Could not open the history store, which SQLite does not find damaged; leaving it as it is")
+                return inMemory()
+            }
             let failedLaunches = defaults.integer(forKey: Self.failedLaunchesKey) + 1
             guard failedLaunches < Self.failedLaunchesBeforeReset else {
-                AppLogger.history.error("The history store failed to open on several launches; moving it aside")
+                AppLogger.history.error("The damaged history store failed to open on several launches; moving it aside")
                 return reset()
             }
             defaults.set(failedLaunches, forKey: Self.failedLaunchesKey)
-            AppLogger.history.error("Could not open the history store; leaving it as it is for this launch")
+            AppLogger.history.error("Could not open the damaged history store; leaving it as it is for this launch")
             return inMemory()
         case .missing, .unreadable:
             AppLogger.history.error("Could not open or create the history store; keeping the history in memory only")
@@ -142,10 +149,14 @@ struct HistoryStoreOpener {
 
     /// Moves the store and its SQLite side files to `damagedStoreFileName`, replacing an older damaged copy, and
     /// dates the copy now, so its lifetime counts from the move and not from its last write.
+    ///
+    /// The side files go first and the store last: a move that fails halfway then leaves the store in place without
+    /// a log, which SQLite opens, rather than a log without its store, which SQLite would replay into the new, empty
+    /// store at the next launch. A copy that could not be dated still counts as moved.
     private func moveAside() throws {
         let fileManager = FileManager.default
         let moves = zip(StoreFiles.urls(forStoreAt: storeURL), StoreFiles.urls(forStoreAt: damagedStoreURL))
-        for (source, destination) in moves {
+        for (source, destination) in moves.reversed() {
             if fileManager.fileExists(atPath: destination.path(percentEncoded: false)) {
                 try fileManager.removeItem(at: destination)
             }
@@ -153,9 +164,14 @@ struct HistoryStoreOpener {
                 try fileManager.moveItem(at: source, to: destination)
             }
         }
-        if fileManager.fileExists(atPath: damagedStoreURL.path(percentEncoded: false)) {
-            try fileManager.setAttributes(
-                [.modificationDate: now], ofItemAtPath: damagedStoreURL.path(percentEncoded: false))
+        let path = damagedStoreURL.path(percentEncoded: false)
+        guard fileManager.fileExists(atPath: path) else {
+            return
+        }
+        do {
+            try fileManager.setAttributes([.modificationDate: now], ofItemAtPath: path)
+        } catch {
+            AppLogger.history.error("Could not date the damaged copy of the history; it keeps its last write's date")
         }
     }
 

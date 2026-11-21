@@ -140,6 +140,47 @@ struct AppKitRichTextRendererTests {
         #expect(font.pointSize == 48)
     }
 
+    @Test func clampsSpacingIndentsAndTabStops() throws {
+        // Twips: 200000 is 10000 points of indent and spacing, 100000 of kerning. Each stays within its range, and
+        // the tab stops are dropped.
+        let rtf =
+            #"{\rtf1\ansi\pard\li200000\fi200000\ri200000\sa200000\sb200000\sl200000\slmult1"#
+            + #"\tx100\tx200\tx300\expndtw100000\up500 Spaced}"#
+        let text = try render(rtf)
+        let paragraph = try #require(text.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+        #expect(paragraph.headIndent <= RichTextPreviewPolicy.indents.upperBound)
+        #expect(paragraph.firstLineHeadIndent <= RichTextPreviewPolicy.indents.upperBound)
+        #expect(paragraph.tailIndent >= -RichTextPreviewPolicy.indents.upperBound)
+        #expect(paragraph.tailIndent <= 0)
+        #expect(paragraph.paragraphSpacing <= RichTextPreviewPolicy.paragraphSpacings.upperBound)
+        #expect(paragraph.paragraphSpacingBefore <= RichTextPreviewPolicy.paragraphSpacings.upperBound)
+        #expect(paragraph.lineSpacing <= RichTextPreviewPolicy.paragraphSpacings.upperBound)
+        #expect(paragraph.maximumLineHeight <= RichTextPreviewPolicy.paragraphSpacings.upperBound)
+        #expect(paragraph.lineHeightMultiple <= RichTextPreviewPolicy.lineHeightMultiples.upperBound)
+        #expect(paragraph.tabStops.isEmpty)
+        if let kern = text.attribute(.kern, at: 0, effectiveRange: nil) as? NSNumber {
+            #expect(kern.doubleValue <= RichTextPreviewPolicy.kerning.upperBound)
+        }
+        if let offset = text.attribute(.baselineOffset, at: 0, effectiveRange: nil) as? NSNumber {
+            #expect(offset.doubleValue <= RichTextPreviewPolicy.baselineOffsets.upperBound)
+        }
+    }
+
+    @Test func ordinarySpacingIsKept() throws {
+        // 720 twips = 36 points.
+        let text = try render(#"{\rtf1\ansi\pard\li720\sa240 Indented}"#)
+        let paragraph = try #require(text.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+        #expect(paragraph.headIndent == 36)
+        #expect(paragraph.paragraphSpacing == 12)
+    }
+
+    @Test func numbersThatAreNotFiniteBecomeTheLowerBound() {
+        #expect(RichTextPreviewPolicy.clamped(.infinity, to: RichTextPreviewPolicy.kerning) == -5)
+        #expect(RichTextPreviewPolicy.clamped(.nan, to: RichTextPreviewPolicy.indents) == 0)
+        #expect(RichTextPreviewPolicy.clamped(7, to: RichTextPreviewPolicy.indents) == 7)
+        #expect(RichTextPreviewPolicy.clamped(-7, to: RichTextPreviewPolicy.indents) == 0)
+    }
+
     @Test func cutsVeryLongText() throws {
         let long = String(repeating: "a", count: PreviewText.maximumCharacters + 10)
         let text = try render(#"{\rtf1\ansi "# + long + "}")

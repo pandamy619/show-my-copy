@@ -59,6 +59,34 @@ if "-d" in args:
 sys.exit(2)
 '''
 
+FAKE_OTOOL = r'''#!/usr/bin/env python3
+# Fake otool for the self-test: prints the libraries listed in <code>.fake/otool-L, else only libSystem.
+import os, sys
+path = sys.argv[-1]
+meta = path + ".fake" if os.path.isfile(path) else os.path.join(path, "_fake")
+answer = os.path.join(meta, "otool-L")
+sys.stdout.write(path + ":\n")
+if os.path.exists(answer):
+    with open(answer) as handle:
+        for line in handle.read().splitlines():
+            sys.stdout.write("\t%s (compatibility version 1.0.0, current version 1.0.0)\n" % line)
+else:
+    sys.stdout.write("\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1.0.0)\n")
+'''
+
+FAKE_NM = r'''#!/usr/bin/env python3
+# Fake nm for the self-test: prints the undefined symbols listed in <code>.fake/nm-u, one per line, else a few.
+import os, sys
+path = sys.argv[-1]
+meta = path + ".fake" if os.path.isfile(path) else os.path.join(path, "_fake")
+answer = os.path.join(meta, "nm-u")
+symbols = ["_objc_msgSend", "_swift_retain", "_CFStringCreateWithCString"]
+if os.path.exists(answer):
+    with open(answer) as handle:
+        symbols = handle.read().split()
+sys.stdout.write("".join("%s\n" % symbol for symbol in symbols))
+'''
+
 FAKE_XCODEBUILD = r'''#!/usr/bin/env python3
 # Fake xcodebuild for the self-test: answers -showBuildSettings -json from settings/<target>/<config>.json.
 import os, sys
@@ -115,6 +143,10 @@ class Fixture:
             if name.endswith(".xcconfig"):
                 with open(os.path.join(REPO, "Config", name), encoding="utf-8") as handle:
                     self.write("Config/" + name, handle.read())
+        # The resolved packages and their review, which the package checks read.
+        for relative in (check_security.PACKAGE_RESOLVED, check_security.DEPENDENCIES_FILE):
+            with open(os.path.join(REPO, relative), encoding="utf-8") as handle:
+                self.write(relative, handle.read())
 
     def read(self, relative: str) -> str:
         with open(os.path.join(self.root, relative), encoding="utf-8") as handle:
@@ -426,6 +458,61 @@ class ProjectFixtureTests(CheckerTestCase):
         self.assertIn("kind = exactVersion;", self.fixture.pbxproj)
         self.assertFailsWith(self.fixture.errors(), "https://example.com/other must use an exact version")
 
+    # Package.resolved and DEPENDENCIES.md
+
+    def resolved(self) -> dict:
+        return json.loads(self.fixture.read(check_security.PACKAGE_RESOLVED))
+
+    def save_resolved(self, resolved: dict) -> None:
+        self.fixture.write(check_security.PACKAGE_RESOLVED, json.dumps(resolved, indent=2))
+
+    def test_package_pinned_to_another_version_fails(self) -> None:
+        resolved = self.resolved()
+        resolved["pins"][0]["state"]["version"] = "9.9.9"
+        self.save_resolved(resolved)
+        self.assertFailsWith(self.fixture.errors(), "is pinned to 9.9.9 but the project asks for")
+
+    def test_package_without_a_pin_fails(self) -> None:
+        self.save_resolved({"pins": [], "version": 3})
+        self.assertFailsWith(self.fixture.errors(), "is not pinned")
+
+    def test_pin_the_project_does_not_use_fails(self) -> None:
+        resolved = self.resolved()
+        resolved["pins"].append({
+            "identity": "other", "kind": "remoteSourceControl", "location": "https://example.com/other",
+            "state": {"revision": "0" * 40, "version": "1.0.0"},
+        })
+        self.save_resolved(resolved)
+        self.assertFailsWith(self.fixture.errors(), "pins other (https://example.com/other), which the project does not use")
+
+    def test_pin_without_a_revision_fails(self) -> None:
+        resolved = self.resolved()
+        resolved["pins"][0]["state"] = {"version": resolved["pins"][0]["state"]["version"]}
+        self.save_resolved(resolved)
+        self.assertFailsWith(self.fixture.errors(), "has no revision")
+
+    def test_missing_package_resolved_fails(self) -> None:
+        os.remove(os.path.join(self.fixture.root, check_security.PACKAGE_RESOLVED))
+        self.assertFailsWith(self.fixture.errors(), "cannot read %s" % check_security.PACKAGE_RESOLVED)
+
+    def test_package_not_reviewed_in_dependencies_fails(self) -> None:
+        self.fixture.write(check_security.DEPENDENCIES_FILE, "# Dependencies\n\n| Package | Version |\n|---|---|\n")
+        self.assertFailsWith(self.fixture.errors(), "must be listed in a table row with")
+
+    def test_package_reviewed_at_another_revision_fails(self) -> None:
+        text = self.fixture.read(check_security.DEPENDENCIES_FILE)
+        revision = self.resolved()["pins"][0]["state"]["revision"]
+        self.assertIn("`%s`" % revision[:7], text)
+        self.fixture.write(check_security.DEPENDENCIES_FILE, text.replace("`%s`" % revision[:7], "`0000000`"))
+        self.assertFailsWith(self.fixture.errors(), "must be listed in a table row with")
+
+    def test_package_reviewed_at_another_version_fails(self) -> None:
+        text = self.fixture.read(check_security.DEPENDENCIES_FILE)
+        version = self.resolved()["pins"][0]["state"]["version"]
+        self.assertIn(version, text)
+        self.fixture.write(check_security.DEPENDENCIES_FILE, text.replace(version, "0.0.1"))
+        self.assertFailsWith(self.fixture.errors(), "must be listed in a table row with")
+
     def test_unknown_xcconfig_reference_fails(self) -> None:
         self.fixture.replace(APP_RELEASE, APP_RELEASE.replace(
             "isa = XCBuildConfiguration;", "isa = XCBuildConfiguration;\n\t\t\tbaseConfigurationReference = CC01;"
@@ -732,10 +819,11 @@ class SignedAppTests(CheckerTestCase):
         super().setUp()
         self.bin = os.path.join(self.tmp, "bin")
         os.makedirs(self.bin)
-        codesign = os.path.join(self.bin, "codesign")
-        with open(codesign, "w") as out:
-            out.write(FAKE_CODESIGN)
-        os.chmod(codesign, os.stat(codesign).st_mode | stat.S_IXUSR)
+        for name, source in (("codesign", FAKE_CODESIGN), ("otool", FAKE_OTOOL), ("nm", FAKE_NM)):
+            tool = os.path.join(self.bin, name)
+            with open(tool, "w") as out:
+                out.write(source)
+            os.chmod(tool, os.stat(tool).st_mode | stat.S_IXUSR)
         self.app = os.path.join(self.tmp, "ShowMyCopy.app")
         self.bundle(self.app, SANDBOX_ONLY)
         self.executable = self.nested("MacOS/ShowMyCopy")
@@ -880,6 +968,67 @@ class SignedAppTests(CheckerTestCase):
                     self.bundle(self.nested("PlugIns/Share.appex"), SANDBOX_ONLY)
                 self.assertFailsWith(self.errors(), "%s: contains the Debug-only string" % relative)
                 os.remove(path)
+
+    def test_linking_a_networking_framework_fails(self) -> None:
+        for library in (
+            "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork",
+            "/System/Library/Frameworks/Network.framework/Versions/A/Network",
+            "/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit",
+            "@rpath/SafariServices.framework/Versions/A/SafariServices",
+        ):
+            with self.subTest(library):
+                meta = self.executable + ".fake"
+                os.makedirs(meta, exist_ok=True)
+                with open(os.path.join(meta, "otool-L"), "w") as out:
+                    out.write("/usr/lib/libSystem.B.dylib\n%s\n" % library)
+                self.assertFailsWith(self.errors(), "MacOS/ShowMyCopy: links %s" % library)
+                shutil.rmtree(meta)
+
+    def test_a_networking_symbol_in_the_executable_fails(self) -> None:
+        for symbol in ("_OBJC_CLASS_$_NSURLSession", "_nw_connection_create", "_socket", "_getaddrinfo", "_CFSocketCreate"):
+            with self.subTest(symbol):
+                meta = self.executable + ".fake"
+                os.makedirs(meta, exist_ok=True)
+                with open(os.path.join(meta, "nm-u"), "w") as out:
+                    out.write("_objc_msgSend\n%s\n" % symbol)
+                self.assertFailsWith(self.errors(), "MacOS/ShowMyCopy: references the networking symbol %s" % symbol)
+                shutil.rmtree(meta)
+
+    def test_a_symbol_that_only_contains_a_networking_word_passes(self) -> None:
+        meta = self.executable + ".fake"
+        os.makedirs(meta)
+        with open(os.path.join(meta, "nm-u"), "w") as out:
+            out.write("$s11ShowMyCopy9connectedSbvp\n_NSSocketPortNameServer\n_disconnect_all\n")
+        self.assertEqual(self.errors(), [])
+
+    def test_networking_symbol_in_nested_code_fails(self) -> None:
+        path = self.nested("PlugIns/Share.appex/Contents/MacOS/Share")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "wb") as out:
+            out.write(b"\xcf\xfa\xed\xfe")
+        self.bundle(self.nested("PlugIns/Share.appex"), SANDBOX_ONLY)
+        meta = path + ".fake"
+        os.makedirs(meta)
+        with open(os.path.join(meta, "nm-u"), "w") as out:
+            out.write("_CFURLSessionCreate\n")
+        self.assertFailsWith(self.errors(), "PlugIns/Share.appex/Contents/MacOS/Share: references the networking symbol")
+
+    def test_a_file_that_is_not_mach_o_is_not_asked_about(self) -> None:
+        resource = self.nested("Resources/notes.txt")
+        os.makedirs(os.path.dirname(resource))
+        with open(resource, "w") as out:
+            out.write("_socket _connect NSURLSession")
+        self.assertEqual(self.errors(), [])
+
+    def test_without_otool(self) -> None:
+        os.remove(os.path.join(self.bin, "otool"))
+        old = os.environ.get("PATH", "")
+        os.environ["PATH"] = self.bin  # only the remaining fakes, so a real otool elsewhere is not found
+        try:
+            errors = check_security.check_signed_app(self.app)
+        finally:
+            os.environ["PATH"] = old
+        self.assertFailsWith(errors, "otool not found")
 
     def test_unreadable_file_in_the_app_fails(self) -> None:
         if os.geteuid() == 0:
@@ -1168,7 +1317,10 @@ class RealRepositoryTests(unittest.TestCase):
     def test_configured_files_exist(self) -> None:
         # A moved or renamed file would leave its check pointing at nothing: the pane's stricter check and the
         # app's entitlements would no longer be looked at where the code now is.
-        for relative in (check_security.SETTINGS_PANE_FILE, check_security.APP_ENTITLEMENTS_FILE):
+        for relative in (
+            check_security.SETTINGS_PANE_FILE, check_security.APP_ENTITLEMENTS_FILE, check_security.PACKAGE_RESOLVED,
+            check_security.DEPENDENCIES_FILE,
+        ):
             with self.subTest(relative):
                 self.assertTrue(os.path.isfile(os.path.join(REPO, relative)), relative)
 

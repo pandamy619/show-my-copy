@@ -34,6 +34,7 @@ extension AppServices {
             paste: Paste(
                 access: keystrokes,
                 keystrokes: keystrokes,
+                frontmostProcess: { NSWorkspace.shared.frontmostApplication?.processIdentifier },
                 systemSettings: SystemSettingsPane(),
                 sleep: { duration in
                     try await Task.sleep(for: duration)

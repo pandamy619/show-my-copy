@@ -20,10 +20,28 @@ enum RichTextPreviewPolicy {
     static let fontSizes: ClosedRange<Double> = 8...48
 
     static func clampedFontSize(_ size: Double) -> Double {
-        guard size.isFinite else {
-            return fontSizes.lowerBound
+        clamped(size, to: fontSizes)
+    }
+
+    /// Spacing between characters (`.kern`), in points. Copied RTF can ask for metres of it.
+    static let kerning: ClosedRange<Double> = -5...50
+    /// Horizontal stretch of glyphs (`.expansion`) and slant (`.obliqueness`), as AppKit factors.
+    static let glyphFactors: ClosedRange<Double> = -1...1
+    /// Shift of the baseline (`.baselineOffset`), in points.
+    static let baselineOffsets: ClosedRange<Double> = -50...50
+    /// Space around and between lines and paragraphs, in points: line spacing, paragraph spacing, line heights.
+    static let paragraphSpacings: ClosedRange<Double> = 0...200
+    /// Indents of a paragraph, in points, from either side.
+    static let indents: ClosedRange<Double> = 0...400
+    /// How much taller than natural a line may be.
+    static let lineHeightMultiples: ClosedRange<Double> = 0...4
+
+    /// `value` within `range`; a value that is not a number becomes the range's lower bound.
+    static func clamped(_ value: Double, to range: ClosedRange<Double>) -> Double {
+        guard value.isFinite else {
+            return range.lowerBound
         }
-        return min(max(size, fontSizes.lowerBound), fontSizes.upperBound)
+        return min(max(value, range.lowerBound), range.upperBound)
     }
 
     /// Renders off the main actor. RTF up to 1 MB can take a moment to read.

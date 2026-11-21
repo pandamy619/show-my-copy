@@ -15,7 +15,9 @@ struct AppKitRenderedRichText: RenderedRichText, @unchecked Sendable {
 ///   cursors and anything else are dropped, so nothing in the preview can open a link, an app or a file.
 /// - The object replacement characters attachments leave behind, control characters and Unicode direction
 ///   overrides are removed, as everywhere in the history window (`PreviewText`).
-/// - Font sizes are clamped and the text is cut after `PreviewText.maximumCharacters` characters.
+/// - Font sizes, kerning, glyph factors, baseline offsets, indents and spacing are clamped
+///   (`RichTextPreviewPolicy`), so laying the text out stays cheap whatever the RTF asks for, and the text is cut
+///   after `PreviewText.maximumCharacters` characters.
 ///
 /// Reading RTF with AppKit never touches the network. It runs off the main actor: unlike HTML, RTF may be read on
 /// any thread.
@@ -56,7 +58,59 @@ struct AppKitRichTextRenderer: RichTextRendering {
                     text.addAttribute(.font, value: resized, range: range)
                 }
             }
+            clampNumbers(in: attributes, range: range, of: text)
+            if let paragraph = attributes[.paragraphStyle] as? NSParagraphStyle {
+                text.addAttribute(.paragraphStyle, value: clamped(paragraph), range: range)
+            }
         }
+    }
+
+    /// The attributes that are plain numbers, each within its range (`RichTextPreviewPolicy`).
+    private static func clampNumbers(
+        in attributes: [NSAttributedString.Key: Any], range: NSRange, of text: NSMutableAttributedString
+    ) {
+        let ranges: [(NSAttributedString.Key, ClosedRange<Double>)] = [
+            (.kern, RichTextPreviewPolicy.kerning),
+            (.expansion, RichTextPreviewPolicy.glyphFactors),
+            (.obliqueness, RichTextPreviewPolicy.glyphFactors),
+            (.baselineOffset, RichTextPreviewPolicy.baselineOffsets),
+        ]
+        for (key, allowed) in ranges {
+            guard let value = attributes[key] as? NSNumber else {
+                continue
+            }
+            let clamped = RichTextPreviewPolicy.clamped(value.doubleValue, to: allowed)
+            if clamped != value.doubleValue {
+                text.addAttribute(key, value: NSNumber(value: clamped), range: range)
+            }
+        }
+    }
+
+    /// The paragraph style with its spacing, indents and line heights within their ranges, and without tab stops of
+    /// its own: a thousand of them would each be laid out. The default tab interval is clamped like an indent.
+    private static func clamped(_ style: NSParagraphStyle) -> NSParagraphStyle {
+        guard let paragraph = style.mutableCopy() as? NSMutableParagraphStyle else {
+            return style
+        }
+        let spacing = RichTextPreviewPolicy.paragraphSpacings
+        let indents = RichTextPreviewPolicy.indents
+        paragraph.lineSpacing = clamp(paragraph.lineSpacing, spacing)
+        paragraph.paragraphSpacing = clamp(paragraph.paragraphSpacing, spacing)
+        paragraph.paragraphSpacingBefore = clamp(paragraph.paragraphSpacingBefore, spacing)
+        paragraph.minimumLineHeight = clamp(paragraph.minimumLineHeight, spacing)
+        paragraph.maximumLineHeight = clamp(paragraph.maximumLineHeight, spacing)
+        paragraph.lineHeightMultiple = clamp(paragraph.lineHeightMultiple, RichTextPreviewPolicy.lineHeightMultiples)
+        paragraph.headIndent = clamp(paragraph.headIndent, indents)
+        paragraph.firstLineHeadIndent = clamp(paragraph.firstLineHeadIndent, indents)
+        // A tail indent is measured from the leading edge when positive and from the trailing edge when negative.
+        paragraph.tailIndent = paragraph.tailIndent < 0 ? -clamp(-paragraph.tailIndent, indents) : 0
+        paragraph.defaultTabInterval = clamp(paragraph.defaultTabInterval, indents)
+        paragraph.tabStops = []
+        return paragraph
+    }
+
+    private static func clamp(_ value: CGFloat, _ range: ClosedRange<Double>) -> CGFloat {
+        CGFloat(RichTextPreviewPolicy.clamped(Double(value), to: range))
     }
 
     private static func removeHiddenCharacters(_ text: NSMutableAttributedString) {

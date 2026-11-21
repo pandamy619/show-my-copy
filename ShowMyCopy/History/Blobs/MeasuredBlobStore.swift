@@ -50,6 +50,10 @@ final class MeasuredBlobStore: BlobStore {
         base.size(of: id)
     }
 
+    func presence(of id: BlobID) -> BlobPresence {
+        base.presence(of: id)
+    }
+
     /// The running total, counted from `base` first when it is not known.
     func totalBytes() -> Int64 {
         let known: Int64? = state.withLock { state in

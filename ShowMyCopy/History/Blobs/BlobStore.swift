@@ -35,6 +35,16 @@ enum BlobStoreError: Error, Equatable, Sendable {
 /// sizing on it. Whoever removes the entry that references a blob deletes the blob; the history stores do that.
 /// Work that writes blobs in the background goes through `InFlightBlobStore`, so they are not deleted before the
 /// work hands them to the history.
+/// Whether a blob is in the store, as far as the store can tell.
+enum BlobPresence: Equatable, Sendable {
+    case present
+    /// The store has no such blob: it was never written, or was deleted.
+    case missing
+    /// The store cannot tell now, for example because the file's metadata could not be read. The blob may well be
+    /// there, so nothing that relies on it is deleted for this.
+    case unknown
+}
+
 protocol BlobStore: Sendable {
     /// Stores `data` under `id`, a new ID no blob has.
     func write(_ data: Data, as id: BlobID) throws(BlobStoreError)
@@ -44,8 +54,12 @@ protocol BlobStore: Sendable {
     /// Deletes these blobs. IDs that are not stored are ignored.
     func delete(_ ids: [BlobID]) throws(BlobStoreError)
 
-    /// The size of the blob in bytes, or nil when it is not stored.
+    /// The size of the blob in bytes, or nil when it is not stored or cannot be looked at.
     func size(of id: BlobID) -> Int?
+
+    /// Whether the blob is stored, telling a blob that is not there from one that cannot be looked at now. A store
+    /// whose `size(of:)` cannot fail gets this from it (`BlobStore.presence(of:)` below).
+    func presence(of id: BlobID) -> BlobPresence
 
     /// The total size of every stored blob in bytes. May list the blobs and read their sizes, so call it off the
     /// main actor.
@@ -67,9 +81,14 @@ extension BlobStore {
         return id
     }
 
-    /// Whether the blob is stored.
+    /// Whether the blob is stored. A blob that cannot be looked at now does not count as stored.
     func contains(_ id: BlobID) -> Bool {
-        size(of: id) != nil
+        presence(of: id) == .present
+    }
+
+    /// Present when it has a size, else missing: for stores whose look-ups cannot fail.
+    func presence(of id: BlobID) -> BlobPresence {
+        size(of: id) != nil ? .present : .missing
     }
 
     /// A store without a running total counts every time.

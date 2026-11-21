@@ -106,6 +106,7 @@ extension AppServices.Paste {
         return AppServices.Paste(
             access: keystrokes,
             keystrokes: keystrokes,
+            frontmostProcess: { nil },
             systemSettings: systemSettings ?? FakeAccessibilitySettings(),
             sleep: { _ in },
             tuning: { .standard }
