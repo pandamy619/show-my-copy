@@ -40,8 +40,17 @@ struct SealedCodeAccountsFileTests {
         // Sealed: neither the names nor the secrets are on disk as they are.
         #expect(onDisk.range(of: Data("GitHub".utf8)) == nil)
         #expect(onDisk.range(of: Data("JBSWY3DPEHPK3PXP".utf8)) == nil)
-        let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
-        #expect(values.isExcludedFromBackup == true)
+    }
+
+    @Test(
+        .enabled(
+            if: BackupExclusion.isKeptByThisVolume(),
+            "The temporary folder's volume does not keep the exclusion from backups, as on GitHub's macOS runners"))
+    func theFolderIsExcludedFromBackups() async throws {
+        defer { removeDirectory() }
+        try await makeFile().save([CodeFixtures.stored()])
+
+        #expect(try BackupExclusion.isExcluded(directory))
     }
 
     @Test func savingAnEmptyListDeletesTheFile() async throws {

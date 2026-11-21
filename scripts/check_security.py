@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple
 
 PROJECT = "ShowMyCopy.xcodeproj"
 PACKAGE_RESOLVED = PROJECT + "/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+# The review of every package. docs/ is not in the repository, so the file is checked only where it is present.
 DEPENDENCIES_FILE = "docs/DEPENDENCIES.md"
 # How many leading characters of a package's resolved revision DEPENDENCIES.md must quote, in backticks.
 REVISION_PREFIX = 7
@@ -610,9 +611,9 @@ def _project_packages(objects: dict) -> Dict[str, Tuple[str, str]]:
 
 
 def check_resolved_packages(root: str, objects: dict) -> List[str]:
-    """Package.resolved pins exactly the project's packages, at their exact versions, and every package is listed in
-    DEPENDENCIES.md with that version and the revision it resolved to: a package that was not reviewed, or moved to a
-    revision nobody looked at, fails."""
+    """Package.resolved pins exactly the project's packages, at their exact versions, and, where DEPENDENCIES.md is
+    present (docs/ is not in the repository, so CI has no copy), every package is listed there with that version and
+    the revision it resolved to: a package that was not reviewed, or moved to a revision nobody looked at, fails."""
     packages = _project_packages(objects)
     if not packages:
         return []
@@ -627,11 +628,13 @@ def check_resolved_packages(root: str, objects: dict) -> List[str]:
     for pin in resolved.get("pins", []) if isinstance(resolved, dict) else []:
         if isinstance(pin, dict):
             pins[str(pin.get("identity", "")).lower()] = pin
-    try:
-        with open(os.path.join(root, DEPENDENCIES_FILE), encoding="utf-8") as handle:
-            dependencies = handle.read()
-    except OSError as error:
-        return ["cannot read %s: %s" % (DEPENDENCIES_FILE, error)]
+    dependencies = None
+    if os.path.exists(os.path.join(root, DEPENDENCIES_FILE)):
+        try:
+            with open(os.path.join(root, DEPENDENCIES_FILE), encoding="utf-8") as handle:
+                dependencies = handle.read()
+        except OSError as error:
+            return ["cannot read %s: %s" % (DEPENDENCIES_FILE, error)]
     for name, (url, version) in sorted(packages.items()):
         pin = pins.pop(name.lower(), None)
         if pin is None:
@@ -648,7 +651,7 @@ def check_resolved_packages(root: str, objects: dict) -> List[str]:
         if not re.fullmatch(r"[0-9a-f]{40}", revision):
             errors.append("%s: package %s has no revision" % (PACKAGE_RESOLVED, name))
             continue
-        if not _dependency_listed(dependencies, url, version, revision):
+        if dependencies is not None and not _dependency_listed(dependencies, url, version, revision):
             errors.append(
                 "%s: package %s must be listed in a table row with %s, version %s and the revision %s (at least %d "
                 "characters, in backticks)" % (DEPENDENCIES_FILE, name, url, version, revision[:7], REVISION_PREFIX)

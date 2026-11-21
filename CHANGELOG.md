@@ -21,7 +21,7 @@ One-time codes from Google Authenticator, and the fixes of a security audit of 0
 - An image whose saved file cannot be looked at (not missing, only unreadable now) keeps its entry; before, it was deleted like a missing one.
 - Previews of styled text clamp indents, spacing, line heights, kerning and baseline offsets, and drop tab stops, so an RTF cannot ask for a layout that takes seconds.
 - Paste after choosing an entry checks that the app in front is the same process, not only an app with the same bundle identifier and name.
-- `make security` fails when any code in the app links CFNetwork, Network, WebKit or SafariServices or references a networking symbol, and `make lint` fails when `Package.resolved` or DEPENDENCIES.md disagree with the project's packages.
+- `make security` fails when any code in the app links CFNetwork, Network, WebKit or SafariServices or references a networking symbol, and `make lint` fails when `Package.resolved` disagrees with the project's packages, or DEPENDENCIES.md, where it is present, with `Package.resolved`.
 
 ## [0.1.0] - 2026-11-09
 

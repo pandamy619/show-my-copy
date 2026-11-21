@@ -143,10 +143,30 @@ class Fixture:
             if name.endswith(".xcconfig"):
                 with open(os.path.join(REPO, "Config", name), encoding="utf-8") as handle:
                     self.write("Config/" + name, handle.read())
-        # The resolved packages and their review, which the package checks read.
-        for relative in (check_security.PACKAGE_RESOLVED, check_security.DEPENDENCIES_FILE):
-            with open(os.path.join(REPO, relative), encoding="utf-8") as handle:
-                self.write(relative, handle.read())
+        # The resolved packages and their review, which the package checks read. docs/ is not in the repository,
+        # so where the review is missing (CI) the fixture gets one that matches the pins, and the tests that change
+        # the review still have something to change.
+        with open(os.path.join(REPO, check_security.PACKAGE_RESOLVED), encoding="utf-8") as handle:
+            resolved = handle.read()
+        self.write(check_security.PACKAGE_RESOLVED, resolved)
+        dependencies = os.path.join(REPO, check_security.DEPENDENCIES_FILE)
+        if os.path.isfile(dependencies):
+            with open(dependencies, encoding="utf-8") as handle:
+                self.write(check_security.DEPENDENCIES_FILE, handle.read())
+        else:
+            self.write(check_security.DEPENDENCIES_FILE, self.review_of(json.loads(resolved)))
+
+    @staticmethod
+    def review_of(resolved: dict) -> str:
+        """A DEPENDENCIES.md table with one row per pin, as the real one has."""
+        rows = ["# Dependencies", "", "| Package | Version | Why | Reviewed |", "|---|---|---|---|"]
+        for pin in resolved["pins"]:
+            state = pin["state"]
+            rows.append("| [%s](%s) | %s (`%s`) | fixture | fixture |" % (
+                pin["identity"], pin["location"], state["version"],
+                state["revision"][:check_security.REVISION_PREFIX],
+            ))
+        return "\n".join(rows) + "\n"
 
     def read(self, relative: str) -> str:
         with open(os.path.join(self.root, relative), encoding="utf-8") as handle:
@@ -494,6 +514,15 @@ class ProjectFixtureTests(CheckerTestCase):
     def test_missing_package_resolved_fails(self) -> None:
         os.remove(os.path.join(self.fixture.root, check_security.PACKAGE_RESOLVED))
         self.assertFailsWith(self.fixture.errors(), "cannot read %s" % check_security.PACKAGE_RESOLVED)
+
+    def test_missing_dependencies_file_is_skipped(self) -> None:
+        # docs/ is not in the repository: without the review only the pins are checked.
+        os.remove(os.path.join(self.fixture.root, check_security.DEPENDENCIES_FILE))
+        self.assertEqual(self.fixture.errors(), [])
+        resolved = self.resolved()
+        resolved["pins"][0]["state"]["version"] = "9.9.9"
+        self.save_resolved(resolved)
+        self.assertFailsWith(self.fixture.errors(), "is pinned to 9.9.9 but the project asks for")
 
     def test_package_not_reviewed_in_dependencies_fails(self) -> None:
         self.fixture.write(check_security.DEPENDENCIES_FILE, "# Dependencies\n\n| Package | Version |\n|---|---|\n")
@@ -1319,7 +1348,6 @@ class RealRepositoryTests(unittest.TestCase):
         # app's entitlements would no longer be looked at where the code now is.
         for relative in (
             check_security.SETTINGS_PANE_FILE, check_security.APP_ENTITLEMENTS_FILE, check_security.PACKAGE_RESOLVED,
-            check_security.DEPENDENCIES_FILE,
         ):
             with self.subTest(relative):
                 self.assertTrue(os.path.isfile(os.path.join(REPO, relative)), relative)
