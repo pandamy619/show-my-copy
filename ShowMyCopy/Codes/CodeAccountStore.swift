@@ -3,10 +3,10 @@ import Observation
 
 /// The accounts the user added, in memory, and what keeping them on disk found (`CodeAccountsPersisting`).
 ///
-/// Accounts are added and removed at once in memory and then saved, the whole list in one write. Only a list this
-/// session loaded is ever saved: when the saved file could not be read (no key, damaged, newer), accounts added
-/// now stay in memory until the app quits, and the file is left as it is, so nothing saved is lost to a session that
-/// could not see it. The Keychain can be locked at launch; `load()` is called again when the user is back.
+/// Accounts are added, renamed and removed at once in memory and then saved, the whole list in one write. Only a
+/// list this session loaded is ever saved: when the saved file could not be read (no key, damaged, newer), accounts
+/// added now stay in memory until the app quits, and the file is left as it is, so nothing saved is lost to a session
+/// that could not see it. The Keychain can be locked at launch; `load()` is called again when the user is back.
 @MainActor
 @Observable
 final class CodeAccountStore {
@@ -110,6 +110,33 @@ final class CodeAccountStore {
         accounts = CodeAccount.sorted(accounts + added)
         save()
         return result
+    }
+
+    /// Gives the account the service and account names typed in Settings, trimmed, and saves the list. The secret,
+    /// how the code is computed, the id and when it was added stay as they are; the list is sorted again. Returns
+    /// false, changing nothing, when there is no such account or another account would then be the same.
+    @discardableResult
+    func rename(id: CodeAccount.ID, issuer: String, name: String) async -> Bool {
+        await load()
+        guard let index = accounts.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        let current = accounts[index]
+        let renamed = OneTimeCodeAccount(
+            issuer: issuer.trimmingCharacters(in: .whitespacesAndNewlines),
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            secret: current.account.secret, algorithm: current.account.algorithm, digits: current.account.digits,
+            period: current.account.period)
+        guard renamed != current.account else {
+            return true
+        }
+        guard !accounts.contains(where: { $0.account == renamed }) else {
+            return false
+        }
+        accounts[index] = CodeAccount(id: current.id, account: renamed, addedAt: current.addedAt)
+        accounts = CodeAccount.sorted(accounts)
+        save()
+        return true
     }
 
     /// Removes the account and saves the list without it. The secret goes with it.

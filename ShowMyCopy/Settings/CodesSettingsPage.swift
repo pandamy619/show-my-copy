@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings → Codes: the accounts, with a button to remove each, and how to add more.
+/// Settings → Codes: the accounts, each with a button to edit its names and one to remove it, and how to add more.
 struct CodesSettingsPage: View {
     @Bindable var codes: CodesSettings
 
@@ -19,21 +19,10 @@ struct CodesSettingsPage: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(codes.accounts) { account in
-                HStack {
-                    Text(verbatim: account.displayName)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    Button {
-                        Task {
-                            await codes.remove(account)
-                        }
-                    } label: {
-                        Label("Remove \(account.displayName)", systemImage: "minus.circle")
-                            .labelStyle(.iconOnly)
-                    }
-                    .buttonStyle(.borderless)
-                    .help(Text("Remove \(account.displayName)"))
+                if codes.isEditing(account) {
+                    namesEditor(for: account)
+                } else {
+                    accountRow(account)
                 }
             }
             if let warning = Self.storageWarning(for: codes.store) {
@@ -55,6 +44,62 @@ struct CodesSettingsPage: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private func accountRow(_ account: CodeAccount) -> some View {
+        HStack {
+            Text(verbatim: account.displayName)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+            Button {
+                codes.beginEditing(account)
+            } label: {
+                Label("Edit the names of \(account.displayName)", systemImage: "pencil")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .help(Text("Edit the names of \(account.displayName)"))
+            Button {
+                Task {
+                    await codes.remove(account)
+                }
+            } label: {
+                Label("Remove \(account.displayName)", systemImage: "minus.circle")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .help(Text("Remove \(account.displayName)"))
+        }
+    }
+
+    /// The row of the account being edited: its names in two fields, Save and Cancel. The secret is never shown.
+    private func namesEditor(for account: CodeAccount) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("Service", text: $codes.editedIssuer, prompt: Text("GitHub, Google…"))
+                .onSubmit { Task { await codes.saveEditing() } }
+            TextField("Account", text: $codes.editedName, prompt: Text("Your name or e-mail"))
+                .onSubmit { Task { await codes.saveEditing() } }
+            HStack {
+                Button("Save") {
+                    Task {
+                        await codes.saveEditing()
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!codes.canSaveEditing)
+                Button("Cancel") {
+                    codes.cancelEditing()
+                }
+                .keyboardShortcut(.cancelAction)
+                if codes.editRefused {
+                    Text("Another account already has these names.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     private var addSection: some View {

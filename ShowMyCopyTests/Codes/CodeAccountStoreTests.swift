@@ -68,6 +68,51 @@ struct CodeAccountStoreTests {
         #expect(persistence.saveCount == 1)
     }
 
+    @Test func renamingKeepsTheSecretAndTheIdentityAndSavesTheListSortedAgain() async throws {
+        let github = CodeFixtures.stored()
+        let google = CodeFixtures.stored(issuer: "Google", secret: "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")
+        let persistence = InMemoryCodeAccounts(saved: [github, google])
+        let store = makeStore(persistence)
+
+        #expect(await store.rename(id: github.id, issuer: "  Work  ", name: "octocat@work.example\n"))
+        await store.finishSaving()
+
+        let renamed = try #require(store.accounts.first { $0.id == github.id })
+        #expect(renamed.account.issuer == "Work")
+        #expect(renamed.account.name == "octocat@work.example")
+        #expect(renamed.account.secret == github.account.secret)
+        #expect(renamed.addedAt == github.addedAt)
+        #expect(store.accounts.map(\.displayName) == ["Google (octocat)", "Work (octocat@work.example)"])
+        #expect(persistence.saved == store.accounts)
+        #expect(persistence.saveCount == 1)
+    }
+
+    @Test func renamingToTheSameNamesOrAnUnknownAccountSavesNothing() async {
+        let github = CodeFixtures.stored()
+        let persistence = InMemoryCodeAccounts(saved: [github])
+        let store = makeStore(persistence)
+
+        #expect(await store.rename(id: github.id, issuer: "GitHub", name: "octocat"))
+        #expect(await !store.rename(id: UUID(), issuer: "Other", name: "name"))
+        await store.finishSaving()
+
+        #expect(store.accounts == [github])
+        #expect(persistence.saveCount == 0)
+    }
+
+    @Test func renamingToAnotherAccountsNamesWithTheSameSecretIsRefused() async {
+        let work = CodeFixtures.stored(issuer: "Work")
+        let github = CodeFixtures.stored()
+        let persistence = InMemoryCodeAccounts(saved: [work, github])
+        let store = makeStore(persistence)
+
+        #expect(await !store.rename(id: work.id, issuer: "GitHub", name: "octocat"))
+        await store.finishSaving()
+
+        #expect(store.accounts == [github, work])
+        #expect(persistence.saveCount == 0)
+    }
+
     @Test func aFailedSaveKeepsTheAccountsInMemoryAndSaysSo() async {
         persistence.setSaveError(.writeFailed)
         let store = makeStore()

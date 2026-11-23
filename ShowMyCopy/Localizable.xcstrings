@@ -493,6 +493,16 @@
         }
       }
     },
+    "Another account already has these names." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Такие названия уже есть у другого аккаунта."
+          }
+        }
+      }
+    },
     "App memory" : {
       "localizations" : {
         "ru" : {
@@ -683,6 +693,16 @@
         }
       }
     },
+    "Edit the names of %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изменить названия %@"
+          }
+        }
+      }
+    },
     "Entries older than this are removed automatically. Pinned entries are kept." : {
       "localizations" : {
         "ru" : {
@@ -799,6 +819,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Основные"
+          }
+        }
+      }
+    },
+    "GitHub, Google…" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub, Google…"
           }
         }
       }
@@ -1618,6 +1648,16 @@
         }
       }
     },
+    "Save" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранить"
+          }
+        }
+      }
+    },
     "Save passwords" : {
       "localizations" : {
         "ru" : {
@@ -2320,6 +2360,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Если выключено, пароли и всё, что вы копируете из менеджера паролей, не сохраняются."
+          }
+        }
+      }
+    },
+    "Your name or e-mail" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваше имя или e-mail"
           }
         }
       }

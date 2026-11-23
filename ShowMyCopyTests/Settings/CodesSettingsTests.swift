@@ -78,6 +78,76 @@ struct CodesSettingsTests {
         #expect(settings.note == nil)
     }
 
+    // MARK: - Names
+
+    private func settingsWithGitHub() async throws -> (CodesSettings, CodeAccount) {
+        let settings = makeSettings()
+        settings.draft = CodeFixtures.addressURL
+        await settings.addDraft()
+        return (settings, try #require(settings.accounts.first))
+    }
+
+    @Test func editingShowsTheNamesAndSavingRenamesTheAccount() async throws {
+        let (settings, github) = try await settingsWithGitHub()
+
+        settings.beginEditing(github)
+        #expect(settings.isEditing(github))
+        #expect(settings.editedIssuer == "GitHub")
+        #expect(settings.editedName == "octocat")
+
+        settings.editedIssuer = "Work"
+        await settings.saveEditing()
+        await settings.store.finishSaving()
+
+        #expect(settings.editingID == nil)
+        #expect(settings.accounts.map(\.displayName) == ["Work (octocat)"])
+        #expect(settings.accounts.first?.id == github.id)
+        #expect(persistence.saved.map(\.displayName) == ["Work (octocat)"])
+    }
+
+    @Test func cancelLeavesTheNamesAndAnUnnamedAccountCannotBeSaved() async throws {
+        let (settings, github) = try await settingsWithGitHub()
+        settings.beginEditing(github)
+        settings.editedIssuer = " "
+        settings.editedName = ""
+        #expect(!settings.canSaveEditing)
+
+        await settings.saveEditing()
+        #expect(settings.isEditing(github))
+        settings.cancelEditing()
+
+        #expect(settings.editingID == nil)
+        #expect(settings.accounts.map(\.displayName) == ["GitHub (octocat)"])
+    }
+
+    @Test func aRefusedRenameKeepsTheFieldsOpenAndSaysSo() async throws {
+        let (settings, github) = try await settingsWithGitHub()
+        await settings.store.add([CodeFixtures.account(issuer: "Work")])
+        settings.beginEditing(github)
+        settings.editedIssuer = "Work"
+
+        await settings.saveEditing()
+
+        #expect(settings.isEditing(github))
+        #expect(settings.editRefused)
+        #expect(settings.editedIssuer == "Work")
+        settings.editedIssuer = "Home"
+        await settings.saveEditing()
+        #expect(!settings.editRefused)
+        #expect(settings.editingID == nil)
+        #expect(settings.accounts.map(\.displayName) == ["Home (octocat)", "Work (octocat)"])
+    }
+
+    @Test func removingTheEditedAccountClosesItsFields() async throws {
+        let (settings, github) = try await settingsWithGitHub()
+        settings.beginEditing(github)
+
+        await settings.remove(github)
+
+        #expect(settings.editingID == nil)
+        #expect(settings.accounts.isEmpty)
+    }
+
     @Test func theWarningFollowsTheStore() async {
         let store = CodeAccountStore(
             persistence: InMemoryCodeAccounts(loadResult: .damaged), now: { CodeFixtures.date })

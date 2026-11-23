@@ -5,6 +5,7 @@
 ### Codes
 
 - A code's row has a context menu, swipe buttons and VoiceOver actions like an entry's, from one list: Copy Code, which copies the code like a click on the row, and Remove Account, which removes the account with its secret as the button in Settings → Codes does. A full swipe never removes an account: the row slides no further than its two buttons.
+- Settings → Codes edit an account's service and account names in its row (the pencil button): the secret and the way the code is computed stay as they are, the list is sorted again and saved. Names that another account with the same secret already has are refused.
 
 ### Fixed
 
