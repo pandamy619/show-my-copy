@@ -209,9 +209,10 @@ struct HistoryView: View {
     private func codesSection(_ codes: [CodeAccount], selectedID: UUID?, aboveEntries: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             sectionHeader("Codes")
-            CodeRows(accounts: codes, selectedID: selectedID, model: model) { account, isAlternate in
-                codeRowClicked(account, isAlternate: isAlternate)
-            }
+            CodeRows(
+                accounts: codes, selectedID: selectedID, model: model,
+                onClick: { account, isAlternate in codeRowClicked(account, isAlternate: isAlternate) },
+                onAction: { account, action in codeRowAction(action, on: account) })
             if aboveEntries {
                 Divider()
                     .padding(.vertical, 4)
@@ -249,9 +250,9 @@ struct HistoryView: View {
                     rowClicked(entry, isAlternate: isAlternate)
                 }
             )
-            .modifier(RowContextMenu(entry: entry, model: model))
+            .modifier(RowContextMenu(row: .entry(entry)) { model.perform($0, on: entry) })
             .modifier(PreviewAccessibilityHint(entry: entry))
-            .modifier(RowActionsAccessibility(entry: entry, model: model))
+            .modifier(RowActionsAccessibility(row: .entry(entry)) { model.perform($0, on: entry) })
             if entry.isConcealed {
                 RevealButton(isRevealed: isRevealed) {
                     guard !model.closeSwipedRow() else {
@@ -266,7 +267,7 @@ struct HistoryView: View {
                 .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.clear)
         )
         // Swipe left to show the row's actions; the selection slides with the row.
-        .modifier(RowSwipeModifier(entry: entry, model: model))
+        .modifier(RowSwipeModifier(row: .entry(entry), model: model) { model.perform($0, on: entry) })
         .id(entry.id)
     }
 
@@ -285,6 +286,20 @@ struct HistoryView: View {
             return
         }
         onChooseCode(account, model.choosingPastes(isAlternate: isAlternate))
+    }
+
+    /// The menu item, swipe button or VoiceOver action `action` of the row of `account`: Copy Code copies the code
+    /// like a click on the row, Remove Account removes the account as Settings → Codes do. Both close the swiped row.
+    private func codeRowAction(_ action: RowAction, on account: CodeAccount) {
+        switch action {
+        case .copyCode:
+            model.closeSwipedRow()
+            onChooseCode(account, model.choosingPastes(isAlternate: false))
+        case .removeAccount:
+            Task { await model.remove(account) }
+        case .showPreview, .pin, .unpin, .delete:
+            break
+        }
     }
 
 }

@@ -1,20 +1,27 @@
 import SwiftUI
 
 /// The rows of the Codes section: each account with its code as it is now and how long it stays valid, redrawn
-/// every second while the window is open. A click copies the code, like Return on the selected row.
+/// every second while the window is open. A click copies the code, like Return on the selected row. Like an entry's
+/// row, each has a context menu, swipe buttons and VoiceOver actions from one list (`RowAction.codeOffers`).
 struct CodeRows: View {
     let accounts: [CodeAccount]
     let selectedID: UUID?
     let model: HistoryWindowModel
     /// The row's account and whether ⌥ was held, which does the other of what Return does.
     let onClick: @MainActor (CodeAccount, Bool) -> Void
+    /// An action of the row's menu, swipe buttons or VoiceOver actions.
+    let onAction: @MainActor (CodeAccount, RowAction) -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             ForEach(accounts) { account in
+                let row = HistoryRowItem.code(account)
                 CodeRow(account: account, now: context.date, isSelected: account.id == selectedID) { isAlternate in
                     onClick(account, isAlternate)
                 }
+                .modifier(RowContextMenu(row: row) { onAction(account, $0) })
+                .modifier(RowActionsAccessibility(row: row) { onAction(account, $0) })
+                .modifier(RowSwipeModifier(row: row, model: model) { onAction(account, $0) })
                 .id(account.id)
             }
         }

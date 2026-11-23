@@ -157,6 +157,40 @@ struct HistoryWindowCodesTests {
         #expect(model.selectedCode == stored(google))
     }
 
+    /// A trackpad swipe of `distance` points to the left over the row of `account`, in one step.
+    private func swipeLeft(_ distance: CGFloat, on account: CodeAccount, in model: HistoryWindowModel) {
+        let row = HistoryRowItem.code(account)
+        _ = model.swipeScrolled(RowSwipe.Scroll(phase: .began), on: row)
+        _ = model.swipeScrolled(RowSwipe.Scroll(phase: .changed, deltaX: -distance), on: row)
+        _ = model.swipeScrolled(RowSwipe.Scroll(phase: .ended), on: row)
+    }
+
+    @Test func aFullSwipeOnACodeOnlyOpensItsRowAndAClickClosesIt() async throws {
+        let model = await makeModel()
+        let github = try #require(stored(github))
+
+        swipeLeft(RowSwipe.maximumOffset, on: github, in: model)
+
+        #expect(codes.accounts.count == 2)
+        #expect(model.swipe.swipedRowID == github.id)
+        #expect(model.swipe.offset(of: github.id) == RowSwipe.actionsWidth(buttonCount: RowAction.codeOffers.count))
+        #expect(model.closeSwipedRow())
+        #expect(model.swipe.swipedRowID == nil)
+    }
+
+    @Test func removeAccountRemovesTheAccountWithItsSecretAndClosesTheRow() async throws {
+        let model = await makeModel()
+        let github = try #require(stored(github))
+        swipeLeft(RowSwipe.holdThreshold + 1, on: github, in: model)
+
+        await model.remove(github)
+
+        #expect(model.swipe.swipedRowID == nil)
+        #expect(codes.accounts.map(\.account) == [google])
+        #expect(model.rows.map(\.code?.displayName) == ["Google (me@gmail.com)"])
+        #expect(model.selectedCode == stored(google))
+    }
+
     @Test func aModelWithoutCodesListsNoneAndOffersNoButton() {
         let model = HistoryWindowModel(history: history)
         #expect(!model.hasCodes)

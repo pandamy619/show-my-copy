@@ -63,6 +63,20 @@ struct RowSwipeTests {
         #expect(RowSwipe.actionsWidth(buttonCount: 3) == 3 * RowSwipe.buttonWidth)
     }
 
+    @Test func aRowNotDeletedByAFullSwipeSlidesNoFurtherThanItsButtonsAndStaysOpen() {
+        let narrow = RowSwipe.actionsWidth(buttonCount: 2)
+        func scroll(_ event: RowSwipe.Scroll) -> RowSwipe.Outcome {
+            swipe.scroll(event, on: row, actionsWidth: narrow, deletesOnFullSwipe: false)
+        }
+
+        #expect(scroll(RowSwipe.Scroll(phase: .began)) == .pass)
+        #expect(scroll(RowSwipe.Scroll(phase: .changed, deltaX: -RowSwipe.maximumOffset)) == .consume)
+        #expect(swipe.offset(of: row) == narrow)
+        #expect(scroll(RowSwipe.Scroll(phase: .ended)) == .pass)
+        #expect(swipe.swipedRowID == row)
+        #expect(swipe.offset(of: row) == narrow)
+    }
+
     @Test func aRowWithFewerButtonsOpensNarrowerAndDeletesSooner() {
         let narrow = RowSwipe.actionsWidth(buttonCount: 2)
         let full = RowSwipe.fullSwipeThreshold(actionsWidth: narrow)

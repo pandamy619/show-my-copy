@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Codes
+
+- A code's row has a context menu, swipe buttons and VoiceOver actions like an entry's, from one list: Copy Code, which copies the code like a click on the row, and Remove Account, which removes the account with its secret as the button in Settings → Codes does. A full swipe never removes an account: the row slides no further than its two buttons.
+
 ### Fixed
 
 - Showing the codes with the button or ⌘K scrolls the list to the top, where they slide in, also when it was scrolled down. The scroll went to the first code's row, not laid out yet at that moment, and was lost.

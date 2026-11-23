@@ -9,7 +9,8 @@ import Observation
 /// Each gesture first moves `axisLockDistance` undecided, then locks to one axis. A horizontal one slides its row, and
 /// the list does not see it or its momentum; a vertical one scrolls the list and closes the row that shows its
 /// buttons. On release a row slid at least `holdThreshold` stays open, as wide as its buttons; one slid at least
-/// `fullSwipeThreshold(actionsWidth:)` is deleted at once; any other slides back. Only one row is open at a time:
+/// `fullSwipeThreshold(actionsWidth:)` is deleted at once, when the row deletes on a full swipe (an entry's does, a
+/// code's does not: it slides no further than its buttons); any other slides back. Only one row is open at a time:
 /// swiping another row closes it, and so do a mouse wheel, typing, a key, a change of selection, a click and
 /// tapping one of its buttons (`close()`).
 @MainActor
@@ -81,6 +82,8 @@ final class RowSwipe {
         let rowID: ClipboardEntry.ID
         /// How wide the row is open: the width of its buttons.
         let actionsWidth: CGFloat
+        /// Whether a full swipe deletes the row. Otherwise it slides no further than `actionsWidth`.
+        let deletesOnFullSwipe: Bool
         /// The row's offset when the gesture began: an open row slides on from there.
         let startOffset: CGFloat
         var movedX: CGFloat = 0
@@ -125,9 +128,11 @@ final class RowSwipe {
         return offset >= Self.holdThreshold ? actionsWidth : 0
     }
 
-    /// A scroll event over the row of `id`, which is `actionsWidth` wide when open. Events after the first of a gesture
-    /// belong to the row it began on.
-    func scroll(_ event: Scroll, on id: ClipboardEntry.ID, actionsWidth: CGFloat) -> Outcome {
+    /// A scroll event over the row of `id`, which is `actionsWidth` wide when open and, when `deletesOnFullSwipe`, is
+    /// deleted by a full swipe. Events after the first of a gesture belong to the row it began on.
+    func scroll(
+        _ event: Scroll, on id: ClipboardEntry.ID, actionsWidth: CGFloat, deletesOnFullSwipe: Bool = true
+    ) -> Outcome {
         if event.isMomentum {
             return swallowsMomentum ? .consume : .pass
         }
@@ -139,7 +144,9 @@ final class RowSwipe {
             return .pass
         case .began:
             swallowsMomentum = false
-            gesture = Gesture(rowID: id, actionsWidth: actionsWidth, startOffset: offset(of: id))
+            gesture = Gesture(
+                rowID: id, actionsWidth: actionsWidth, deletesOnFullSwipe: deletesOnFullSwipe,
+                startOffset: offset(of: id))
             return move(byX: event.deltaX, y: event.deltaY)
         case .changed:
             return move(byX: event.deltaX, y: event.deltaY)
@@ -192,7 +199,8 @@ final class RowSwipe {
         guard gesture.axis == .horizontal else {
             return .pass
         }
-        let slid = min(max(gesture.startOffset - gesture.movedX, 0), Self.maximumOffset)
+        let limit = gesture.deletesOnFullSwipe ? Self.maximumOffset : gesture.actionsWidth
+        let slid = min(max(gesture.startOffset - gesture.movedX, 0), limit)
         if slid != offset {
             offset = slid
         }
@@ -209,7 +217,7 @@ final class RowSwipe {
         }
         swallowsMomentum = true
         isTracking = false
-        if deletes, offset >= Self.fullSwipeThreshold(actionsWidth: gesture.actionsWidth) {
+        if deletes, gesture.deletesOnFullSwipe, offset >= Self.fullSwipeThreshold(actionsWidth: gesture.actionsWidth) {
             close()
             return .delete(gesture.rowID)
         }

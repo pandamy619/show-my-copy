@@ -19,17 +19,17 @@ struct RevealButton: View {
 }
 
 /// The row's context menu, built from its actions (`RowAction.offers(for:)`): Show Preview, Pin or Unpin, and
-/// Delete. A dimmed item does nothing.
+/// Delete for an entry; Copy Code and Remove Account for a code. A dimmed item does nothing.
 struct RowContextMenu: ViewModifier {
-    let entry: ClipboardEntry
-    let model: HistoryWindowModel
+    let row: HistoryRowItem
+    let perform: @MainActor (RowAction) -> Void
 
     func body(content: Content) -> some View {
         content
             .contextMenu {
-                ForEach(RowAction.offers(for: entry), id: \.action) { offer in
+                ForEach(RowAction.offers(for: row), id: \.action) { offer in
                     Button(offer.action.menuTitle, role: offer.action.isDestructive ? .destructive : nil) {
-                        model.perform(offer.action, on: entry)
+                        perform(offer.action)
                     }
                     .disabled(!offer.isEnabled)
                 }
@@ -40,15 +40,15 @@ struct RowContextMenu: ViewModifier {
 /// Offers VoiceOver users the row's actions that can be used now, from the same list as the context menu and the
 /// swipe buttons, so every swipe button is also an action. A password's row has no Pin.
 struct RowActionsAccessibility: ViewModifier {
-    let entry: ClipboardEntry
-    let model: HistoryWindowModel
+    let row: HistoryRowItem
+    let perform: @MainActor (RowAction) -> Void
 
     func body(content: Content) -> some View {
         content
             .accessibilityActions {
-                ForEach(RowAction.offers(for: entry).filter(\.isEnabled), id: \.action) { offer in
+                ForEach(RowAction.offers(for: row).filter(\.isEnabled), id: \.action) { offer in
                     Button(offer.action.menuTitle) {
-                        model.perform(offer.action, on: entry)
+                        perform(offer.action)
                     }
                 }
             }
@@ -68,6 +68,10 @@ extension RowAction {
             "Unpin"
         case .delete:
             "Delete"
+        case .copyCode:
+            "Copy Code"
+        case .removeAccount:
+            "Remove Account"
         }
     }
 
@@ -82,6 +86,10 @@ extension RowAction {
             "Unpin"
         case .delete:
             "Delete"
+        case .copyCode:
+            "Copy"
+        case .removeAccount:
+            "Remove"
         }
     }
 
@@ -95,17 +103,21 @@ extension RowAction {
             "pin.slash"
         case .delete:
             "trash"
+        case .copyCode:
+            "doc.on.doc"
+        case .removeAccount:
+            "minus.circle"
         }
     }
 
-    /// Delete is red; the others are not, so it stands out at the edge.
+    /// Delete and Remove Account are red; the others are not, so they stand out at the edge.
     var swipeColor: Color {
         switch self {
-        case .showPreview:
+        case .showPreview, .copyCode:
             .blue
         case .pin, .unpin:
             .orange
-        case .delete:
+        case .delete, .removeAccount:
             .red
         }
     }

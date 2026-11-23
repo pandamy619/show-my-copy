@@ -6,8 +6,16 @@ extension HistoryWindowModel {
     /// The row opens as wide as the buttons of its actions (`RowAction.offers(for:)`). A full swipe deletes the
     /// entry, like ⌘⌫.
     func swipeScrolled(_ scroll: RowSwipe.Scroll, on entry: ClipboardEntry) -> Bool {
-        let actionsWidth = RowSwipe.actionsWidth(buttonCount: RowAction.offers(for: entry).count)
-        switch swipe.scroll(scroll, on: entry.id, actionsWidth: actionsWidth) {
+        swipeScrolled(scroll, on: .entry(entry))
+    }
+
+    /// A scroll event over `row`, an entry's or a code's. A full swipe deletes an entry, never an account: its secret
+    /// goes only with the Remove Account button or menu item, and the row slides no further than its buttons.
+    func swipeScrolled(_ scroll: RowSwipe.Scroll, on row: HistoryRowItem) -> Bool {
+        let actionsWidth = RowSwipe.actionsWidth(buttonCount: RowAction.offers(for: row).count)
+        let outcome = swipe.scroll(
+            scroll, on: row.id, actionsWidth: actionsWidth, deletesOnFullSwipe: row.entry != nil)
+        switch outcome {
         case .pass:
             return false
         case .consume:
@@ -18,11 +26,11 @@ extension HistoryWindowModel {
         }
     }
 
-    /// Closes the open row, for a click on any row: then the click does nothing else. Returns whether a listed row
-    /// was open.
+    /// Closes the open row, an entry's or a code's, for a click on any row: then the click does nothing else. Returns
+    /// whether a listed row was open.
     @discardableResult
     func closeSwipedRow() -> Bool {
-        let wasShown = swipe.swipedRowID.map { id in items.contains { $0.id == id } } ?? false
+        let wasShown = swipe.swipedRowID.map { id in rows.contains { $0.id == id } } ?? false
         swipe.close()
         return wasShown
     }

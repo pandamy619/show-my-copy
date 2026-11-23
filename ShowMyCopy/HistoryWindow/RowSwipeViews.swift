@@ -1,38 +1,38 @@
 import AppKit
 import SwiftUI
 
-/// Swiping a history row: the row slides left over a button for each of its actions (`RowAction`), with a two-finger
-/// swipe on a trackpad. `RowSwipe` decides everything; this only draws its state and feeds it events. A mouse drag
-/// drags the entry out of the window instead (`RowDragSource`).
+/// Swiping a row, an entry's or a code's: the row slides left over a button for each of its actions (`RowAction`),
+/// with a two-finger swipe on a trackpad. `RowSwipe` decides everything; this only draws its state and feeds it
+/// events. A mouse drag drags an entry out of the window instead (`RowDragSource`).
 ///
 /// The buttons are hidden from VoiceOver: the row offers the same actions as accessibility actions, from the same
 /// list.
 struct RowSwipeModifier: ViewModifier {
-    let entry: ClipboardEntry
+    let row: HistoryRowItem
     let model: HistoryWindowModel
+    /// Does the action of a tapped button.
+    let perform: @MainActor (RowAction) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reducesMotion
 
     @ViewBuilder
     func body(content: Content) -> some View {
         let swipe = model.swipe
-        let offset = swipe.displayedOffset(of: entry.id, reducesMotion: reducesMotion)
+        let offset = swipe.displayedOffset(of: row.id, reducesMotion: reducesMotion)
         // The row follows the fingers as they move, and slides into place when they let go. Not with Reduce Motion:
         // then the buttons just appear.
-        let animates = !reducesMotion && !swipe.isTracking(entry.id)
+        let animates = !reducesMotion && !swipe.isTracking(row.id)
         content
             .offset(x: -offset)
             .background(alignment: .trailing) {
                 if offset > 0 {
-                    SwipeActionButtons(offers: RowAction.offers(for: entry), offset: offset) { action in
-                        model.perform(action, on: entry)
-                    }
+                    SwipeActionButtons(offers: RowAction.offers(for: row), offset: offset, perform: perform)
                 }
             }
             // Over the whole row, but only scroll events stop there: clicks reach the row and the buttons.
             .overlay {
                 RowSwipeScrollReader { scroll in
-                    model.swipeScrolled(scroll, on: entry)
+                    model.swipeScrolled(scroll, on: row)
                 }
                 .accessibilityHidden(true)
             }

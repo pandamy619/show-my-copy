@@ -88,6 +88,18 @@ struct RowActionTests {
         }
     }
 
+    @Test func anAccountOffersCopyCodeAndRemoveAccount() {
+        let account = CodeAccount(account: CodeFixtures.account(), addedAt: clock.now)
+
+        let offers = RowAction.offers(for: .code(account))
+
+        #expect(offers == RowAction.codeOffers)
+        #expect(offers.map(\.action) == [.copyCode, .removeAccount])
+        #expect(offers.allSatisfy { $0.isEnabled })
+        #expect(offers.map(\.action).filter(\.isDestructive) == [.removeAccount])
+        #expect(offers.count <= RowAction.maximumCount)
+    }
+
     // MARK: - Performing
 
     @Test func showPreviewSelectsAndPreviewsTheEntryAndClosesTheRow() throws {
@@ -153,6 +165,19 @@ struct RowActionTests {
 
         #expect(model.showsPinLimitNotice)
         #expect(try entry(text.id).isPinned)
+    }
+
+    @Test func aCodesActionsLeaveAnEntryAloneAndCloseTheRow() throws {
+        let text = try record(.text("hello"))
+        let model = makeModel()
+        swipeOpen(text, in: model)
+
+        model.perform(.copyCode, on: text)
+        model.perform(.removeAccount, on: text)
+
+        #expect(deleter.deletedIDs.isEmpty)
+        #expect(model.items.map(\.id) == [text.id])
+        #expect(model.swipe.swipedRowID == nil)
     }
 
     @Test func deleteDeletesLikeCommandDeleteAndClosesTheRow() throws {
