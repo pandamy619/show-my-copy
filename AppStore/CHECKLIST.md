@@ -97,10 +97,10 @@ Two consequences to decide on before the first store build:
 
 ## 4. Version
 
-- [ ] `MARKETING_VERSION` is `0.2.0` in `Config/Shared.xcconfig` (one value for the app and the extension, which
+- [ ] `MARKETING_VERSION` is `0.3.0` in `Config/Shared.xcconfig` (one value for the app and the extension, which
       must match). Leave it until you decide; for the store release set it to `1.0` (or `1.0.0`), and update
-      the "0.2.0" in README.md, README.ru.md, SECURITY.md, CHANGELOG.md and PRIVACY*.md with it.
-- [ ] `CURRENT_PROJECT_VERSION` (`2`) is the build number: raise it for every upload, since App Store Connect
+      the "0.3.0" in README.md, README.ru.md, SECURITY.md, CHANGELOG.md and PRIVACY*.md with it.
+- [ ] `CURRENT_PROJECT_VERSION` (`3`) is the build number: raise it for every upload, since App Store Connect
       takes each build number of a version only once.
 - [ ] "What's New" (`release_notes.txt`) is not shown for the first version of an app; the draft is for the
       next one ([platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information)).

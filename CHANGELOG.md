@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] - 2026-11-23
+
+Actions on code rows, editable account names, and each sealed secret bound to its place. Requires macOS 15 Sequoia or later.
 
 ### Codes
 
