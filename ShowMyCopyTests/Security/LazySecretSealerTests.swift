@@ -56,16 +56,17 @@ final class SealerFactorySpy: Sendable {
 
 struct LazySecretSealerTests {
     private let secret = Data("hunter2".utf8)
+    private let context = SealingContext.historyEntry(UUID())
 
     @Test func doesNotCreateTheSealerUntilItsKeyIsLoaded() {
         let factory = SealerFactorySpy()
         let sealer = factory.makeLazySealer()
 
         #expect(throws: SecretSealingError.keyNotLoaded) {
-            try sealer.seal(secret)
+            try sealer.seal(secret, boundTo: context)
         }
         #expect(throws: SecretSealingError.keyNotLoaded) {
-            try sealer.open(secret)
+            try sealer.open(secret, boundTo: context)
         }
         #expect(factory.calls == 0)
     }
@@ -76,9 +77,9 @@ struct LazySecretSealerTests {
         let sealer = factory.makeLazySealer()
 
         #expect(await sealer.loadKey() == .ready)
-        let sealed = try sealer.seal(secret)
+        let sealed = try sealer.seal(secret, boundTo: context)
         #expect(sealed != secret)
-        #expect(try sealer.open(sealed) == secret)
+        #expect(try sealer.open(sealed, boundTo: context) == secret)
         #expect(await sealer.loadKey() == .ready)
 
         #expect(factory.calls == 1)
@@ -91,13 +92,13 @@ struct LazySecretSealerTests {
 
         #expect(await sealer.loadKey() == .unavailable)
         #expect(throws: SecretSealingError.keyUnavailable(.accessDenied)) {
-            try sealer.seal(secret)
+            try sealer.seal(secret, boundTo: context)
         }
         // Asking again would show the same prompt again: the next launch tries again.
         factory.setFailure(nil)
         #expect(await sealer.loadKey() == .unavailable)
         #expect(throws: SecretSealingError.keyUnavailable(.accessDenied)) {
-            try sealer.open(secret)
+            try sealer.open(secret, boundTo: context)
         }
         #expect(factory.calls == 1)
     }
@@ -108,12 +109,12 @@ struct LazySecretSealerTests {
 
         #expect(await sealer.loadKey() == .lockedOut)
         #expect(throws: SecretSealingError.keyUnavailable(.interactionNotAllowed)) {
-            try sealer.seal(secret)
+            try sealer.seal(secret, boundTo: context)
         }
 
         factory.setFailure(nil)
         #expect(await sealer.loadKey() == .ready)
-        #expect(try sealer.open(try sealer.seal(secret)) == secret)
+        #expect(try sealer.open(try sealer.seal(secret, boundTo: context), boundTo: context) == secret)
         #expect(factory.calls == 2)
     }
 

@@ -6,8 +6,9 @@ import Foundation
 /// `seal` and `open` never wait for a key: one whose key has to be fetched first (from the Keychain, which can wait
 /// for the user to answer a prompt) throws `SecretSealingError.keyNotLoaded` until `loadKey()` fetched it.
 protocol SecretSealing: Sendable {
-    func seal(_ plaintext: Data) throws -> Data
-    func open(_ sealed: Data) throws -> Data
+    /// Seals `plaintext` for `context` alone: `open` with another context fails like changed data.
+    func seal(_ plaintext: Data, boundTo context: SealingContext) throws -> Data
+    func open(_ sealed: Data, boundTo context: SealingContext) throws -> Data
 
     /// Gets the key ready, off the caller's actor, and says whether `seal` and `open` can use it now.
     func loadKey() async -> SealingKeyState

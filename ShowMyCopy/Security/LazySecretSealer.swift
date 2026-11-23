@@ -34,12 +34,12 @@ final class LazySecretSealer: SecretSealing {
         self.makeSealer = makeSealer
     }
 
-    func seal(_ plaintext: Data) throws -> Data {
-        try loadedSealer().seal(plaintext)
+    func seal(_ plaintext: Data, boundTo context: SealingContext) throws -> Data {
+        try loadedSealer().seal(plaintext, boundTo: context)
     }
 
-    func open(_ sealed: Data) throws -> Data {
-        try loadedSealer().open(sealed)
+    func open(_ sealed: Data, boundTo context: SealingContext) throws -> Data {
+        try loadedSealer().open(sealed, boundTo: context)
     }
 
     func loadKey() async -> SealingKeyState {

@@ -76,6 +76,18 @@ struct SealedCodeAccountsFileTests {
         #expect(FileManager.default.contents(atPath: file.fileURL.path(percentEncoded: false)) == bytes)
     }
 
+    @Test func aSecretSealedForAHistoryRecordDoesNotOpenAsTheAccountsFile() async throws {
+        // The file is bound to its place: a sealed password put there (same key, valid JSON inside) is damaged.
+        defer { removeDirectory() }
+        let file = makeFile()
+        let json = try SealedCodeAccountsFile.encode([CodeFixtures.stored()])
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try sealer.seal(json, boundTo: .historyEntry(UUID())).write(to: file.fileURL)
+
+        #expect(await file.load() == .damaged)
+        #expect(try sealer.open(try sealer.seal(json, boundTo: .codeAccounts), boundTo: .codeAccounts) == json)
+    }
+
     @Test func aFileSealedWithAnotherKeyIsDamaged() async throws {
         defer { removeDirectory() }
         try await makeFile().save([CodeFixtures.stored()])
@@ -126,11 +138,11 @@ struct SealedCodeAccountsFileTests {
 private struct UnreadySealer: SecretSealing {
     let state: SealingKeyState
 
-    func seal(_ plaintext: Data) throws -> Data {
+    func seal(_ plaintext: Data, boundTo context: SealingContext) throws -> Data {
         throw SecretSealingError.keyNotLoaded
     }
 
-    func open(_ sealed: Data) throws -> Data {
+    func open(_ sealed: Data, boundTo context: SealingContext) throws -> Data {
         throw SecretSealingError.keyNotLoaded
     }
 

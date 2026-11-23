@@ -1,6 +1,7 @@
 import Foundation
 
-/// Turns history entries into the records written to disk and back. Concealed entries are sealed with `sealer`.
+/// Turns history entries into the records written to disk and back. Concealed entries are sealed with `sealer`,
+/// bound to their record (`SealingContext.historyEntry`): a sealed payload copied into another record does not open.
 ///
 /// Without a sealer concealed entries are not written at all: they stay in memory until they expire or the app quits,
 /// and saved concealed records cannot be opened. A sealer whose key cannot be used now (not loaded yet, locked,
@@ -55,7 +56,7 @@ struct StoredEntryCoder: Sendable {
             return nil
         }
         do {
-            record.payload = try sealer.seal(Self.padded(payload))
+            record.payload = try sealer.seal(Self.padded(payload), boundTo: .historyEntry(entry.id))
         } catch SecretSealingError.keyNotLoaded {
             AppLogger.history.info("A password waits for its key before it is saved")
             throw .sealFailed
@@ -78,7 +79,7 @@ struct StoredEntryCoder: Sendable {
         }
         var payload = record.payload
         if record.isConcealed {
-            switch open(payload) {
+            switch open(payload, boundTo: .historyEntry(record.id)) {
             case .opened(let opened):
                 payload = opened
             case .waitsForKey:
@@ -119,13 +120,13 @@ struct StoredEntryCoder: Sendable {
         case unreadable
     }
 
-    private func open(_ sealed: Data) -> Opened {
+    private func open(_ sealed: Data, boundTo context: SealingContext) -> Opened {
         guard let sealer else {
             return .unreadable
         }
         let padded: Data
         do {
-            padded = try sealer.open(sealed)
+            padded = try sealer.open(sealed, boundTo: context)
         } catch let error as SecretSealingError where error.isAboutTheKey {
             return .waitsForKey
         } catch SecretSealingError.newerFormatVersion {

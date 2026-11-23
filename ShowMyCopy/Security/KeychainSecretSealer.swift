@@ -3,8 +3,8 @@ import Foundation
 import os
 
 /// Seals secrets with AES-256-GCM under a key kept in the Keychain (see `KeychainSymmetricKeyStore` for which
-/// keychain and why). Sealed data is `[format version 1] + nonce + ciphertext + tag`, with the version byte
-/// authenticated too.
+/// keychain and why). Sealed data is `[format version] + nonce + ciphertext + tag`, with the version byte and the
+/// `SealingContext` authenticated too (see `VersionedSecretSealer` for the versions).
 ///
 /// Holds only an immutable key, so one instance can be shared across threads and actors.
 final class KeychainSecretSealer: SecretSealing {
@@ -35,12 +35,12 @@ final class KeychainSecretSealer: SecretSealing {
         sealer = VersionedSecretSealer(cipher: AESGCMCipher(key: SymmetricKey(data: keyData)))
     }
 
-    func seal(_ plaintext: Data) throws -> Data {
-        try sealer.seal(plaintext)
+    func seal(_ plaintext: Data, boundTo context: SealingContext) throws -> Data {
+        try sealer.seal(plaintext, boundTo: context)
     }
 
-    func open(_ sealed: Data) throws -> Data {
-        try sealer.open(sealed)
+    func open(_ sealed: Data, boundTo context: SealingContext) throws -> Data {
+        try sealer.open(sealed, boundTo: context)
     }
 
     private static func newKeyData() -> Data {

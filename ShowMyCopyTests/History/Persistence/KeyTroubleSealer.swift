@@ -31,12 +31,12 @@ final class KeyTroubleSealer: SecretSealing {
         state.withLock { $0.loadedState = loadedState }
     }
 
-    func seal(_ plaintext: Data) throws -> Data {
-        try readySealer().seal(plaintext)
+    func seal(_ plaintext: Data, boundTo context: SealingContext) throws -> Data {
+        try readySealer().seal(plaintext, boundTo: context)
     }
 
-    func open(_ sealed: Data) throws -> Data {
-        try readySealer().open(sealed)
+    func open(_ sealed: Data, boundTo context: SealingContext) throws -> Data {
+        try readySealer().open(sealed, boundTo: context)
     }
 
     func loadKey() async -> SealingKeyState {
@@ -64,11 +64,11 @@ final class KeyTroubleSealer: SecretSealing {
 struct DataTroubleSealer: SecretSealing {
     let error: SecretSealingError
 
-    func seal(_ plaintext: Data) throws -> Data {
-        try FakeSecretSealer().seal(plaintext)
+    func seal(_ plaintext: Data, boundTo context: SealingContext) throws -> Data {
+        try FakeSecretSealer().seal(plaintext, boundTo: context)
     }
 
-    func open(_ sealed: Data) throws -> Data {
+    func open(_ sealed: Data, boundTo context: SealingContext) throws -> Data {
         throw error
     }
 }

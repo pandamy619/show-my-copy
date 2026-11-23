@@ -1,7 +1,8 @@
 import Foundation
 
 /// The accounts in `Application Support/ShowMyCopy/Codes/Accounts.sealed`: JSON, sealed with the same key as saved
-/// passwords (`KeychainSecretSealer`), in a folder left out of backups. The whole file is written at once, atomically,
+/// passwords (`KeychainSecretSealer`) and bound to this file (`SealingContext.codeAccounts`), so a sealed password
+/// put in its place does not open, in a folder left out of backups. The whole file is written at once, atomically,
 /// so a failed write leaves the previous accounts in place.
 ///
 /// The key is the history key, so a user who allowed the app to use it for passwords is not asked again for codes,
@@ -49,7 +50,7 @@ struct SealedCodeAccountsFile: CodeAccountsPersisting {
         }
         let json: Data
         do {
-            json = try sealer.open(sealed)
+            json = try sealer.open(sealed, boundTo: .codeAccounts)
         } catch let error as SecretSealingError where error.isAboutTheKey {
             return error.isTemporary ? .keyLockedOut : .keyUnavailable
         } catch SecretSealingError.newerFormatVersion {
@@ -81,7 +82,7 @@ struct SealedCodeAccountsFile: CodeAccountsPersisting {
         }
         let sealed: Data
         do {
-            sealed = try sealer.seal(try Self.encode(accounts))
+            sealed = try sealer.seal(try Self.encode(accounts), boundTo: .codeAccounts)
         } catch let error as SecretSealingError where error.isAboutTheKey {
             throw .keyNotReady
         } catch {

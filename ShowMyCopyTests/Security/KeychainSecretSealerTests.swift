@@ -6,6 +6,7 @@ import Testing
 
 struct KeychainSecretSealerTests {
     private let secret = Data("correct horse battery staple".utf8)
+    private let context = SealingContext.historyEntry(UUID())
 
     private func makeSealer(store: InMemorySymmetricKeyStore = .init()) throws -> KeychainSecretSealer {
         try KeychainSecretSealer(keyStores: [store])
@@ -13,13 +14,13 @@ struct KeychainSecretSealerTests {
 
     @Test func roundTrip() throws {
         let sealer = try makeSealer()
-        let sealed = try sealer.seal(secret)
-        #expect(try sealer.open(sealed) == secret)
+        let sealed = try sealer.seal(secret, boundTo: context)
+        #expect(try sealer.open(sealed, boundTo: context) == secret)
     }
 
     @Test func sealedDataIsVersionNonceCiphertextAndTag() throws {
-        let sealed = try makeSealer().seal(secret)
-        #expect(sealed.first == 1)
+        let sealed = try makeSealer().seal(secret, boundTo: context)
+        #expect(sealed.first == 2)
         #expect(sealed.count == 1 + 12 + secret.count + 16)
         #expect(sealed.range(of: secret) == nil)
     }
@@ -27,56 +28,60 @@ struct KeychainSecretSealerTests {
     @Test func sealingTheSameSecretTwiceGivesDifferentData() throws {
         // A fresh random nonce for every seal: reusing one with the same key would break AES-GCM.
         let sealer = try makeSealer()
-        #expect(try sealer.seal(secret) != sealer.seal(secret))
+        #expect(try sealer.seal(secret, boundTo: context) != sealer.seal(secret, boundTo: context))
     }
 
     @Test func emptyPlaintextRoundTrip() throws {
         let sealer = try makeSealer()
-        let sealed = try sealer.seal(Data())
+        let sealed = try sealer.seal(Data(), boundTo: context)
         #expect(sealed.count == 1 + 12 + 16)
-        #expect(try sealer.open(sealed) == Data())
+        #expect(try sealer.open(sealed, boundTo: context) == Data())
     }
 
     @Test func tamperedCiphertextFails() throws {
         let sealer = try makeSealer()
-        let sealed = try sealer.seal(secret)
+        let sealed = try sealer.seal(secret, boundTo: context)
         for index in sealed.indices.dropFirst() {
             var tampered = sealed
             tampered[index] ^= 0x80
             #expect(throws: SecretSealingError.authenticationFailed) {
-                try sealer.open(tampered)
+                try sealer.open(tampered, boundTo: context)
             }
         }
     }
 
     @Test func truncatedDataFails() throws {
         let sealer = try makeSealer()
-        let sealed = try sealer.seal(secret)
+        let sealed = try sealer.seal(secret, boundTo: context)
         #expect(throws: SecretSealingError.authenticationFailed) {
-            try sealer.open(sealed.dropLast())
+            try sealer.open(sealed.dropLast(), boundTo: context)
         }
         #expect(throws: SecretSealingError.authenticationFailed) {
-            try sealer.open(sealed.prefix(10))
+            try sealer.open(sealed.prefix(10), boundTo: context)
         }
     }
 
     @Test func wrongKeyFails() throws {
-        let sealed = try makeSealer().seal(secret)
+        let sealed = try makeSealer().seal(secret, boundTo: context)
         let other = try makeSealer()
         #expect(throws: SecretSealingError.authenticationFailed) {
-            try other.open(sealed)
+            try other.open(sealed, boundTo: context)
         }
     }
 
     @Test func unknownVersionFails() throws {
         let sealer = try makeSealer()
-        var sealed = try sealer.seal(secret)
-        sealed[sealed.startIndex] = 2
-        #expect(throws: SecretSealingError.newerFormatVersion(2)) {
-            try sealer.open(sealed)
+        var sealed = try sealer.seal(secret, boundTo: context)
+        sealed[sealed.startIndex] = 3
+        #expect(throws: SecretSealingError.newerFormatVersion(3)) {
+            try sealer.open(sealed, boundTo: context)
+        }
+        sealed[sealed.startIndex] = 0
+        #expect(throws: SecretSealingError.unsupportedFormatVersion(0)) {
+            try sealer.open(sealed, boundTo: context)
         }
         #expect(throws: SecretSealingError.missingFormatVersion) {
-            try sealer.open(Data())
+            try sealer.open(Data(), boundTo: context)
         }
     }
 
@@ -84,21 +89,44 @@ struct KeychainSecretSealerTests {
 
     @Test func newKeyIsStoredAndReusedByTheNextSealer() throws {
         let store = InMemorySymmetricKeyStore()
-        let sealed = try makeSealer(store: store).seal(secret)
+        let sealed = try makeSealer(store: store).seal(secret, boundTo: context)
         #expect(store.added.count == 1)
         #expect(store.key?.count == 32)
 
         let next = try makeSealer(store: store)
-        #expect(try next.open(sealed) == secret)
+        #expect(try next.open(sealed, boundTo: context) == secret)
         #expect(store.added.count == 1)
     }
 
     @Test func storedKeyIsUsedForAESGCM() throws {
         let keyData = Data((0..<32).map { UInt8($0) })
-        let sealed = try makeSealer(store: InMemorySymmetricKeyStore(key: keyData)).seal(secret)
+        let sealed = try makeSealer(store: InMemorySymmetricKeyStore(key: keyData)).seal(secret, boundTo: context)
         let box = try AES.GCM.SealedBox(combined: sealed.dropFirst())
-        let opened = try AES.GCM.open(box, using: SymmetricKey(data: keyData), authenticating: Data([1]))
+        let opened = try AES.GCM.open(
+            box, using: SymmetricKey(data: keyData), authenticating: Data([2]) + context.bytes)
         #expect(opened == secret)
+    }
+
+    @Test func dataSealedByAnEarlierVersionStillOpens() throws {
+        // 0.1.0 and 0.2.0 sealed with the version byte alone authenticated (format version 1).
+        let keyData = Data((0..<32).map { UInt8($0) })
+        let key = SymmetricKey(data: keyData)
+        let box = try AES.GCM.seal(secret, using: key, authenticating: Data([1]))
+        let sealed = Data([1]) + (try #require(box.combined))
+        let sealer = try makeSealer(store: InMemorySymmetricKeyStore(key: keyData))
+        #expect(try sealer.open(sealed, boundTo: context) == secret)
+        #expect(try sealer.open(sealed, boundTo: .codeAccounts) == secret)
+    }
+
+    @Test func dataBoundToAnotherRecordFailsAuthentication() throws {
+        let sealer = try makeSealer()
+        let sealed = try sealer.seal(secret, boundTo: context)
+        #expect(throws: SecretSealingError.authenticationFailed) {
+            try sealer.open(sealed, boundTo: .historyEntry(UUID()))
+        }
+        #expect(throws: SecretSealingError.authenticationFailed) {
+            try sealer.open(sealed, boundTo: .codeAccounts)
+        }
     }
 
     @Test func unavailableKeyStoreThrowsATypedError() {
@@ -142,10 +170,10 @@ struct KeychainSecretSealerTests {
             }
         }
 
-        let sealed = try KeychainSecretSealer(keyStores: item.stores).seal(secret)
+        let sealed = try KeychainSecretSealer(keyStores: item.stores).seal(secret, boundTo: context)
         // A second sealer must find the same key in the Keychain instead of creating another one.
         let reopened = try KeychainSecretSealer(keyStores: item.stores)
-        #expect(try reopened.open(sealed) == secret)
+        #expect(try reopened.open(sealed, boundTo: context) == secret)
     }
 }
 

@@ -65,7 +65,16 @@ struct StoredEntryCoderTests {
         #expect(record.previewText == nil)
         #expect(record.byteSize == 0)
         #expect(record.payload.range(of: Data("hunter2".utf8)) == nil)
-        #expect(try FakeSecretSealer().open(record.payload) != Data("hunter2".utf8))
+        #expect(try FakeSecretSealer().open(record.payload, boundTo: .historyEntry(record.id)) != Data("hunter2".utf8))
+    }
+
+    @Test func aPasswordCopiedIntoAnotherRecordIsUnreadable() throws {
+        // The sealed payload is bound to its record, so it opens nowhere else, and the record it was copied into
+        // is of no use: it is deleted like any password that cannot be opened.
+        let record = try #require(try coder.record(for: entry("hunter2", concealed: true)))
+        let other = record.replacingID(with: UUID())
+        #expect(coder.decode(other) == .unreadable)
+        #expect(coder.decode(record) != .unreadable)
     }
 
     @Test func sealedPasswordsOfDifferentLengthsHaveTheSameSize() throws {
@@ -174,7 +183,8 @@ struct StoredEntryCoderTests {
         // The sealed data opens, and what is inside has a format byte this version does not write.
         let sealer = FakeSecretSealer()
         let record = try #require(try coder.record(for: entry("hunter2", concealed: true)))
-        let inside = try sealer.seal(Data([0, 0, 0, 1, StoredPayload.format + 1]) + Data(count: 59))
+        let inside = try sealer.seal(
+            Data([0, 0, 0, 1, StoredPayload.format + 1]) + Data(count: 59), boundTo: .historyEntry(record.id))
         #expect(coder.decode(record.replacingPayload(with: inside)) == .newerFormat)
     }
 }
@@ -182,6 +192,10 @@ struct StoredEntryCoderTests {
 extension StoredEntryRecord {
     func replacingPayload(with payload: Data) -> StoredEntryRecord {
         changed { $0.payload = payload }
+    }
+
+    func replacingID(with id: UUID) -> StoredEntryRecord {
+        changed { $0.id = id }
     }
 
     func replacingKind(with kind: String) -> StoredEntryRecord {

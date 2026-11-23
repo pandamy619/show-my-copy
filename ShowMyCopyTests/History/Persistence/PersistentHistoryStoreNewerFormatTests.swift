@@ -12,12 +12,15 @@ struct PersistentHistoryStoreNewerFormatTests {
     private let blobs = InMemoryBlobStore()
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
     private let sealer = FakeSecretSealer()
+    /// A padded payload whose format byte this version does not write.
+    private let newerPayload = Data([0, 0, 0, 1, StoredPayload.format + 1]) + Data(count: 59)
 
     private func record(
-        kind: String = "text", payload: Data, concealed: Bool = false, expiresAt: Date? = nil, blobIDs: [UUID] = []
+        id: UUID = UUID(), kind: String = "text", payload: Data, concealed: Bool = false, expiresAt: Date? = nil,
+        blobIDs: [UUID] = []
     ) -> StoredEntryRecord {
         StoredEntryRecord(
-            id: UUID(), kind: kind, payload: payload, contentHash: concealed ? nil : "00ff", byteSize: 0,
+            id: id, kind: kind, payload: payload, contentHash: concealed ? nil : "00ff", byteSize: 0,
             previewText: concealed ? nil : "", date: start, sourceAppBundleIdentifier: nil, sourceAppName: nil,
             isConcealed: concealed, expiresAt: expiresAt, isPinned: false, blobIDs: blobIDs)
     }
@@ -33,11 +36,12 @@ struct PersistentHistoryStoreNewerFormatTests {
     private func saveNewerRecords() throws -> Saved {
         let blob = BlobID()
         blobs.write(Data([1, 2, 3]), as: blob)
+        let password = UUID()
         let newer = [
             record(payload: Data([StoredPayload.format + 1, 0x61])),
             record(kind: "hologram", payload: Data([StoredPayload.format, 0x61]), blobIDs: [blob.uuid]),
             record(
-                payload: try sealer.seal(Data([0, 0, 0, 1, StoredPayload.format + 1]) + Data(count: 59)),
+                id: password, payload: try sealer.seal(newerPayload, boundTo: .historyEntry(password)),
                 concealed: true, expiresAt: start + 600),
             // Sealed with a format version this app does not know: `FakeSecretSealer` puts its key first, so a
             // leading byte it does not know fails like a newer version byte would for the real sealer.
@@ -102,8 +106,9 @@ struct PersistentHistoryStoreNewerFormatTests {
     @Test func aWaitingPasswordThatTurnsOutNewerIsLeftAlone() async throws {
         // The key was not loaded at launch, so the password waited; once the key loads it turns out to be of a newer
         // format: it stays on disk, unopened and unchanged, and stops waiting.
-        let sealed = try sealer.seal(Data([0, 0, 0, 1, StoredPayload.format + 1]) + Data(count: 59))
-        let waiting = record(payload: sealed, concealed: true, expiresAt: start + 600)
+        let password = UUID()
+        let sealed = try sealer.seal(newerPayload, boundTo: .historyEntry(password))
+        let waiting = record(id: password, payload: sealed, concealed: true, expiresAt: start + 600)
         try disk.insert([waiting])
         let locked = KeyTroubleSealer(failure: .keyNotLoaded)
         let store = disk.makeStore(sealer: locked, now: start + 1)

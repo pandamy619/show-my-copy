@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- Each saved password is bound to its history record and the code accounts file to its place (sealed format version 2: the record's id, or the file's label, is authenticated with the ciphertext), so sealed data moved to another record or file does not open there. Data sealed by 0.2.0 and earlier (version 1) still opens; passwords until they expire, the accounts file until the accounts next change.
+
 ## [0.2.0] - 2026-11-21
 
 One-time codes from Google Authenticator, and the fixes of a security audit of 0.1.0. Requires macOS 15 Sequoia or later.
