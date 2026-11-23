@@ -148,34 +148,41 @@ struct HistoryView: View {
         // on the clipboard stays among the pinned ones: then there is no "Current clipboard" row.
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    if !codes.isEmpty {
-                        codesSection(codes, selectedID: selectedID, aboveEntries: !sections.isEmpty)
-                    }
-                    if let current = sections.current {
-                        sectionHeader("Current clipboard")
-                        row(current, selectedID: selectedID, now: now)
-                        Divider()
-                            .padding(.vertical, 4)
-                    }
-                    if !sections.pinned.isEmpty {
-                        sectionHeader("Pinned")
-                        ForEach(sections.pinned) { entry in
-                            row(entry, selectedID: selectedID, now: now)
+                VStack(spacing: 0) {
+                    // The top edge, always in place and outside the lazy stack, so the list can be scrolled to it
+                    // by id while a row that is only being added, like the first code, is not laid out yet.
+                    Color.clear
+                        .frame(height: 0)
+                        .id(Self.topID)
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        if !codes.isEmpty {
+                            codesSection(codes, selectedID: selectedID, aboveEntries: !sections.isEmpty)
                         }
-                        if !sections.history.isEmpty {
+                        if let current = sections.current {
+                            sectionHeader("Current clipboard")
+                            row(current, selectedID: selectedID, now: now)
                             Divider()
                                 .padding(.vertical, 4)
                         }
-                    }
-                    if !sections.history.isEmpty {
-                        sectionHeader("History")
-                        ForEach(sections.history) { entry in
-                            row(entry, selectedID: selectedID, now: now)
+                        if !sections.pinned.isEmpty {
+                            sectionHeader("Pinned")
+                            ForEach(sections.pinned) { entry in
+                                row(entry, selectedID: selectedID, now: now)
+                            }
+                            if !sections.history.isEmpty {
+                                Divider()
+                                    .padding(.vertical, 4)
+                            }
+                        }
+                        if !sections.history.isEmpty {
+                            sectionHeader("History")
+                            ForEach(sections.history) { entry in
+                                row(entry, selectedID: selectedID, now: now)
+                            }
                         }
                     }
+                    .padding(6)
                 }
-                .padding(6)
             }
             .onChange(of: selectedID) {
                 if let selectedID {
@@ -183,12 +190,20 @@ struct HistoryView: View {
                 }
             }
             .onChange(of: model.presentationCount) {
-                if let first = model.rows.first {
-                    proxy.scrollTo(first.id, anchor: .top)
+                proxy.scrollTo(Self.topID, anchor: .top)
+            }
+            // The codes slide in at the top, where the list may be scrolled away from: a scroll to the first code,
+            // not laid out yet in the lazy stack, would be lost. The top is always there.
+            .onChange(of: model.showsCodes) { _, shows in
+                if shows {
+                    proxy.scrollTo(Self.topID, anchor: .top)
                 }
             }
         }
     }
+
+    /// The id of the list's top edge, for `ScrollViewProxy.scrollTo`.
+    private static let topID = "top"
 
     /// The Codes section, first under the search bar, when the user asked for it; it slides in and out.
     private func codesSection(_ codes: [CodeAccount], selectedID: UUID?, aboveEntries: Bool) -> some View {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Showing the codes with the button or ⌘K scrolls the list to the top, where they slide in, also when it was scrolled down. The scroll went to the first code's row, not laid out yet at that moment, and was lost.
+
 ### Security
 
 - Each saved password is bound to its history record and the code accounts file to its place (sealed format version 2: the record's id, or the file's label, is authenticated with the ciphertext), so sealed data moved to another record or file does not open there. Data sealed by 0.2.0 and earlier (version 1) still opens; passwords until they expire, the accounts file until the accounts next change.
