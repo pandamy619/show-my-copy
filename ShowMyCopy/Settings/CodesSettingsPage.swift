@@ -38,6 +38,7 @@ struct CodesSettingsPage: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("The button next to the gear in the history window (or ⌘K) shows the codes.")
                 Text("They are hidden each time the window opens.")
+                Text("A shortcut recorded in Settings → General shows and hides them in the open window too.")
                 Text("Choosing one copies it. The code leaves the clipboard when its time is up.")
             }
             .font(.footnote)

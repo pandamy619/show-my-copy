@@ -142,6 +142,17 @@ struct AppContainerTests {
         }
     }
 
+    @Test func toggleCodesLeavesAClosedWindowClosed() throws {
+        try withContainer { container in
+            container.start()
+
+            container.toggleCodes()
+
+            #expect(!container.historyWindow.isVisible)
+            #expect(!container.historyWindow.model.showsCodes)
+        }
+    }
+
     @Test func toggleHistoryCatchesUpBeforeShowing() throws {
         try withContainer { container in
             // Copied before the monitor's next poll, here before it ever polled.

@@ -269,6 +269,12 @@ final class AppContainer: HistoryShowing {
         historyWindow.shortcutPressed()
     }
 
+    /// Shows or hides the codes of the open history window, for the codes shortcut (`GlobalShortcut.showCodes`).
+    /// A closed window is left closed.
+    func toggleCodes() {
+        historyWindow.codesShortcutPressed()
+    }
+
     /// Shows the history window, or leaves it open: the Control Center button opens the history and never closes it.
     func showHistory() {
         historyWindow.openRequested()

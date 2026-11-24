@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Codes
+
+- A second shortcut, Show codes in Settings → General, shows and hides the codes in the open history window like ⌘K, with keys of your choice: the first code is selected when they appear, so Return copies it right away. It never opens the window and does nothing while it is closed or without accounts. It has no keys until you record them.
+
 ## [0.3.0] - 2026-11-23
 
 Actions on code rows, editable account names, and each sealed secret bound to its place. Requires macOS 15 Sequoia or later.

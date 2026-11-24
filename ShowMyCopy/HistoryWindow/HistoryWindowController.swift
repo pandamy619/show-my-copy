@@ -104,24 +104,6 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Called when the user presses the history shortcut. Only a person at the awake, unlocked Mac can press it,
-    /// so the monitor drops pause reasons left by a missed wake or unlock notification before the window opens.
-    func shortcutPressed() {
-        monitor.userIsActive()
-        toggle()
-    }
-
-    /// Called when the user asks for the history from outside the app, such as with the Control Center button. Like
-    /// the shortcut, only a person at the Mac can ask. Unlike the shortcut, it only opens the window: an open window
-    /// stays open, with its search and selection.
-    func openRequested() {
-        monitor.userIsActive()
-        guard !isVisible else {
-            return
-        }
-        show()
-    }
-
     /// Copies the entry back to the clipboard and closes the window, then, when `pastes` is true, pastes it into the
     /// app in front (`EntryPasting`). When the copy fails, the window stays open, so the user can try again or pick
     /// another entry, and nothing is pasted.
@@ -322,6 +304,38 @@ final class HistoryWindowController: NSObject, NSWindowDelegate {
             return .zero
         }
         return HistoryPanelPlacement.origin(for: size, in: visibleFrame)
+    }
+}
+
+/// What the user asks for from outside the window: the shortcuts and the Control Center button.
+extension HistoryWindowController {
+    /// Called when the user presses the history shortcut. Only a person at the awake, unlocked Mac can press it,
+    /// so the monitor drops pause reasons left by a missed wake or unlock notification before the window opens.
+    func shortcutPressed() {
+        monitor.userIsActive()
+        toggle()
+    }
+
+    /// Called when the user presses the codes shortcut. It works only while the history window is open: there it
+    /// shows the codes, the first one selected so Return right after copies it, or hides them when they are shown,
+    /// like ⌘K and the button next to the gear. A closed window stays closed: only the history shortcut opens it,
+    /// and the codes are never the first thing on screen. Without accounts there is nothing to show.
+    func codesShortcutPressed() {
+        guard isVisible, model.hasCodes else {
+            return
+        }
+        model.toggleCodes()
+    }
+
+    /// Called when the user asks for the history from outside the app, such as with the Control Center button. Like
+    /// the shortcut, only a person at the Mac can ask. Unlike the shortcut, it only opens the window: an open window
+    /// stays open, with its search and selection.
+    func openRequested() {
+        monitor.userIsActive()
+        guard !isVisible else {
+            return
+        }
+        show()
     }
 }
 

@@ -1,33 +1,44 @@
 import AppKit
 import SwiftUI
 
-/// Settings → General, the page Settings open on: opening at login and pasting, the shortcut, and how to reach and
+/// Settings → General, the page Settings open on: opening at login and pasting, the shortcuts, and how to reach and
 /// quit an app without a Dock or menu bar icon. The first launch's Settings show the one-time suggestion to open at
 /// login at the top, before anything else.
 struct GeneralSettingsPage<ShortcutRecorder: View>: View {
     let launchAtLogin: LaunchAtLoginSettings
     let paste: PasteSettings
-    let shortcutRecorder: ShortcutRecorder
+    /// Makes the control that records a global shortcut.
+    let shortcutRecorder: (GlobalShortcut) -> ShortcutRecorder
 
     var body: some View {
         Form {
             GeneralSettingsSection(launchAtLogin: launchAtLogin, paste: paste)
-            Section("Shortcut") {
+            Section("Shortcuts") {
                 LabeledContent("Show history") {
-                    shortcutRecorder
+                    shortcutRecorder(.showHistory)
                 }
-                Text(Self.shortcutNote)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                LabeledContent("Show codes") {
+                    shortcutRecorder(.showCodes)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(Self.historyShortcutNote)
+                    Text(Self.codesShortcutNote)
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             appSection
         }
         .formStyle(.grouped)
     }
 
-    private static var shortcutNote: LocalizedStringKey {
-        "Opens the clipboard history window. Avoid ⇧⌘V: it would replace Paste and Match Style in other apps."
+    private static var historyShortcutNote: LocalizedStringKey {
+        "Show history opens the history window. Avoid ⇧⌘V: it would replace Paste and Match Style in other apps."
+    }
+
+    private static var codesShortcutNote: LocalizedStringKey {
+        "Show codes shows the codes in the open window, the first one selected so Return copies it, and hides them."
     }
 
     /// The app has no Dock or menu bar icon, so this is the only place that says how to reach it and how to quit.

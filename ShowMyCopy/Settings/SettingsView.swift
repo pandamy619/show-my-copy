@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The settings: a sidebar of pages (`SettingsSection`) and the chosen page, each one grouped form.
-/// `shortcutRecorder` is the control that records the global shortcut.
+/// `shortcutRecorder` makes the control that records a global shortcut.
 ///
 /// Each page keeps its own unconfirmed edits: going to another page drops them, as closing the window does, and
 /// changes nothing.
@@ -10,18 +10,18 @@ struct SettingsView<ShortcutRecorder: View>: View {
     @Bindable var navigation: SettingsNavigation
     /// Copies text selected in Settings without recording it.
     let copyText: @MainActor (String) -> Void
-    let shortcutRecorder: ShortcutRecorder
+    let shortcutRecorder: (GlobalShortcut) -> ShortcutRecorder
 
     init(
         settings: AppSettings,
         navigation: SettingsNavigation,
         copyText: @escaping @MainActor (String) -> Void,
-        @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
+        @ViewBuilder shortcutRecorder: @escaping (GlobalShortcut) -> ShortcutRecorder
     ) {
         self.settings = settings
         _navigation = Bindable(navigation)
         self.copyText = copyText
-        self.shortcutRecorder = shortcutRecorder()
+        self.shortcutRecorder = shortcutRecorder
     }
 
     var body: some View {

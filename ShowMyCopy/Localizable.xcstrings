@@ -331,6 +331,16 @@
         }
       }
     },
+    "A shortcut recorded in Settings → General shows and hides them in the open window too." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сочетание клавиш, записанное в «Настройках» → «Основные», тоже показывает и скрывает их в открытом окне."
+          }
+        }
+      }
+    },
     "About" : {
       "localizations" : {
         "ru" : {
@@ -1284,16 +1294,6 @@
         }
       }
     },
-    "Opens the clipboard history window. Avoid ⇧⌘V: it would replace Paste and Match Style in other apps." : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Открывает окно истории буфера обмена. Не выбирайте ⇧⌘V: это сочетание заменит «Вставить и согласовать стиль» в других приложениях."
-          }
-        }
-      }
-    },
     "PRIVACY.md" : {
       "comment" : "The privacy policy's file name in the source code, in this language.",
       "localizations" : {
@@ -1718,12 +1718,12 @@
         }
       }
     },
-    "Shortcut" : {
+    "Shortcuts" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сочетание клавиш"
+            "value" : "Сочетания клавиш"
           }
         }
       }
@@ -1838,12 +1838,32 @@
         }
       }
     },
+    "Show codes shows the codes in the open window, the first one selected so Return copies it, and hides them." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Показать коды» показывает коды в открытом окне, первый из них выбран, так что Return копирует его, и скрывает их."
+          }
+        }
+      }
+    },
     "Show history" : {
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Показать историю"
+          }
+        }
+      }
+    },
+    "Show history opens the history window. Avoid ⇧⌘V: it would replace Paste and Match Style in other apps." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Показать историю» открывает окно истории. Не выбирайте ⇧⌘V: это сочетание заменит «Вставить и согласовать стиль» в других приложениях."
           }
         }
       }

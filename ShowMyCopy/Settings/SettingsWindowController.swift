@@ -8,7 +8,8 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let settings: AppSettings
-    private let shortcutRecorder: AnyView
+    /// The control that records a global shortcut, one per `GlobalShortcut`.
+    private let shortcutRecorder: (GlobalShortcut) -> AnyView
     /// Copies text selected in Settings without recording it (`EntryCopying.copyText(_:)`).
     private let copyText: @MainActor (String) -> Void
     /// The page shown. Kept while the app runs, so a caller can pick a page while the window is open.
@@ -18,11 +19,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     init<ShortcutRecorder: View>(
         settings: AppSettings,
         copyText: @escaping @MainActor (String) -> Void,
-        @ViewBuilder shortcutRecorder: () -> ShortcutRecorder
+        @ViewBuilder shortcutRecorder: @escaping (GlobalShortcut) -> ShortcutRecorder
     ) {
         self.settings = settings
         self.copyText = copyText
-        self.shortcutRecorder = AnyView(shortcutRecorder())
+        self.shortcutRecorder = { AnyView(shortcutRecorder($0)) }
         super.init()
     }
 
@@ -80,9 +81,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// The window takes the size the content asks for (`SettingsView`), also when the content is replaced on close.
     private func makeContent() -> NSViewController {
         let controller = NSHostingController(
-            rootView: SettingsView(settings: settings, navigation: navigation, copyText: copyText) {
-                shortcutRecorder
-            }
+            rootView: SettingsView(
+                settings: settings, navigation: navigation, copyText: copyText, shortcutRecorder: shortcutRecorder)
         )
         controller.sizingOptions = [.preferredContentSize]
         return controller

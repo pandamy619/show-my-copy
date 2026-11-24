@@ -116,6 +116,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .toggleHistoryWindow) { [weak container] in
             container?.toggleHistory()
         }
+        KeyboardShortcuts.onKeyDown(for: .showCodes) { [weak container] in
+            container?.toggleCodes()
+        }
         container.start()
         self.container = container
         historyRequests.connect(container)

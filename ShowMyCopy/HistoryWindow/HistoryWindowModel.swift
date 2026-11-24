@@ -228,7 +228,8 @@ final class HistoryWindowModel {
         deleter.canUndoDelete
     }
 
-    /// Shows the Codes section, or hides it when it is shown, for the button next to the gear and ⌘K. Showing it
+    /// Shows the Codes section, or hides it when it is shown, for the button next to the gear, ⌘K and the codes
+    /// shortcut (`HistoryWindowController.codesShortcutPressed()`). Showing it
     /// selects the first code, so Return right after copies it; hiding it selects the first row again.
     func toggleCodes() {
         swipe.close()
