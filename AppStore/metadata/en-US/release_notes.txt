@@ -1,3 +1,1 @@
-Codes: a right-click or a two-finger swipe on a code's row offers Copy Code and Remove Account, like an entry's row; a full swipe never removes an account. Settings → Codes edit an account's service and account names; the secret stays. Showing the codes with the button or ⌘K now scrolls the list to them also when it was scrolled down.
-
-Security: each saved password is bound to its history record and the code accounts file to its place, so encrypted data moved to another record or file does not open there. Data saved by earlier versions still opens.
+Codes: a second shortcut, Show codes in Settings → General, shows and hides the codes in the open history window like ⌘K, with keys of your choice. The first code is selected when they appear, so Return copies it right away. The shortcut never opens the window and has no keys until you record them.

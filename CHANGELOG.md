@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-11-25
+
+A shortcut of your choice for the codes in the open history window. Requires macOS 15 Sequoia or later.
 
 ### Codes
 
